@@ -1,0 +1,16 @@
+# Ingested sources, newest first.
+filters:
+  and:
+    - type == "Source"
+views:
+  - type: table
+    name: Sources
+    order:
+      - note.title
+      - note.author
+      - note.published
+      - note.resource
+      - file.mtime
+    sort:
+      - property: file.mtime
+        direction: DESC

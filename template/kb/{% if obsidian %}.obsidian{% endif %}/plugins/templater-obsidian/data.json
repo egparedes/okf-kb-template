@@ -1,0 +1,9 @@
+{
+  "data_version": 2,
+  "templates_folder": "_templates",
+  "auto_jump_to_cursor": true,
+  "trigger_on_file_creation_mode": "folder",
+  "folder_templates": [
+    { "folder": "journal", "template": "_templates/journal-entry.md" }
+  ]
+}

@@ -1,0 +1,90 @@
+# Controlled vocabulary for kb/ (the OKF bundle). This file belongs to this
+# knowledge base: the template creates it once and never overwrites it.
+#
+# OKF leaves `type` values open; this file is the house vocabulary that
+# `kb check` enforces. Add a type here before using it in a page.
+#
+# types.<name>:
+#   plural:      section heading used by the index generator
+#   description: when to use the type
+#   folders:     bundle-relative folder prefixes where the type may live
+#                ("*" = any knowledge-domain folder, see taxonomy.yaml)
+#   required:    frontmatter keys required on top of the common profile
+#   sections:    body headings for new pages (`kb new` skeleton); adapt freely
+#
+# Keep the core types (Concept ... Template): skills and tools rely on them.
+
+types:
+  Concept:
+    plural: Concepts
+    description: An idea, principle, theory, model, or definition.
+    folders: ["*"]
+    sections: [Definition, Details, Examples, Related]
+  Practice:
+    plural: Practices
+    description: A method, technique, process, or how-to guide.
+    folders: ["*"]
+    sections: [Goal, Steps, Pitfalls, Related]
+  Comparison:
+    plural: Comparisons
+    description: A side-by-side evaluation of alternatives.
+    folders: ["*", "syntheses"]
+    sections: [Summary, Comparison, Recommendation, Related]
+  Synthesis:
+    plural: Syntheses
+    description: An answer or analysis filed back from a query, spanning several pages.
+    folders: ["syntheses"]
+    sections: [Question, Answer, Evidence, Open questions]
+  Source:
+    plural: Sources
+    description: Summary of one ingested external source (article, paper, book, talk, docs).
+    folders: ["sources"]
+    sections: [Summary, Key points, Pages updated]
+    required: [resource]
+  Person:
+    plural: People
+    description: A person relevant to the field.
+    folders: ["entities"]
+    sections: [Overview, Contributions, Related]
+  Organization:
+    plural: Organizations
+    description: A company, institution, standards body, or community.
+    folders: ["entities"]
+    sections: [Overview, Contributions, Related]
+  Project:
+    plural: Projects
+    description: Overview page of one of my own projects.
+    folders: ["projects"]
+    sections: [Goal, Status, Decisions, Links]
+  Decision Record:
+    plural: Decision Records
+    description: A decision record (context, decision, alternatives, consequences).
+    folders: ["projects"]
+    sections: [Context, Decision, Alternatives, Consequences]
+  Journal Entry:
+    plural: Journal Entries
+    description: A dated personal note (learning log, reflections, open questions).
+    folders: ["journal"]
+    sections: [Notes, Open questions]
+  Template:
+    plural: Templates
+    description: An Obsidian Templater template (vault tooling, not knowledge).
+    folders: ["_templates"]
+    sections: []
+
+# Typed relations: frontmatter keys whose value is a list of markdown-link
+# strings, e.g.  depends_on: ["[Consensus](/systems/consensus.md)"]
+# OKF consumers ignore these keys, so every target MUST also be linked from
+# the body, in prose that states the relationship.
+relations:
+  part_of: The page is a component or subtopic of the target (Breadcrumbs "up").
+  depends_on: Understanding or using the page requires the target first.
+  example_of: The page is an instance or illustration of the target.
+  alternative_to: The page and the target solve the same problem differently.
+  supersedes: The page replaces the target, which is outdated.
+  contradicts: The page makes claims in conflict with the target.
+  related: Any other notable relationship, explained in the body.
+
+# Extra frontmatter keys for this knowledge base, as JSON Schema snippets,
+# e.g.  isbn: { type: string, pattern: "^[0-9X-]+$" }
+fields: {}

@@ -1,0 +1,36 @@
+---
+type: Template
+title: Decision record template
+tags: [template]
+description: Templater template for a decision record inside projects/<name>/; prompts for the title and description.
+generated: { by: okf-kb-template/0.1.0, at: 2026-09-25T00:00:00Z }
+---
+<%*
+const ACTOR = "human:{{ owner_id }}";
+const title = await tp.system.prompt("Decision title (e.g. ADR-0004: Use X for Y)", "", true);
+const description = await tp.system.prompt("One-sentence summary of the decision", "", true);
+const slug = title.toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "").replace(/[\W_]+/g, "-").replace(/^-+|-+$/g, "");
+const target = tp.config.target_file;
+const now = tp.date.now("YYYY-MM-DD[T]HH:mm:ssZ");
+await tp.file.rename(slug);
+tp.hooks.on_all_templates_executed(async () => {
+  await app.fileManager.processFrontMatter(target, (fm) => {
+    for (const key of Object.keys(fm)) delete fm[key];
+    fm.type = "Decision Record";
+    fm.title = title;
+    fm.description = description;
+    fm.tags = [];
+    fm.status = "draft";
+    fm.generated = { by: ACTOR, at: now };
+  });
+});
+-%>
+# Context
+
+<% tp.file.cursor() %>
+
+# Decision
+
+# Alternatives
+
+# Consequences

@@ -1,0 +1,60 @@
+---
+name: kb-maintain
+description: Lint and maintain the knowledge base. Fixes validation errors, stale or uncited pages, orphans, wanted pages, contradictions, duplicates and folder structure. Use for "lint", health checks, cleanup, reorganizing, or when `kb report` shows problems.
+---
+
+# Maintain the knowledge base
+
+Deterministic checks catch structure. You catch meaning: contradictions,
+duplicates, weak pages and missing connections.
+
+## Steps
+
+1. **Measure.** Run `just check` and `uv run kb report`, and keep the report
+   as the baseline.
+
+2. **Errors.** Fix every `kb check` error. Warnings that come from real
+   problems count too:
+   - broken links that are typos;
+   - unknown keys;
+   - uncited sources.
+
+3. **Triage the report.** Work through each section. A section is done when
+   every item is fixed or has a stated reason to leave it.
+   - **Stale pages:** re-check the page against its sources, following the
+     `resource` URLs. Update the facts, refresh `generated`, and move
+     `stale_after` forward.
+   - **Orphans:** link the page from its parent topic or related pages, in
+     prose. If the page has no value, merge it into another page.
+   - **Uncited knowledge pages:** find and ingest a source (skill
+     `kb-ingest`), or set `status: draft`.
+   - **Wanted pages:** create a page when the target has 2 or more inbound
+     links, otherwise leave it.
+   - **Drafts:** complete them, or merge them into a related page.
+
+4. **Semantic pass.**
+   - Review the 10 most recently changed pages (`git log --name-only -20 -- kb`)
+     and 5 random ones.
+   - Check claims against the cited sources.
+   - Look for `**Conflict:**` paragraphs that newer sources now settle.
+   - Look for near-duplicate pages (similar titles or aliases in
+     `just find --folder …`) and merge them with `uv run kb mv` plus a
+     content merge.
+   - Look for missing cross-links between pages that discuss the same
+     concepts.
+
+5. **Structure.**
+   - Split a folder that has grown past about 20 pages with a clear
+     subtopic: register the subfolder in `schema/taxonomy.yaml`, then move
+     pages with `uv run kb mv`.
+   - Keep the tree at most 3 levels deep.
+
+6. **External links.** When lychee is installed, run `just links-online`.
+   For dead source URLs, add an `archived` snapshot URL, or record it in the
+   Source page.
+
+7. **Close.**
+   - Run `just fix`, then `just check`, until it reports 0 errors.
+   - Log it: `uv run kb log Lint "<what changed, with /links to key pages>"`.
+   - Report the baseline against the final `kb report` numbers, plus any
+     decisions that need the human.

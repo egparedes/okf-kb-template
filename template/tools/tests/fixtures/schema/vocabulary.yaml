@@ -1,0 +1,16 @@
+# Test vocabulary: independent of the instance's schema/vocabulary.yaml.
+types:
+  Concept: { plural: Concepts, description: An idea., folders: ["*"], sections: [Definition] }
+  Synthesis: { plural: Syntheses, description: A filed answer., folders: ["syntheses"] }
+  Source:
+    plural: Sources
+    description: One ingested source.
+    folders: ["sources"]
+    sections: [Summary, Key points]
+    required: [resource]
+  Template: { plural: Templates, description: A template., folders: ["_templates"] }
+relations:
+  depends_on: Needs the target first.
+  related: Other relation.
+fields:
+  isbn: { type: string, pattern: "^[0-9X-]+$" }

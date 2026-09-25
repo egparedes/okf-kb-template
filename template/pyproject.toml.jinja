@@ -1,0 +1,25 @@
+[project]
+name = "{{ kb_name }}-tools"
+version = "0.1.0"
+description = "Tooling for the kb/ OKF v0.2 bundle: validation, index generation, link normalization, log entries."
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml>=6.0",
+    "jsonschema>=4.23",
+]
+
+[project.scripts]
+kb = "kbtools.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "pre-commit>=4"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tools/kbtools"]
+
+[tool.pytest.ini_options]
+testpaths = ["tools/tests"]

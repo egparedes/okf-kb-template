@@ -1,0 +1,51 @@
+---
+name: kb-query
+description: Answer a question from the knowledge base with citations, and file reusable answers back as Synthesis or Comparison pages. Use when the human asks what the wiki/KB/notes say about something, or asks a question the knowledge base should answer.
+---
+
+# Query the knowledge base
+
+The wiki is the first source of truth. Answer from it, cite it, and make gaps
+visible instead of silently filling them with your own knowledge.
+
+## Steps
+
+1. **Navigate.** Read `kb/index.md`, then the `index.md` of each relevant
+   folder. Descriptions there are one sentence each, so scanning is cheap.
+
+2. **Narrow.** Use whichever of these fit the question:
+   - frontmatter filters: `just find --type <Type> --tag <tag> --folder <folder>`;
+   - keyword search: `rg -il "<term>" kb`;
+   - semantic search: `just search "<question>"`. It uses qmd when installed
+     and falls back to ripgrep.
+
+3. **Read and follow.**
+   - Read the candidate pages.
+   - Follow body links and typed relations one hop further.
+   - For key claims, check the cited Source pages.
+   - Note each page's trust tier:
+     - human-reviewed: `verified` by `human:`;
+     - machine-confirmed: `verified` only by processes;
+     - otherwise unverified.
+   - Note stale pages (`stale_after` in the past).
+
+4. **Answer.**
+   - Cite knowledge base pages as links (`/path.md`) and, for key claims,
+     their sources.
+   - Mark clearly anything that comes from your own knowledge rather than
+     the wiki.
+   - Flag stale or unverified pages when the answer depends on them.
+   - If the wiki cannot answer, say so and propose sources to ingest.
+
+5. **File back.**
+   - **When to file:** file the answer if it synthesizes three or more pages,
+     or produces a comparison the wiki lacks. Otherwise offer to file it.
+     Always file it when the human asks.
+   - **Where:** Synthesis pages go in `syntheses/<slug>.md`. Comparison pages
+     go in the domain folder, or in `syntheses/` when they cross domains.
+   - **How:** create the page with `uv run kb new Synthesis …` (or
+     `Comparison`). Its `sources` are the knowledge-base pages used, with
+     `resource: /path.md`. Link it from the pages it draws on where that helps
+     navigation.
+   - **Then:** run `just fix` and `just check`, then log it:
+     `uv run kb log Query "[<Title>](/syntheses/<slug>.md) - <question in brief>"`.

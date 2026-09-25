@@ -1,0 +1,7 @@
+{
+  "search": "-file:index.md -file:log.md -path:_templates",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true
+}

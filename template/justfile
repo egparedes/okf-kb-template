@@ -1,0 +1,74 @@
+# Task runner for the knowledge base. `just` lists recipes.
+
+kb := "uv run --quiet kb"
+# Independent OKF v0.2 validator (scaccogatto/okf-skills), pinned to a reviewed commit.
+okf_validator := "https://raw.githubusercontent.com/scaccogatto/okf-skills/68ce7a0c07f66ca9a6b0beb68937d75314d5e8a5/skills/validate/scripts/okf_validate.py"
+
+default:
+    @just --list
+
+# Install Python tooling and git hooks (initializes git if needed)
+setup:
+    git rev-parse --git-dir >/dev/null 2>&1 || git init -q
+    uv sync
+    uv run pre-commit install
+
+# Validate OKF conformance and house rules (optionally only the given files)
+[positional-arguments]
+check *files:
+    {{kb}} check "$@"
+
+# Normalize links to /bundle-absolute form, then regenerate every index.md
+fix:
+    {{kb}} fix-links
+    {{kb}} index
+
+# Regenerate every index.md from frontmatter
+index:
+    {{kb}} index
+
+# Independent second opinion on OKF conformance (strict: warnings fail)
+validate-okf:
+    uv run --quiet {{okf_validator}} kb --strict
+
+# Health report: trust tiers, stale pages, orphans, uncited pages, wanted pages
+report:
+    {{kb}} report
+
+# List pages by frontmatter, e.g. `just find --type Concept --tag distributed-systems`
+[positional-arguments]
+find *args:
+    {{kb}} find "$@"
+
+# Check external URLs (source rot); needs lychee
+links-online:
+    lychee --no-progress --root-dir "{{justfile_directory()}}/kb" --exclude-path kb/.obsidian 'kb/**/*.md'
+
+# Search: qmd hybrid search when set up, otherwise ripgrep
+[positional-arguments]
+search +query:
+    @if command -v qmd >/dev/null && qmd collection list 2>/dev/null | grep -q '\bkb\b'; then \
+        qmd query "$*" -c kb; \
+    else \
+        rg --ignore-case --files-with-matches --glob '!**/index.md' -- "$*" kb || true; \
+    fi
+
+# One-time qmd setup: collection, per-folder contexts from taxonomy, embeddings
+search-setup:
+    qmd collection add kb --name kb --mask "**/*.md"
+    qmd context add qmd://kb "Knowledge base (OKF v0.2 bundle). Start from the index.md files."
+    {{kb}} folders | while IFS="$(printf '\t')" read -r folder description; do qmd context add "qmd://kb/$folder" "$description"; done
+    qmd embed
+
+# Refresh the qmd index after changes
+search-reindex:
+    qmd update
+    qmd embed
+
+# Run the tooling tests
+test:
+    uv run --quiet pytest -q
+
+# Everything CI runs
+ci: check validate-okf test
+    {{kb}} index --check

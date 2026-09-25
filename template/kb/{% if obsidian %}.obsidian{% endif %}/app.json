@@ -1,0 +1,11 @@
+{
+  "useMarkdownLinks": true,
+  "newLinkFormat": "absolute",
+  "alwaysUpdateLinks": true,
+  "trashOption": "system",
+  "propertiesInDocument": "source",
+  "newFileLocation": "current",
+  "attachmentFolderPath": "assets",
+  "showUnsupportedFiles": false,
+  "readableLineLength": true
+}

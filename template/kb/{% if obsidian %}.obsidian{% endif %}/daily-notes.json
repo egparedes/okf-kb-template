@@ -1,0 +1,6 @@
+{
+  "folder": "journal",
+  "format": "YYYY/YYYY-MM-DD",
+  "template": "_templates/journal-entry",
+  "autorun": false
+}

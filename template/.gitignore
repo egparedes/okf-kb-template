@@ -1,0 +1,24 @@
+# Scratch space for agents (fetched source text, drafts). Never part of kb/.
+.cache/
+
+# Python tooling
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Obsidian: keep shared config, ignore per-device state and plugin code
+kb/.obsidian/workspace*.json
+kb/.obsidian/graph.json.bak
+kb/.obsidian/plugins/*/*
+!kb/.obsidian/plugins/*/data.json
+kb/.obsidian/themes/
+kb/.trash/
+kb/.smart-env/
+
+# Local search indexes (rebuildable)
+.qmd/
+.ck/
+
+# Local Claude Code overrides
+.claude/settings.local.json

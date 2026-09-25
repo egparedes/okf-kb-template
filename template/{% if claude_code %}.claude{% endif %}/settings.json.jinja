@@ -1,0 +1,30 @@
+{
+  "env": {
+    "KB_ACTOR": "{{ agent_actor }}"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run --quiet kb hook post-edit",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run --quiet kb hook stop",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

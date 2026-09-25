@@ -1,0 +1,44 @@
+# Pages awaiting human review (no `verified`), drafts, and stale pages.
+filters:
+  and:
+    - file.ext == "md"
+    - type.isTruthy()
+    - type != "Template"
+    - file.name != "index"
+    - file.name != "log"
+    - not:
+        - file.inFolder("journal")
+views:
+  - type: table
+    name: Unverified
+    filters:
+      not:
+        - verified.isTruthy()
+    order:
+      - note.title
+      - note.type
+      - note.status
+      - file.folder
+      - file.mtime
+    sort:
+      - property: file.mtime
+        direction: DESC
+  - type: table
+    name: Drafts
+    filters:
+      and:
+        - status == "draft"
+    order:
+      - note.title
+      - note.type
+      - file.folder
+  - type: table
+    name: Stale
+    filters:
+      and:
+        - stale_after.isTruthy()
+        - date(stale_after) <= now()
+    order:
+      - note.title
+      - note.stale_after
+      - file.folder

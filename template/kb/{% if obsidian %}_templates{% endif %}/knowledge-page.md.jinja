@@ -1,0 +1,37 @@
+---
+type: Template
+title: Knowledge page template
+tags: [template]
+description: Templater template for a hand-written knowledge page; prompts for type, title and description and renames the file to kebab-case.
+generated: { by: okf-kb-template/0.1.0, at: 2026-09-25T00:00:00Z }
+---
+<%*
+// Replaces the copied frontmatter with a valid house profile (see schema/).
+const ACTOR = "human:{{ owner_id }}";
+// Core types; pick "Other" for a type from this knowledge base's schema/vocabulary.yaml.
+const types = ["Concept", "Practice", "Comparison", "Other..."];
+let type = await tp.system.suggester(types, types, true, "Page type");
+if (type === "Other...") type = await tp.system.prompt("Type (as in schema/vocabulary.yaml)", "", true);
+const title = await tp.system.prompt("Title", "", true);
+const description = await tp.system.prompt("One-sentence description", "", true);
+const slug = title.toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "").replace(/[\W_]+/g, "-").replace(/^-+|-+$/g, "");
+const target = tp.config.target_file;
+const now = tp.date.now("YYYY-MM-DD[T]HH:mm:ssZ");
+await tp.file.rename(slug);
+tp.hooks.on_all_templates_executed(async () => {
+  await app.fileManager.processFrontMatter(target, (fm) => {
+    for (const key of Object.keys(fm)) delete fm[key];
+    fm.type = type;
+    fm.title = title;
+    fm.description = description;
+    fm.tags = [];
+    fm.status = "draft";
+    fm.generated = { by: ACTOR, at: now };
+  });
+});
+-%>
+# Overview
+
+<% tp.file.cursor() %>
+
+# Related

@@ -1,0 +1,103 @@
+# {{ kb_title }}: agent guide
+
+{{ kb_description }}
+
+The knowledge base follows the LLM-wiki pattern. `kb/` is an **Open
+Knowledge Format (OKF) v0.2 bundle**{% if obsidian %} and, at the same time, an **Obsidian vault**{% endif %}.
+You compile sources into interlinked pages, and the human curates, reads and
+asks questions. Every edit must keep `kb/` a conformant bundle.
+
+## Map
+
+| Path | What it is |
+|---|---|
+| `kb/` | The bundle{% if obsidian %} and vault{% endif %}. Every `.md` here is a concept page or a reserved `index.md`/`log.md`. |
+| `schema/vocabulary.yaml` | Page `type`s: meaning, allowed folders, body sections. Also the typed-relation keys. |
+| `schema/taxonomy.yaml` | Folder tree with titles and descriptions; these feed the generated indexes. |
+| `schema/frontmatter.schema.json` | Core frontmatter field shapes (template-managed; extend via `fields` in the vocabulary). |
+| `.agents/skills/` | Workflows: `kb-ingest`, `kb-query`, `kb-maintain`. |
+| `justfile`, `tools/kbtools/` | Commands (`just` lists them) and the `kb` CLI behind them. |
+| `.cache/` | Gitignored scratch space: fetched source text, drafts. |
+
+## Workflows
+
+- **Ingest**: a URL or document to add, or "read/add/summarize this" → skill `kb-ingest`.
+- **Query**: a question the knowledge base should answer → skill `kb-query`.
+- **Maintain**: lint, health check, cleanup, reorganizing → skill `kb-maintain`.
+- **Personal notes**: folders in the "Personal" and "Vault" groups of
+  `schema/taxonomy.yaml` belong to the human. Edit them when asked. When you
+  write on the human's behalf, `generated.by` is still you.
+
+## OKF hard rules
+
+These make `kb/` a bundle. Breaking any of them breaks conformance.
+
+1. Every `.md` file in `kb/` other than `index.md` and `log.md` starts with
+   YAML frontmatter that has a non-empty `type`. Anything else goes in
+   `.cache/` or outside `kb/`.
+2. `index.md` files are **generated**. Change titles, descriptions and
+   `schema/taxonomy.yaml`, then run `just fix`.
+3. `log.md` is newest-first under `## YYYY-MM-DD` headings. Add entries only
+   with `uv run kb log <Op> "<text>"`.
+
+## Page profile
+
+```yaml
+---
+type: Concept                      # from schema/vocabulary.yaml
+title: CAP theorem
+description: One sentence that stands alone; it becomes the index entry.
+aliases: [Brewer's theorem]        # optional, helps search
+tags: [distributed-systems]        # kebab-case, cross-cutting only
+status: stable                     # draft while incomplete; deprecated when superseded
+generated: { by: <tool>/<model>, at: 2026-09-25T12:00:00Z }   # you, UTC, updated on every meaningful edit
+sources:
+  - id: brewer-2012                # stable key cited as [^brewer-2012]
+    resource: /sources/brewer-2012.md
+    title: CAP twelve years later
+depends_on: ["[Consistency models](/systems/distributed/consistency-models.md)"]
+---
+```
+
+- Create pages with `uv run kb new <Type> <folder/slug.md> --title … --description … --tags … --by <tool>/<model>`
+{% if claude_code %}  (Claude Code sets `KB_ACTOR`).{% else %}  (or set `KB_ACTOR`).{% endif %} The skeleton gives you the type's sections.
+- **Citations.** Every non-obvious claim carries a footnote `[^id]` matching
+  a `sources[].id`. The footnote definition links the Source page:
+  `[^id]: [Title](/sources/slug.md)`. What you add from your own knowledge
+  must be unambiguous in the prose.
+- **Trust.** Add `verified: { by: human:{{ owner_id }}, at: … }` only when the
+  human says they reviewed that page. Never mark your own work verified.
+- **Freshness.** Set `stale_after` on pages whose facts expire (versions,
+  pricing, roadmaps).
+
+## Links and relations
+
+- Link other pages with standard markdown links using **bundle-absolute**
+  targets: `[CAP theorem](/systems/distributed/cap-theorem.md)`. Wikilinks
+  (`[[…]]`) are not part of OKF.
+- A link to a page that doesn't exist yet is allowed: it marks a wanted page.
+- **Typed relations** are frontmatter lists of markdown links, using the keys
+  in `schema/vocabulary.yaml`. Each target must also be linked in the body,
+  in prose that says why.
+
+## Placement
+
+- **One concept per page.** Search before creating (`just find`, `rg -il`,
+  folder `index.md`), and extend an existing page rather than creating a
+  near-duplicate.
+- The folder follows the type (`vocabulary.yaml`) and the topic
+  (`taxonomy.yaml`). Keep the tree at most 3 levels deep.
+- Add a subfolder once about 5 pages share a subtopic. Register it in
+  `schema/taxonomy.yaml` in the same change.
+- File and folder names are kebab-case. Move or rename pages with
+  `uv run kb mv <old> <new>`, which rewrites every inbound link and the indexes.
+
+## Done
+
+A change is done when:
+
+- `just check` reports 0 errors (in Claude Code, hooks enforce this);
+- knowledge edits have a `log.md` entry;
+- you have told the human which pages changed.
+
+Commit only when the human asks.

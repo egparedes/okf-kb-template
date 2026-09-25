@@ -1,0 +1,39 @@
+# All knowledge pages (excludes reserved files, templates and personal notes).
+filters:
+  and:
+    - file.ext == "md"
+    - file.name != "index"
+    - file.name != "log"
+    - type.isTruthy()
+    - not:
+        - file.inFolder("_templates")
+        - file.inFolder("journal")
+        - file.inFolder("projects")
+properties:
+  note.title:
+    displayName: Title
+  note.description:
+    displayName: Description
+views:
+  - type: table
+    name: By type
+    groupBy:
+      property: note.type
+      direction: ASC
+    order:
+      - note.title
+      - note.description
+      - note.status
+      - note.tags
+      - file.folder
+  - type: table
+    name: Recently changed
+    order:
+      - note.title
+      - note.type
+      - file.folder
+      - file.mtime
+    sort:
+      - property: file.mtime
+        direction: DESC
+    limit: 50

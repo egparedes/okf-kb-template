@@ -1,0 +1,10 @@
+# Retrieval evaluation set (tiered retrieval: index.md + ripgrep, then
+# frontmatter filters, then qmd hybrid search).
+#
+# Add real questions you ask the knowledge base, with the pages a good answer
+# must use. Before enabling a heavier retrieval tier (qmd vectors, cloud
+# rerankers), check that the lighter tiers miss these pages.
+questions: []
+#  - question: How does X relate to Y?
+#    expected:
+#      - /domain/x.md

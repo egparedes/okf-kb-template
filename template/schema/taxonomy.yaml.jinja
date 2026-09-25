@@ -1,0 +1,61 @@
+# Folder map for kb/ (bundle-relative directory paths). This file belongs to
+# this knowledge base: the template creates it once and never overwrites it.
+#
+# The index generator takes folder titles and descriptions from here, and the
+# bundle-root index.md groups top-level folders by `group` in `root_groups`
+# order. Every folder under kb/ needs an entry (`kb check` warns otherwise).
+# Groups "Personal" and "Vault" are owned by the human: agents edit them only
+# when asked, and health reports skip them.
+#
+# Keep the tree at most 3 levels deep; create a subfolder once about 5 pages
+# share a subtopic.
+#
+# Optional keys:
+#   sort: date-desc      list pages and subfolders newest-first by name (inherited)
+#   auto_children: true  subfolders need no entry; their title is the folder name
+
+root_groups:
+  - Knowledge domains
+  - Library
+  - Personal
+{%- if obsidian %}
+  - Vault
+{%- endif %}
+
+folders:
+{%- for slug, spec in domains.items() %}
+  {{ slug }}:
+{%- if '/' not in slug %}
+    group: Knowledge domains
+{%- endif %}
+    title: {{ spec.title | tojson }}
+    description: {{ spec.description | tojson }}
+{%- endfor %}
+  sources:
+    group: Library
+    title: Sources
+    description: One summary page per ingested external source.
+  syntheses:
+    group: Library
+    title: Syntheses
+    description: Answers, analyses and comparisons filed back from queries.
+  entities:
+    group: Library
+    title: People and Organizations
+    description: People, institutions and communities relevant to the knowledge base.
+  projects:
+    group: Personal
+    title: Projects
+    description: My own projects - overviews and decision records.
+  journal:
+    group: Personal
+    title: Journal
+    description: Dated personal notes - learning log, reflections and open questions (one folder per year).
+    sort: date-desc
+    auto_children: true
+{%- if obsidian %}
+  _templates:
+    group: Vault
+    title: Templates
+    description: Obsidian Templater templates for human-authored notes.
+{%- endif %}

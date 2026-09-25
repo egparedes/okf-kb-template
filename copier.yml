@@ -1,0 +1,95 @@
+# Copier template for an LLM-maintained knowledge base that is an OKF v0.2
+# bundle (and optionally an Obsidian vault).
+#   copier copy --trust <this-repo> <destination>
+#   copier update --trust            (inside a generated knowledge base)
+
+_min_copier_version: "9.6.0"
+_subdirectory: template
+_templates_suffix: .jinja
+_preserve_symlinks: true
+_answers_file: .copier-answers.yml
+
+# Created once, then owned by the knowledge base: never overwritten on update.
+_skip_if_exists:
+  - README.md
+  - schema/vocabulary.yaml
+  - schema/taxonomy.yaml
+  - tools/retrieval-eval/questions.yaml
+  - kb/log.md
+  - kb/.obsidian/*.json
+  - kb/.obsidian/plugins/*/data.json
+  - kb/_views/*.base
+
+_tasks:
+  - command: uv run --quiet kb log Initialization "Created the knowledge base from okf-kb-template."
+    when: "{{ run_setup and _copier_operation == 'copy' }}"
+  - command: uv run --quiet kb index
+    when: "{{ run_setup }}"
+
+kb_name:
+  type: str
+  help: Short slug for this knowledge base (used for the tooling package name)
+  default: my-kb
+  validator: "{% if not (kb_name | regex_search('^[a-z0-9]+(-[a-z0-9]+)*$')) %}Use lowercase kebab-case{% endif %}"
+
+kb_title:
+  type: str
+  help: Human title
+  default: My Knowledge Base
+
+kb_description:
+  type: str
+  help: One or two sentences saying what this knowledge base covers
+  default: A personal knowledge base maintained with LLM agents.
+
+owner_id:
+  type: str
+  help: Your id for OKF actors (`human:<id>`), e.g. your username
+  default: me
+  validator: "{% if not (owner_id | regex_search('^[a-z0-9._-]+$')) %}Use [a-z0-9._-] only{% endif %}"
+
+agent_actor:
+  type: str
+  help: Default OKF actor for agent-written pages (`<tool>/<model>`)
+  default: claude-code/claude-opus-5-5
+  validator: "{% if not (agent_actor | regex_search('^[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+$')) %}Use <tool>/<model>, e.g. claude-code/claude-opus-5-5{% endif %}"
+
+domains:
+  type: yaml
+  help: >-
+    Knowledge-domain folders, as a mapping slug -> {title, description}.
+    Nested slugs such as "science/physics" create subfolders (list the parent too).
+    Only used when the knowledge base is created: afterwards, edit schema/taxonomy.yaml.
+  validator: >-
+    {%- set ns = namespace(err="") -%}
+    {%- if domains is not mapping or not domains -%}{%- set ns.err = "Give at least one domain" -%}{%- else -%}
+    {%- for slug, spec in domains.items() -%}
+    {%- if not (slug | string | regex_search('^[a-z0-9]+(-[a-z0-9]+)*(/[a-z0-9]+(-[a-z0-9]+)*){0,2}$')) -%}{%- set ns.err = "Invalid slug '" ~ slug ~ "': kebab-case segments, at most 3 levels" -%}
+    {%- elif spec is not mapping or not spec.get('title') or not spec.get('description') -%}{%- set ns.err = "Domain '" ~ slug ~ "' needs a title and a description" -%}
+    {%- elif '/' in slug and (slug.rsplit('/', 1)[0]) not in domains -%}{%- set ns.err = "Domain '" ~ slug ~ "' needs its parent '" ~ slug.rsplit('/', 1)[0] ~ "' listed too" -%}
+    {%- endif -%}
+    {%- endfor -%}{%- endif -%}{{ ns.err }}
+  default:
+    general:
+      title: General
+      description: Knowledge that does not fit a more specific domain yet.
+
+obsidian:
+  type: bool
+  help: Configure kb/ as an Obsidian vault (settings, Templater templates, Bases views)?
+  default: true
+
+claude_code:
+  type: bool
+  help: Add Claude Code settings, hooks and CLAUDE.md?
+  default: true
+
+github_ci:
+  type: bool
+  help: Add a GitHub Actions workflow (validation on push, weekly URL check)?
+  default: true
+
+run_setup:
+  type: bool
+  help: After copying, run `uv run kb log/index` to make the bundle conformant (needs uv)?
+  default: true
