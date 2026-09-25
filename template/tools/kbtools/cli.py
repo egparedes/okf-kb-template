@@ -155,7 +155,7 @@ def _cmd_zotero(bundle: Bundle, args: argparse.Namespace) -> int:
     if args.action == "search":
         for item in zotero.search(" ".join(args.query), limit=args.limit):
             year = (item.get("date") or "")[:4]
-            print(f"{item.get('key')}\t{item.get('citationKey') or '-'}\t{year}\t{item.get('title', '')}")
+            print(f"{item.get('key')}\t{resources._citekey(item) or '-'}\t{year}\t{item.get('title', '')}")
         return 0
     item = zotero.item(args.query[0])
     if args.action == "show":

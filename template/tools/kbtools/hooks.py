@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
-from .bundle import Bundle
+from .bundle import TOUCHED, Bundle, record_touched
 from .check import Checker
 
 
@@ -16,9 +17,6 @@ def _payload() -> dict:
         return json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
         return {}
-
-
-TOUCHED = ".cache/kb-touched.txt"
 
 
 def _touched(bundle: Bundle) -> Path:
@@ -35,10 +33,9 @@ def post_edit(bundle: Bundle) -> int:
     path = Path(file_path).resolve()
     if path.suffix != ".md" or not path.is_file() or bundle.root not in path.parents:
         return 0
-    touched = _touched(bundle)
-    touched.parent.mkdir(parents=True, exist_ok=True)
-    with touched.open("a", encoding="utf-8") as fh:
-        fh.write(f"{path}\n")
+    if not os.environ.get("CLAUDECODE"):
+        os.environ["CLAUDECODE"] = "1"  # the hook itself runs inside Claude Code
+    record_touched(bundle.repo_root, [path])
     errors = [d for d in Checker(bundle).check_files([bundle.document(path)]) if d.is_error]
     if not errors:
         return 0
@@ -87,7 +84,11 @@ def stop(bundle: Bundle) -> int:
     errors = [d for d in checker.check_files([bundle.document(p) for p in touched]) if d.is_error]
     checker.diagnostics = []
     checker.check_indexes()
-    errors += checker.diagnostics
+    folders = {p.parent for p in touched}  # their indexes and every ancestor index up to the root
+    errors += [
+        d for d in checker.diagnostics
+        if any((bundle.root / d.path).parent in (f, *f.parents) for f in folders)
+    ]
     problems += [str(d) for d in errors[:30]]
     if len(errors) > 30:
         problems.append(f"... and {len(errors) - 30} more (run `just check`)")

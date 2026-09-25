@@ -24,7 +24,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -50,8 +49,9 @@ class ResourceError(SystemExit):
 
 def _env_value(raw: str) -> str:
     raw = raw.strip()
-    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "\"'":
-        return raw[1:-1]
+    quoted = re.match(r"""^(["'])(.*?)\1\s*(#.*)?$""", raw)
+    if quoted:
+        return quoted.group(2)
     return re.split(r"\s+#", raw, maxsplit=1)[0].strip()  # unquoted: drop an inline comment
 
 
@@ -102,7 +102,7 @@ def deny_patterns(data: dict) -> list[str]:
 
 
 def _norm(path: str) -> str:
-    return path.casefold() if sys.platform in ("darwin", "win32") else path
+    return path.casefold()  # a false deny is cheap; a missed one is not
 
 
 @dataclass
@@ -139,6 +139,7 @@ class Settings:
         """True if `relative` (root/path, normalized) or any of its parent folders matches a deny pattern.
 
         Patterns use `*`, `**` and `?`; brackets are literal, so `[Zotero]` names a folder.
+        Matching ignores case.
         """
         parts = relative.strip("/").split("/")
         candidates = ["/".join(parts[: i + 1]) for i in range(len(parts))]
@@ -337,10 +338,14 @@ class Zotero:
             if isinstance(data, dict):
                 return data.get("data", data)
             raise ResourceError(f"kb: no Zotero item with key `{ref}`")
+        if re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)+", ref):  # a source slug: search by its first word
+            for item in self.search(ref.split("-")[0], limit=100):
+                if zotero_citekey_slug(item) == ref:
+                    return item
         for item in self.search(ref, limit=100):
             if _citekey(item) == ref:
                 return item
-        raise ResourceError(f"kb: no Zotero item with citation key `{ref}`")
+        raise ResourceError(f"kb: no Zotero item with citation key or slug `{ref}`")
 
     def attachments(self, key: str) -> list[dict]:
         children = self._api_or_offline(
@@ -393,7 +398,9 @@ def zotero_citekey_slug(item: dict) -> str:
     last = creators[0].get("lastName") or creators[0].get("name") or "anon"
     year = re.search(r"\d{4}", item.get("date") or "")
     word = next((w for w in re.findall(r"[a-z]+", fold(item.get("title") or "")) if len(w) > 3), "item")
-    return _slugify(f"{last}-{year.group(0) if year else 'nd'}-{word}") or f"zotero-{item['key'].lower()}"
+    if not _slugify(last):
+        return f"zotero-{item['key'].lower()}"
+    return _slugify(f"{last}-{year.group(0) if year else 'nd'}-{word}")
 
 
 def _published(date: str) -> str | None:
@@ -530,6 +537,8 @@ def resolve_file(settings: Settings, rest: str) -> Path:
     path = (base / relative).resolve()
     if base != path and base not in path.parents:
         raise ResourceError("kb: path escapes its root")
+    if path == base:
+        raise ResourceError("kb: point at a file or folder inside the root, not the root itself")
     inside = path.relative_to(base).as_posix()
     for candidate in (f"{root}/{inside}".rstrip("/."), f"{root}/{relative}"):
         if settings.denied(candidate):

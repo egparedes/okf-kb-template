@@ -258,6 +258,7 @@ def test_path_arguments_accept_bundle_and_repo_paths(repo: Path) -> None:
 
 
 def test_stop_hook_checks_only_this_sessions_edits(repo: Path, monkeypatch, capsys) -> None:
+    monkeypatch.delenv("CLAUDECODE", raising=False)
     import io
     import json as _json
     import subprocess
@@ -276,3 +277,17 @@ def test_stop_hook_checks_only_this_sessions_edits(repo: Path, monkeypatch, caps
     pages.add_log_entry(fresh(repo), "update", "agent page")
     monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
     assert hooks.stop(fresh(repo)) == 0  # the human's broken draft does not block the agent
+
+
+def test_kb_commands_in_agent_sessions_are_tracked(repo: Path, monkeypatch) -> None:
+    import io
+    import subprocess
+
+    from kbtools import hooks
+
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    monkeypatch.setenv("CLAUDECODE", "1")
+    created = pages.new_page(fresh(repo), "Concept", "systems/new.md", "New", "New.", [], "test/0")
+    created.write_text(created.read_text() + "\nSee [[Wiki]].\n")  # edited via Bash, not the Edit tool
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert hooks.stop(fresh(repo)) == 2

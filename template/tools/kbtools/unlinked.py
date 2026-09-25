@@ -40,6 +40,8 @@ def _blank(pattern: re.Pattern, text: str) -> str:
 
 def _fold_same_length(text: str) -> str:
     """Casefold and strip accents character by character, keeping offsets intact."""
+    if text.isascii():
+        return text.lower()
     out = []
     for char in text:
         folded = fold(char)
@@ -102,10 +104,11 @@ def find(bundle: Bundle, only: list[str] | None = None, min_len: int = 4, includ
         return []
     acronyms = sorted((s for k, (s, _) in names.items() if k.startswith("=")), key=lambda n: (-len(n), n))
     words = sorted((s for k, (s, _) in names.items() if not k.startswith("=")), key=lambda n: (-len(n), n))
-    parts = [f"(?P<a>{'|'.join(re.escape(a) for a in acronyms)})"] if acronyms else []
+    scans = []  # acronyms match case-sensitively on the text, other names on a folded copy
+    if acronyms:
+        scans.append((True, re.compile(r"(?<!\w)(?:" + "|".join(map(re.escape, acronyms)) + r")(?!\w)")))
     if words:
-        parts.append(f"(?P<w>{'|'.join(_name_pattern(fold(w)) for w in words)})")
-    pattern = re.compile(r"(?<!\w)(?:" + "|".join(parts) + r")(?!\w)")
+        scans.append((False, re.compile(r"(?<!\w)(?:" + "|".join(_name_pattern(fold(w)) for w in words) + r")(?!\w)")))
 
     mentions: list[Mention] = []
     for rel, doc in sorted(pages.items()):
@@ -124,11 +127,8 @@ def find(bundle: Bundle, only: list[str] | None = None, min_len: int = 4, includ
         # Acronyms are matched on the original text, other names on a folded copy.
         folded = _fold_same_length(text)
         seen: set[str] = set()
-        for source, rx in ((text, pattern), (folded, pattern)):
-            for match in rx.finditer(source):
-                is_acronym = match.lastgroup == "a"
-                if (source is text) != is_acronym:
-                    continue
+        for is_acronym, rx in scans:
+            for match in rx.finditer(text if is_acronym else folded):
                 key = "=" + match.group(0) if is_acronym else _key(match.group(0))
                 entry = names.get(key)
                 if entry is None and not is_acronym:  # plural forms: 'languages' -> 'language'

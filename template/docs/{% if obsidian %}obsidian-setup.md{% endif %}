@@ -38,13 +38,17 @@ enabled, but Obsidian only loads them once installed.
 
 **Plugins that create files without OKF frontmatter:**
 
-- **Excalidraw:** drawings are `.excalidraw.md` files. Add `type: Drawing`
-  and a title in the drawing's frontmatter, and declare the `Drawing` type
-  in `schema/vocabulary.yaml`. Or keep drawings as `.excalidraw` files, which
-  have no `.md` extension.
-- **Web Clipper:** give the template the properties `type: Source`, `title`,
-  `description`, `resource: {{url}}`, `status: draft` and `generated`, and
-  point it at `sources/`.
+- **Excalidraw:** set its file format to plain `.excalidraw`, not
+  `.excalidraw.md`. Files without the `.md` extension stay outside OKF;
+  embed them from pages with a markdown image link.
+- **Web Clipper:** in the template, set:
+  - the note name to a kebab-case form of the title, e.g.
+    `{{title|lower|replace:" ":"-"}}`, saved into `sources/`;
+  - properties `type: Source`, `title`, `description`, `resource: {{url}}`,
+    `status: draft`, `tags: []`;
+  - `generated`, typed as text, to `{ by: human:<id>, at: {{time|date:"YYYY-MM-DDTHH:mm:ssZ"}} }`.
+
+  Then ask an agent to finish the page with the `kb-ingest` skill.
 - **Note composer (extract to new note):** add the frontmatter by hand, or
   run the `knowledge-page` Templater template on the new note.
 
@@ -74,3 +78,11 @@ outside OKF:
   directly with `[Title](/folder/page.md)`.
 - Run `just fix` and `just check` before committing. The pre-commit hook
   runs both.
+
+## Caveat: Templater runs code
+
+The vault-wide folder template runs whenever Obsidian creates a file. Files
+that arrive from outside (a `git pull`, a sync) normally already have
+content, and Templater leaves those alone. But avoid committing pages whose
+text contains Templater tags (`<% … %>`) outside `_templates/`: they would
+be executed when opened as templates.

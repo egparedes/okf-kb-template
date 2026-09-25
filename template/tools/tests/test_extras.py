@@ -436,3 +436,26 @@ def test_http_errors_become_messages(repo: Path, server, monkeypatch) -> None:
     with pytest.raises(SystemExit, match="redirects"):
         resources.fetch(bundle(repo), "https://example.org/x", repo / ".cache")
     httpd.shutdown()
+
+
+def test_post_approval_fixes(repo: Path, tmp_path: Path, monkeypatch) -> None:
+    import os
+
+    _roots(repo, tmp_path, monkeypatch, "['docs/personal']")
+    with pytest.raises(SystemExit, match="deny"):
+        resources.fetch(bundle(repo), "file:docs/Personal/secret.md", repo / ".cache")  # case-insensitive
+    with pytest.raises(SystemExit, match="root itself"):
+        resources.open_target(bundle(repo), "file:docs")
+    monkeypatch.delenv("Q_ONE", raising=False)
+    (repo / ".env").write_text('Q_ONE="a b" # comment\n')
+    resources.load_env(repo)
+    assert os.environ["Q_ONE"] == "a b"
+    assert resources.zotero_citekey_slug({"key": "ABCD2345", "creators": [{"lastName": "李"}], "date": "2020"}) == "zotero-abcd2345"
+
+
+def test_zotero_lookup_by_slug(repo: Path, server, monkeypatch) -> None:
+    base, routes = server
+    zotero_routes(routes, base)
+    monkeypatch.setenv("ZOTERO_LOCAL_API", f"{base}/api/users/0")
+    zotero = resources.Zotero(resources.Settings.load(bundle(repo)))
+    assert zotero.item("williams-2009-roofline")["key"] == "ABCD2345"

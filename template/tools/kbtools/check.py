@@ -7,6 +7,7 @@ not an OKF bundle. H codes are house rules: errors (H0xx-H2xx) or warnings
 
 from __future__ import annotations
 
+import posixpath
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -38,7 +39,8 @@ class Diagnostic:
         return not self.code.startswith("W")
 
     def __str__(self) -> str:
-        return f"kb/{self.path}:{self.line}: {self.code} {self.message}"
+        path = self.path[3:] if self.path.startswith("../") else f"kb/{self.path}"
+        return f"{path}:{self.line}: {self.code} {self.message}"
 
 
 class Checker:
@@ -229,7 +231,7 @@ class Checker:
                 root = locator[5:].split("/", 1)[0]
                 if root not in self.roots:
                     self.report(doc, 1, "W060", f"locator root `{root}` is not declared in schema/resources.yaml")
-                elif self.deny.denied(locator[5:]):
+                elif self.deny.denied(posixpath.normpath(locator[5:])):
                     self.report(doc, 1, "H060", f"locator `{locator}` points at denied material; remove it")
 
     def check_staleness(self, doc: Document) -> None:

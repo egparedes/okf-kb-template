@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-from .bundle import Bundle
+from .bundle import Bundle, record_touched
 
 LOG_HEADER = "# Update Log\n"
 LOG_OPS = ("Ingest", "Query", "Lint", "Update", "Creation", "Deprecation", "Refactor", "Initialization")
@@ -66,6 +66,7 @@ def new_page(
     sections = "\n".join(f"# {s}\n" for s in spec.get("sections", []))
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"---\n{fm}---\n\n{body_intro}{sections}", encoding="utf-8")
+    record_touched(bundle.repo_root, [path])
     return path
 
 

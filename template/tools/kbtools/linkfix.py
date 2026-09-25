@@ -18,7 +18,7 @@ import posixpath
 import re
 from urllib.parse import unquote
 
-from .bundle import Bundle, Document, parse_document
+from .bundle import Bundle, Document, parse_document, record_touched
 from .mdlinks import encode_path, find_links, resolve
 
 _FM_LINK = re.compile(r"\]\((?P<target>[^)\s]+)\)")
@@ -67,6 +67,7 @@ def fix(bundle: Bundle, docs: list[Document] | None = None) -> list[Document]:
         if new_text != doc.text:
             doc.path.write_text(new_text, encoding="utf-8")
             changed.append(doc)
+    record_touched(bundle.repo_root, [d.path for d in changed])
     return changed
 
 
@@ -145,7 +146,9 @@ def move(bundle: Bundle, old_rel: str, new_rel: str) -> list[str]:
         raise SystemExit(f"kb: {new_rel} is outside the bundle")
     dest.parent.mkdir(parents=True, exist_ok=True)
     source.rename(dest)
-    return retarget(bundle, old_rel, new_rel, moved_from=old_rel)
+    changed = retarget(bundle, old_rel, new_rel, moved_from=old_rel)
+    record_touched(bundle.repo_root, [dest, *(bundle.root / rel for rel in changed)])
+    return changed
 
 
 def _union(first: list, second: list) -> list:
@@ -216,4 +219,6 @@ def merge(bundle: Bundle, old_rel: str, into_rel: str, actor: str, dry_run: bool
     header = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True, width=1000)
     into.write_text(f"---\n{header}---\n{into_doc.body}", encoding="utf-8")
     old.unlink()
-    return plan + [f"updated links in kb/{rel}" for rel in retarget(bundle, old_rel, into_rel)]
+    changed = retarget(bundle, old_rel, into_rel)
+    record_touched(bundle.repo_root, [into, *(bundle.root / rel for rel in changed)])
+    return plan + [f"updated links in kb/{rel}" for rel in changed]

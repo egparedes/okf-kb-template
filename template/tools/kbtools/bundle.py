@@ -12,6 +12,22 @@ from typing import Any
 import yaml
 
 RESERVED = {"index.md", "log.md"}
+TOUCHED = ".cache/kb-touched.txt"
+
+
+def record_touched(repo_root: Path, paths) -> None:
+    """Remember pages changed in an agent session, for the Stop hook.
+
+    Claude Code sets CLAUDECODE=1 for the commands its agent runs; a human's
+    terminal does not, so human edits never block an agent session.
+    """
+    if not os.environ.get("CLAUDECODE"):
+        return
+    target = repo_root / TOUCHED
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("a", encoding="utf-8") as fh:
+        for path in paths:
+            fh.write(f"{Path(path).resolve()}\n")
 
 
 class _Loader(yaml.SafeLoader):
