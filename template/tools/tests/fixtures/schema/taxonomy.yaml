@@ -2,6 +2,9 @@ root_groups: [Knowledge domains, Library, Personal, Vault]
 folders:
   systems: { group: Knowledge domains, title: Systems, description: Systems things. }
   data: { group: Knowledge domains, title: Data, description: Data things. }
+  programming: { group: Knowledge domains, title: Programming, description: Programming things. }
+  operations: { group: Knowledge domains, title: Operations, description: Operations things. }
+  hpc: { group: Knowledge domains, title: HPC, description: HPC things. }
   sources: { group: Library, title: Sources, description: Source summaries. }
   syntheses: { group: Library, title: Syntheses, description: Filed answers. }
   journal: { group: Personal, title: Journal, description: Notes., sort: date-desc, auto_children: true }

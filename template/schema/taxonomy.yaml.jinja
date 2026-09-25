@@ -4,8 +4,8 @@
 # The index generator takes folder titles and descriptions from here, and the
 # bundle-root index.md groups top-level folders by `group` in `root_groups`
 # order. Every folder under kb/ needs an entry (`kb check` warns otherwise).
-# Groups "Personal" and "Vault" are owned by the human: agents edit them only
-# when asked, and health reports skip them.
+# Group{% if obsidian %}s "Personal" and "Vault" are{% else %} "Personal" is{% endif %} owned by the human: agents edit {% if obsidian %}them{% else %}it{% endif %} only
+# when asked, and health reports skip {% if obsidian %}them{% else %}it{% endif %}.
 #
 # Keep the tree at most 3 levels deep; create a subfolder once about 5 pages
 # share a subtopic.

@@ -75,35 +75,26 @@ def _bundle_rel(path: str) -> str:
     return path[3:] if path.startswith("kb/") else path
 
 
-def move(bundle: Bundle, old_rel: str, new_rel: str) -> list[str]:
-    """Move a page and rewrite every link to it (body, relation keys, sources[].resource).
+def retarget(bundle: Bundle, old_rel: str, new_rel: str, moved_from: str | None = None) -> list[str]:
+    """Rewrite every link to `old_rel` (body, relation keys, sources[].resource) to `/new_rel`.
 
-    Relative links inside the moved page are rebased to bundle-absolute form.
+    `moved_from` is the previous location of a page now at `new_rel`: its own
+    relative links were written against that folder and are rebased.
     """
-    old_rel, new_rel = _bundle_rel(old_rel), _bundle_rel(new_rel)
-    if not new_rel.endswith(".md"):
-        new_rel += ".md"
-    source, dest = bundle.root / old_rel, bundle.root / new_rel
-    if not source.is_file():
-        raise SystemExit(f"kb: {source} does not exist")
-    if dest.exists():
-        raise SystemExit(f"kb: {dest} already exists")
-    if bundle.root.resolve() not in dest.resolve().parents:
-        raise SystemExit(f"kb: {new_rel} is outside the bundle")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    source.rename(dest)
-    old_folder = posixpath.dirname(old_rel)
+    old_folder = posixpath.dirname(moved_from) if moved_from else None
     new_target = "/" + encode_path(new_rel)
     changed = []
     for path in bundle.markdown_paths():
         doc = parse_document(path, bundle.root)
         if doc.rel.name == "index.md" or doc.frontmatter_error:
             continue
-        moved = str(doc.rel) == new_rel
+        if str(doc.rel) == old_rel:
+            continue
+        moved = moved_from is not None and str(doc.rel) == new_rel
         folder = old_folder if moved else doc.folder
         edits: list[tuple[int, int, str]] = []
 
-        def rewrite(target: str) -> str | None:
+        def rewrite(target: str, folder: str = folder, moved: bool = moved) -> str | None:
             path_part, _, fragment = target.partition("#")
             if not path_part or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", path_part):
                 return None
@@ -136,3 +127,80 @@ def move(bundle: Bundle, old_rel: str, new_rel: str) -> list[str]:
             path.write_text(text, encoding="utf-8")
             changed.append(str(doc.rel))
     return changed
+
+
+
+
+def move(bundle: Bundle, old_rel: str, new_rel: str) -> list[str]:
+    """Move a page and rewrite every link to it; its own relative links are rebased."""
+    old_rel, new_rel = _bundle_rel(old_rel), _bundle_rel(new_rel)
+    if not new_rel.endswith(".md"):
+        new_rel += ".md"
+    source, dest = bundle.root / old_rel, bundle.root / new_rel
+    if not source.is_file():
+        raise SystemExit(f"kb: {source} does not exist")
+    if dest.exists():
+        raise SystemExit(f"kb: {dest} already exists")
+    if bundle.root.resolve() not in dest.resolve().parents:
+        raise SystemExit(f"kb: {new_rel} is outside the bundle")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    source.rename(dest)
+    return retarget(bundle, old_rel, new_rel, moved_from=old_rel)
+
+
+def _union(first: list, second: list) -> list:
+    out = list(first)
+    for item in second:
+        if item not in out:
+            out.append(item)
+    return out
+
+
+def merge(bundle: Bundle, old_rel: str, into_rel: str, actor: str, dry_run: bool = False) -> list[str]:
+    """Fold page `old_rel` into `into_rel`: union metadata, retarget links, delete the old page.
+
+    The agent merges the body text into `into_rel` first; this does the bookkeeping.
+    """
+    import yaml
+
+    from .pages import now_utc
+
+    old_rel, into_rel = _bundle_rel(old_rel), _bundle_rel(into_rel)
+    old, into = bundle.root / old_rel, bundle.root / into_rel
+    if not old.is_file() or not into.is_file():
+        raise SystemExit("kb: both pages must exist")
+    old_doc, into_doc = parse_document(old, bundle.root), parse_document(into, bundle.root)
+    if old_doc.frontmatter_error or into_doc.frontmatter_error:
+        raise SystemExit("kb: fix the frontmatter of both pages first")
+    fm, extra = dict(into_doc.frontmatter), old_doc.frontmatter
+    aliases = _union(fm.get("aliases") or [], extra.get("aliases") or [])
+    if old_doc.title != into_doc.title and old_doc.title not in aliases:
+        aliases.append(old_doc.title)
+    if aliases:
+        fm["aliases"] = aliases
+    fm["tags"] = _union(fm.get("tags") or [], extra.get("tags") or [])
+    sources = {s["id"]: s for s in fm.get("sources") or [] if isinstance(s, dict) and "id" in s}
+    for source in extra.get("sources") or []:
+        if not isinstance(source, dict) or "id" not in source:
+            continue
+        mine = sources.get(source["id"])
+        if mine and mine.get("resource") != source.get("resource"):
+            raise SystemExit(f"kb: source id `{source['id']}` points to different resources; rename one first")
+        sources.setdefault(source["id"], source)
+    if sources:
+        fm["sources"] = list(sources.values())
+    for key in bundle.config.relations:
+        values = [v for v in _union(fm.get(key) or [], extra.get(key) or [])
+                  if isinstance(v, str) and f"(/{into_rel})" not in v and f"(/{old_rel})" not in v]
+        if values:
+            fm[key] = values
+        else:
+            fm.pop(key, None)
+    fm["generated"] = {"by": actor, "at": now_utc()}
+    plan = [f"merge metadata of kb/{old_rel} into kb/{into_rel}", f"delete kb/{old_rel}"]
+    if dry_run:
+        return plan + ["(dry run: nothing written)"]
+    header = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True, width=1000)
+    into.write_text(f"---\n{header}---\n{into_doc.body}", encoding="utf-8")
+    old.unlink()
+    return plan + [f"updated links in kb/{rel}" for rel in retarget(bundle, old_rel, into_rel)]

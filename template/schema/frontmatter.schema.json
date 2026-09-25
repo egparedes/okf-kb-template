@@ -132,6 +132,38 @@
       "type": "string",
       "pattern": "^https?://",
       "description": "Source pages: archived snapshot URL (e.g. Wayback Machine)."
+    },
+    "zotero": {
+      "type": "object",
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false,
+      "description": "Source pages from Zotero: the item key never changes; citekey is the Better BibTeX citation key.",
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]{8}$"
+        },
+        "citekey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "library": {
+          "type": "string",
+          "pattern": "^(user|group:[0-9]+)$"
+        }
+      }
+    },
+    "locators": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Private access routes to material kept outside the bundle, e.g. file:<root>/<path>; roots are declared in schema/resources.yaml.",
+      "items": {
+        "type": "string",
+        "pattern": "^(file:[a-z0-9-]+/.+|zotero:[A-Z0-9]{8})$"
+      }
     }
   },
   "if": {

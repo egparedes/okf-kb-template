@@ -11,31 +11,49 @@ touch 5-15 pages.
 
 ## Steps
 
-1. **Dedupe.** Run `rg -l "<canonical-url>" kb/sources`. If a Source page
-   already exists, treat this as a re-ingest: update that page and continue
-   from step 4.
+1. **Dedupe.** Search `kb/sources` for the canonical URL, the Zotero item key
+   and the citation key (`rg -l "<url>|<KEY>|<citekey>" kb/sources`). If a
+   Source page already exists, treat this as a re-ingest: update that page
+   and continue from step 4.
 
-2. **Fetch.** Save a readable copy in `.cache/sources/<slug>.md`, which is
-   gitignored scratch and never part of `kb/`.
-   - Web pages: fetch the content.
-   - PDFs and office docs: `uvx markitdown <url-or-file> > .cache/sources/<slug>.md`.
+2. **Fetch.** Get the text into `.cache/sources/` (gitignored scratch, never
+   part of `kb/`). Pick the branch that matches the source; setup is in
+   `docs/external-resources.md`.
+   - **Paper, book or report:** it belongs in Zotero. If it is not there
+     (`uv run kb zotero search <words>`), ask the human to add it. Then:
+     ```sh
+     uv run kb zotero new-source <key-or-citekey> --tags …
+     uv run kb fetch zotero:<key-or-citekey>
+     ```
+   - **Web page:** `uv run kb fetch <url>`. This archives the page in
+     KaraKeep and extracts its text. Without KaraKeep, fetch the page
+     yourself and save it to `.cache/sources/`.
+   - **File in a declared root** (talk slides, course material):
+     `uv run kb fetch "file:<root>/<path>"`.
    - Record the canonical URL, author and publication date.
 
 3. **Write the Source page.**
-   ```sh
-   uv run kb new Source sources/<slug>.md --title "…" --description "…" --resource <url> --tags …
-   ```
-   - Add `author`, `published` (YYYY, YYYY-MM or YYYY-MM-DD) and, when it
-     exists, `archived` (a Wayback Machine URL).
+   - Zotero sources already have one, created by `kb zotero new-source`
+     (named `sources/<citekey>.md`, status `draft`).
+   - Otherwise create it:
+     ```sh
+     uv run kb new Source sources/<slug>.md --title "…" --description "…" --resource <url> --tags …
+     ```
+     Choose `<slug>` as author-or-org plus a short topic, e.g.
+     `kleppmann-ddia-ch5`, `rfc-9110`.
+   - Add `author` and `published` (YYYY, YYYY-MM or YYYY-MM-DD) if missing.
+   - For files in a root, add `locators: ["file:<root>/<path>"]`.
+   - Write a real one-sentence `description`.
    - Fill `# Summary` and `# Key points` in your own words, keeping the
      claims specific enough to cite.
-   - Choose `<slug>` as author-or-org plus a short topic, e.g.
-     `kleppmann-ddia-ch5`, `rfc-9110`.
+   - Set `status: stable` when the summary is complete.
 
 4. **Map the impact.**
    - Read `kb/index.md`, then the index of each relevant domain folder.
    - Run `just find --tag <tag>` and `rg -il "<term>" kb` for each key term
      in the source.
+   - After compiling, run `uv run kb unlinked <pages you touched>` to find
+     mentions of existing pages that should become links.
    - Write a list of every concept, technology, tool, pattern, practice,
      person or organization the source covers **substantively**, and mark
      each one *update* (a page exists) or *create*.

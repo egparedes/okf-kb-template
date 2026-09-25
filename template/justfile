@@ -35,6 +35,13 @@ validate-okf:
 report:
     {{kb}} report
 
+# Maintenance candidates (read-only): report, link graph, near-duplicates, unlinked mentions
+health:
+    {{kb}} report
+    {{kb}} graph
+    {{kb}} dupes
+    {{kb}} unlinked
+
 # List pages by frontmatter, e.g. `just find --type Concept --tag distributed-systems`
 [positional-arguments]
 find *args:

@@ -17,14 +17,16 @@ It was generated from the `okf-kb-template` copier template (answers in
 ```
 AGENTS.md{% if claude_code %} / CLAUDE.md{% endif %}   conventions and workflows for agents
 .agents/skills/         kb-ingest, kb-query, kb-maintain
-schema/                 vocabulary (types, relations, extra fields), taxonomy (folders), core frontmatter schema
-tools/kbtools/          the `kb` CLI: check, index, fix-links, mv, new, log, find, report
+schema/                 vocabulary (types, relations, extra fields), taxonomy (folders), resources, core frontmatter schema
+tools/kbtools/          the `kb` CLI: check, index, fix-links, mv, merge, new, log, find, report,
+                        graph, dupes, unlinked, zotero, karakeep, fetch, open
 justfile                task runner (`just` lists recipes)
 kb/                     OKF bundle root{% if obsidian %} == Obsidian vault root{% endif %}
 ```
 
 **Owned by this knowledge base:** `schema/vocabulary.yaml`,
-`schema/taxonomy.yaml`, this README and everything in `kb/`.
+`schema/taxonomy.yaml`, `schema/resources.yaml`, this README and everything
+in `kb/`.
 Copier never overwrites these files.
 
 **Managed by the template:** the rest (tooling, skills, AGENTS.md, CI).
@@ -62,4 +64,7 @@ Talk to your agent from the repository root:
 | `just report` | Trust tiers, stale pages, orphans, uncited and wanted pages |
 | `just find --type Concept --tag x` | Frontmatter queries |
 | `just search "question"` | qmd hybrid search, falling back to ripgrep |
+| `just health` | Link graph (index hubs excluded), duplicate candidates, unlinked mentions |
 | `uv run kb mv old.md new.md` | Move a page and rewrite every inbound link |
+| `uv run kb merge old.md into.md` | Fold a duplicate into another page (after merging the text) |
+| `uv run kb zotero search …` / `kb fetch <ref>` | Zotero, KaraKeep and file roots: see [docs/external-resources.md](docs/external-resources.md) |

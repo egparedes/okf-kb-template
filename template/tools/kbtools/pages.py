@@ -39,6 +39,8 @@ def new_page(
     by: str | None,
     status: str = "stable",
     resource: str | None = None,
+    extra: dict | None = None,
+    body_intro: str = "",
 ) -> Path:
     spec = bundle.config.types.get(type_name)
     if spec is None:
@@ -55,13 +57,15 @@ def new_page(
     frontmatter: dict = {"type": type_name, "title": title, "description": description}
     if resource:
         frontmatter["resource"] = resource
+    for key, value in (extra or {}).items():
+        frontmatter.setdefault(key, value)
     frontmatter["tags"] = tags
     frontmatter["status"] = status
     fm = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=True, width=1000)
     fm += f"generated: {{ by: {resolve_actor(by)}, at: {now_utc()} }}\n"
     sections = "\n".join(f"# {s}\n" for s in spec.get("sections", []))
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"---\n{fm}---\n\n{sections}", encoding="utf-8")
+    path.write_text(f"---\n{fm}---\n\n{body_intro}{sections}", encoding="utf-8")
     return path
 
 

@@ -10,8 +10,9 @@ duplicates, weak pages and missing connections.
 
 ## Steps
 
-1. **Measure.** Run `just check` and `uv run kb report`, and keep the report
-   as the baseline.
+1. **Measure.** Run `just check` and `just health` (the report, link graph,
+   duplicate candidates and unlinked mentions). Keep the output as the
+   baseline.
 
 2. **Errors.** Fix every `kb check` error. Warnings that come from real
    problems count too:
@@ -37,11 +38,21 @@ duplicates, weak pages and missing connections.
      and 5 random ones.
    - Check claims against the cited sources.
    - Look for `**Conflict:**` paragraphs that newer sources now settle.
-   - Look for near-duplicate pages (similar titles or aliases in
-     `just find --folder …`) and merge them with `uv run kb mv` plus a
-     content merge.
-   - Look for missing cross-links between pages that discuss the same
-     concepts.
+   - **Duplicates** (`uv run kb dupes`):
+     - Read both pages of each candidate pair.
+     - Keep them separate when they are distinct: record the pair in
+       `schema/distinct.yaml`, or relate them with `alternative_to`.
+     - Otherwise, with the human's confirmation and a clean
+       `git status -- kb`, merge the text into the better page, then run
+       `uv run kb merge <old> <into>`.
+   - **Missing links** (`uv run kb unlinked`): link a mention where a reader
+     would follow it, usually its first occurrence; skip incidental uses.
+     For names reported as ambiguous, add distinguishing titles or aliases.
+   - **Graph** (`uv run kb graph`):
+     - review "review first" pages against their sources;
+     - give orphans and dead ends links in prose;
+     - write a Synthesis or Comparison for strong co-link gaps;
+     - cross-link weakly linked tags.
 
 5. **Structure.**
    - Split a folder that has grown past about 20 pages with a clear

@@ -11,7 +11,13 @@ pattern. A generated knowledge base keeps its pages in `kb/`, which is:
 
 Agents (Claude Code, Codex, Gemini CLI…) compile sources into pages through
 three skills: ingest, query and maintain. A small Python CLI, `kb`, keeps the
-bundle valid.
+bundle valid and supports two further jobs:
+
+- **Maintenance analytics:** a link graph that excludes generated index
+  hubs, near-duplicate candidates, and unlinked mentions. These are
+  deterministic candidates that the agent then judges.
+- **External material:** Zotero, KaraKeep and synced file roots, resolved on
+  demand so that binary files never enter the repository.
 
 ## Use
 
@@ -49,6 +55,7 @@ copier update --trust
 - **Owned by each knowledge base:**
   - `schema/vocabulary.yaml`: page types, relations and extra `fields`;
   - `schema/taxonomy.yaml`: folders;
+  - `schema/resources.yaml`: file roots, deny patterns, Zotero user id;
   - `README.md`;
   - `kb/log.md` and every page;
   - the Obsidian settings and Bases views.

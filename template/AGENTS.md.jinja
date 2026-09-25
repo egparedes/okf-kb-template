@@ -16,15 +16,17 @@ asks questions. Every edit must keep `kb/` a conformant bundle.
 | `schema/taxonomy.yaml` | Folder tree with titles and descriptions; these feed the generated indexes. |
 | `schema/frontmatter.schema.json` | Core frontmatter field shapes (template-managed; extend via `fields` in the vocabulary). |
 | `.agents/skills/` | Workflows: `kb-ingest`, `kb-query`, `kb-maintain`. |
+| `schema/resources.yaml`, `docs/external-resources.md` | External material (Zotero, KaraKeep, file roots) resolved on demand, never copied into `kb/`. |
 | `justfile`, `tools/kbtools/` | Commands (`just` lists them) and the `kb` CLI behind them. |
 | `.cache/` | Gitignored scratch space: fetched source text, drafts. |
+| `.env` | Secrets and machine paths. Never read it; `kb` loads it. |
 
 ## Workflows
 
 - **Ingest**: a URL or document to add, or "read/add/summarize this" → skill `kb-ingest`.
 - **Query**: a question the knowledge base should answer → skill `kb-query`.
 - **Maintain**: lint, health check, cleanup, reorganizing → skill `kb-maintain`.
-- **Personal notes**: folders in the "Personal" and "Vault" groups of
+- **Personal notes**: folders in the "Personal"{% if obsidian %} and "Vault"{% endif %} group{% if obsidian %}s{% endif %} of
   `schema/taxonomy.yaml` belong to the human. Edit them when asked. When you
   write on the human's behalf, `generated.by` is still you.
 
@@ -67,6 +69,14 @@ depends_on: ["[Consistency models](/systems/distributed/consistency-models.md)"]
   must be unambiguous in the prose.
 - **Trust.** Add `verified: { by: human:{{ owner_id }}, at: … }` only when the
   human says they reviewed that page. Never mark your own work verified.
+- **External material.**
+  - Source pages from Zotero carry `zotero: { key, citekey }` and are named
+    by citation key.
+  - Files in synced folders are referenced with
+    `locators: ["file:<root>/<path>"]`.
+  - Web articles are resolved through their `resource` URL.
+  - Read any of them with `uv run kb fetch <ref>`; nothing is copied into
+    `kb/`.
 - **Freshness.** Set `stale_after` on pages whose facts expire (versions,
   pricing, roadmaps).
 
@@ -96,7 +106,7 @@ depends_on: ["[Consistency models](/systems/distributed/consistency-models.md)"]
 
 A change is done when:
 
-- `just check` reports 0 errors (in Claude Code, hooks enforce this);
+- `just check` reports 0 errors{% if claude_code %} (in Claude Code, hooks enforce this){% endif %};
 - knowledge edits have a `log.md` entry;
 - you have told the human which pages changed.
 

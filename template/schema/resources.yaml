@@ -1,0 +1,20 @@
+# External resources for this knowledge base. This file belongs to the
+# knowledge base: the template creates it once and never overwrites it.
+# Secrets and machine-specific paths never go here: they live in the
+# gitignored `.env` (see `.env.example`).
+
+zotero:
+  # Numeric Zotero user id (zotero.org/settings/keys shows it). It is not a
+  # secret; it is only needed for the web API fallback. Leave null otherwise.
+  user_id: null
+  # group_id: 1234567   # use a group library instead of the user library
+
+# File roots: synced or local folders that pages point into with
+# `locators: ["file:<root>/<path>"]`. Map each root to a local path per
+# machine with KB_ROOT_<ROOT>=... in .env (upper-case, dashes as underscores).
+roots: {}
+#  talks: My talks - slides and sources, one dated folder per talk.
+
+# Glob patterns (root/path) that `kb fetch` and `kb open` refuse to resolve.
+deny: []
+#  - "documents/Personal/**"

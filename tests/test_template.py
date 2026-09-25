@@ -57,7 +57,7 @@ def test_rendered_knowledge_base_is_conformant(tmp_path: Path, variant: str) -> 
     {"ok": {"title": "Only a title"}},
 ])
 def test_invalid_domains_are_rejected(tmp_path: Path, domains: dict) -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError, match="Validation error for question 'domains'"):
         render(tmp_path, {"domains": domains, "run_setup": False})
 
 

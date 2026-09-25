@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
-from . import hooks, indexgen, linkfix, pages, report
+import json
+import os
+import subprocess
+
+from . import dupes, graph, hooks, indexgen, linkfix, pages, report, resources, unlinked
 from .bundle import Bundle
 from .check import Checker, exit_code
 
@@ -15,9 +18,11 @@ def _cmd_check(bundle: Bundle, args: argparse.Namespace) -> int:
     checker = Checker(bundle)
     if args.paths:
         paths = [bundle.path_arg(p) for p in args.paths if p.endswith(".md")]
-        for arg, path in zip([p for p in args.paths if p.endswith(".md")], paths):
-            if path is None:
-                print(f"kb: skipping {arg} (not a file in the bundle)", file=sys.stderr)
+        missing = [arg for arg, path in zip([p for p in args.paths if p.endswith(".md")], paths, strict=True) if path is None]
+        for arg in missing:
+            print(f"kb: {arg} is not a file in the bundle", file=sys.stderr)
+        if missing and not any(paths):
+            return 1
         diagnostics = checker.check_files([bundle.document(p) for p in paths if p])
     else:
         diagnostics = checker.check_all()
@@ -105,6 +110,99 @@ def _cmd_folders(bundle: Bundle, args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_graph(bundle: Bundle, args: argparse.Namespace) -> int:
+    result = graph.analyze(bundle, scope=args.scope, top=args.top)
+    print(json.dumps(result, indent=2) if args.json else graph.to_markdown(result), end="" if not args.json else "\n")
+    return 0
+
+
+def _cmd_dupes(bundle: Bundle, args: argparse.Namespace) -> int:
+    found = dupes.find(bundle, min_score=args.min_score, body=args.body, scope=args.scope)
+    if args.json:
+        print(json.dumps([c.__dict__ for c in found], indent=2))
+    for c in [] if args.json else found:
+        print(f"{c.score:.2f}  /{c.a}  <->  /{c.b}  [{'; '.join(c.signals)}]")
+    if not args.json:
+        print(f"kb dupes: {len(found)} candidate pair(s)", file=sys.stderr)
+    return 0
+
+
+def _cmd_unlinked(bundle: Bundle, args: argparse.Namespace) -> int:
+    found = unlinked.find(bundle, only=args.pages or None, min_len=args.min_len, include_personal=args.all)
+    if args.json:
+        print(json.dumps([m.__dict__ for m in found], indent=2))
+    else:
+        for m in found:
+            print(f"{m.page}:{m.line}  \"{m.text}\" -> {m.target}\n    {m.snippet}")
+        _, ambiguous = unlinked.vocabulary(bundle, args.min_len)
+        for name, owners in sorted(ambiguous.items()):
+            print(f"ambiguous name \"{name}\": {', '.join('/' + o for o in owners)} (add distinguishing titles or aliases)")
+        print(f"kb unlinked: {len(found)} unlinked mention(s)", file=sys.stderr)
+    return 0
+
+
+def _cmd_merge(bundle: Bundle, args: argparse.Namespace) -> int:
+    for line in linkfix.merge(bundle, args.old, args.into, pages.resolve_actor(args.by), dry_run=args.dry_run):
+        print(line)
+    if not args.dry_run:
+        indexgen.write(Bundle(bundle.root, bundle.repo_root))
+    return 0
+
+
+def _cmd_zotero(bundle: Bundle, args: argparse.Namespace) -> int:
+    settings = resources.Settings.load(bundle)
+    zotero = resources.Zotero(settings)
+    if args.action == "search":
+        for item in zotero.search(" ".join(args.query), limit=args.limit):
+            year = (item.get("date") or "")[:4]
+            print(f"{item.get('key')}\t{item.get('citationKey') or '-'}\t{year}\t{item.get('title', '')}")
+        return 0
+    item = zotero.item(args.query[0])
+    if args.action == "show":
+        print(json.dumps(item, indent=2, ensure_ascii=False))
+        return 0
+    fm = resources.zotero_source_frontmatter(item, settings)
+    slug = args.path or f"sources/{resources.zotero_citekey_slug(item)}.md"
+    link = resources.open_target(bundle, f"zotero:{item['key']}")
+    path = pages.new_page(
+        bundle, "Source", slug, fm.pop("title"), fm.pop("description"),
+        [t.strip() for t in (args.tags or "").split(",") if t.strip()], args.by,
+        status="draft", resource=fm.pop("resource"), extra=fm,
+        body_intro=f"Open in Zotero: [{item['key']}]({link})\n\n",
+    )
+    print(path.relative_to(bundle.repo_root))
+    return 0
+
+
+def _cmd_karakeep(bundle: Bundle, args: argparse.Namespace) -> int:
+    resources.load_env(bundle.repo_root)
+    keep = resources.KaraKeep()
+    bookmark_id = keep.find(args.url)
+    if bookmark_id:
+        print(f"already saved: {bookmark_id}")
+    else:
+        saved = keep.save(args.url)
+        print(f"saved: {saved.get('id')} (archiving runs in the background)")
+    return 0
+
+
+def _cmd_fetch(bundle: Bundle, args: argparse.Namespace) -> int:
+    out = resources.fetch(bundle, args.ref, bundle.repo_root / ".cache" / "sources")
+    print(out.relative_to(bundle.repo_root))
+    return 0
+
+
+def _cmd_open(bundle: Bundle, args: argparse.Namespace) -> int:
+    target = resources.open_target(bundle, args.ref)
+    if args.print:
+        print(target)
+        return 0
+    opener = "open" if sys.platform == "darwin" else "xdg-open"
+    subprocess.Popen([opener, target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=os.environ)
+    print(target)
+    return 0
+
+
 def _cmd_hook(bundle: Bundle, args: argparse.Namespace) -> int:
     return hooks.post_edit(bundle) if args.event == "post-edit" else hooks.stop(bundle)
 
@@ -162,6 +260,57 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("folders", help="print folder<TAB>description for every indexed folder")
     p.set_defaults(func=_cmd_folders)
+
+    p = sub.add_parser("graph", help="link-graph analytics (generated index hubs excluded)")
+    p.add_argument("--scope", choices=["knowledge", "all"], default="knowledge",
+                   help="all = include personal areas (projects, journal, ...)")
+    p.add_argument("--top", type=int, default=15)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=_cmd_graph)
+
+    p = sub.add_parser("dupes", help="near-duplicate page candidates (read-only)")
+    p.add_argument("--min-score", type=float, default=0.6)
+    p.add_argument("--body", action="store_true", help="also compare page text (slower)")
+    p.add_argument("--scope", choices=["knowledge", "all"], default="knowledge")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=_cmd_dupes)
+
+    p = sub.add_parser("unlinked", help="mentions of other pages that are not linked (read-only)")
+    p.add_argument("pages", nargs="*", help="only scan these pages (bundle paths)")
+    p.add_argument("--min-len", type=int, default=4, help="ignore shorter names (all-caps aliases excepted)")
+    p.add_argument("--all", action="store_true", help="also scan personal areas")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=_cmd_unlinked)
+
+    p = sub.add_parser("merge", help="fold a duplicate page into another (after merging the text by hand)")
+    p.add_argument("old", help="page to remove")
+    p.add_argument("into", help="page that absorbs it")
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--by", help="actor for generated.by (default: $KB_ACTOR)")
+    p.set_defaults(func=_cmd_merge)
+
+    p = sub.add_parser("zotero", help="read-only Zotero access (local API, then web API)")
+    p.add_argument("action", choices=["search", "show", "new-source"])
+    p.add_argument("query", nargs="+", help="search words, or an item key / citation key")
+    p.add_argument("--limit", type=int, default=20)
+    p.add_argument("--path", help="new-source: bundle path (default sources/<citekey>.md)")
+    p.add_argument("--tags", help="new-source: comma-separated tags")
+    p.add_argument("--by", help="new-source: actor (default: $KB_ACTOR)")
+    p.set_defaults(func=_cmd_zotero)
+
+    p = sub.add_parser("karakeep", help="archive a web page in KaraKeep (cloud or self-hosted)")
+    p.add_argument("action", choices=["save"])
+    p.add_argument("url")
+    p.set_defaults(func=_cmd_karakeep)
+
+    p = sub.add_parser("fetch", help="text of an external resource into .cache/sources/")
+    p.add_argument("ref", help="zotero:<key|citekey>, file:<root>/<path>, or a web URL (via KaraKeep)")
+    p.set_defaults(func=_cmd_fetch)
+
+    p = sub.add_parser("open", help="open an external resource (zotero://, file, URL)")
+    p.add_argument("ref")
+    p.add_argument("--print", action="store_true", help="only print what would be opened")
+    p.set_defaults(func=_cmd_open)
 
     p = sub.add_parser("hook", help="Claude Code hook entry points")
     p.add_argument("event", choices=["post-edit", "stop"])

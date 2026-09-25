@@ -15,7 +15,7 @@ from pathlib import PurePosixPath
 import jsonschema
 
 from . import indexgen
-from .bundle import Bundle, Document
+from .bundle import Bundle, Document, load_yaml
 from .mdlinks import find_links, footnote_defs, footnote_refs, reference_definitions, resolve
 
 KEBAB = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -45,6 +45,9 @@ class Checker:
         self.config = bundle.config
         self.validator = jsonschema.Draft202012Validator(self.config.schema)
         self.known_keys = set(self.config.schema.get("properties", {}))
+        resources = bundle.repo_root / "schema" / "resources.yaml"
+        data = (load_yaml(resources.read_text(encoding="utf-8")) or {}) if resources.is_file() else {}
+        self.roots = set((data.get("roots") or {}).keys())
         self.diagnostics: list[Diagnostic] = []
 
     def report(self, doc_or_path: Document | str, line: int, code: str, message: str) -> None:
@@ -97,6 +100,7 @@ class Checker:
         self.check_links(doc)
         self.check_reference_links(doc)
         self.check_relations(doc)
+        self.check_locators(doc)
         self.check_staleness(doc)
 
     def check_names(self, doc: Document) -> None:
@@ -190,6 +194,13 @@ class Checker:
                     self.report(doc, 1, "W032", f"{key}: target `{match.group('target')}` does not exist")
                 if target not in body_targets:
                     self.report(doc, 1, "H031", f"{key}: `{match.group('target')}` is not linked from the body (explain the relation in prose)")
+
+    def check_locators(self, doc: Document) -> None:
+        for locator in doc.frontmatter.get("locators") or []:
+            if isinstance(locator, str) and locator.startswith("file:"):
+                root = locator[5:].split("/", 1)[0]
+                if root not in self.roots:
+                    self.report(doc, 1, "W060", f"locator root `{root}` is not declared in schema/resources.yaml")
 
     def check_staleness(self, doc: Document) -> None:
         stale_after = doc.frontmatter.get("stale_after")

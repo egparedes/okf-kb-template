@@ -22,3 +22,6 @@ kb/.smart-env/
 
 # Local Claude Code overrides
 .claude/settings.local.json
+
+# Secrets and machine-specific paths (see .env.example)
+.env
