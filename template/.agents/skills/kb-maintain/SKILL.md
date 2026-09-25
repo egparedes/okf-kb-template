@@ -25,8 +25,9 @@ duplicates, weak pages and missing connections.
    - **Stale pages:** re-check the page against its sources, following the
      `resource` URLs. Update the facts, refresh `generated`, and move
      `stale_after` forward.
-   - **Orphans:** link the page from its parent topic or related pages, in
-     prose. If the page has no value, merge it into another page.
+   - **Orphans** (listed by `kb graph`): link the page from its parent topic
+     or related pages, in prose. If the page has no value, merge it into
+     another page.
    - **Uncited knowledge pages:** find and ingest a source (skill
      `kb-ingest`), or set `status: draft`.
    - **Wanted pages:** create a page when the target has 2 or more inbound
@@ -40,11 +41,13 @@ duplicates, weak pages and missing connections.
    - Look for `**Conflict:**` paragraphs that newer sources now settle.
    - **Duplicates** (`uv run kb dupes`):
      - Read both pages of each candidate pair.
-     - Keep them separate when they are distinct: record the pair in
-       `schema/distinct.yaml`, or relate them with `alternative_to`.
+     - Keep them separate when they are distinct: relate them with
+       `alternative_to`, or record the pair in `schema/distinct.yaml`
+       (`distinct: [[/a.md, /b.md], ...]`; create the file if needed).
      - Otherwise, with the human's confirmation and a clean
        `git status -- kb`, merge the text into the better page, then run
-       `uv run kb merge <old> <into>`.
+       `uv run kb merge <old> <into>` (try `--dry-run` first). The merged page
+       loses `verified`: it needs a new review.
    - **Missing links** (`uv run kb unlinked`): link a mention where a reader
      would follow it, usually its first occurrence; skip incidental uses.
      For names reported as ambiguous, add distinguishing titles or aliases.

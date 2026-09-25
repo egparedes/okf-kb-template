@@ -26,16 +26,27 @@ enabled, but Obsidian only loads them once installed.
 
 | Plugin | Configure | Role |
 |---|---|---|
-| **Templater** | Already configured: templates folder `_templates`, folder template for `journal/`. Turn **"Trigger Templater on new file creation"** on yourself, because it is a per-device setting. | Templates set a valid OKF frontmatter on new notes. |
+| **Templater** | Already configured: templates folder `_templates`, and folder templates for `journal/` (journal entry) and for the whole vault (knowledge page). New blank notes and clicks on wanted links therefore get valid frontmatter. Turn **"Trigger Templater on new file creation"** on yourself, because it is a per-device setting. | Templates set a valid OKF frontmatter on new notes. |
 | **Better Markdown Links** | Make sure "Use leading slash for absolute paths" is on (the default). | Writes `/…` links. |
 | **Front Matter Title** | Enable it for the explorer, tabs, graph and search, with the title key `title`. | Shows titles instead of filenames, which matters because many files are called `index`. |
 | **Folder notes** | Folder note name: `index`. Don't let it create folder notes automatically: `index.md` files are generated. | Clicking a folder opens its index. |
 | **Breadcrumbs** | Add one edge field per relation key in `schema/vocabulary.yaml` (`part_of` as "up"). | Navigates the typed relations stored as markdown links in frontmatter. |
-| **Linter** | YAML key sort, priority order: `type, title, description, aliases, resource, author, published, archived, tags, status, generated, verified, stale_after, sources`, then the relation keys. Leave "lint on save" **off** for `_templates/`. | Keeps frontmatter tidy. It cannot validate. `kb check` does that. |
+| **Linter** | YAML key sort, priority order: `type, title, description, aliases, resource, author, published, archived, tags, status, generated, verified, stale_after, sources, zotero, locators`, then the relation keys. Leave "lint on save" **off** for `_templates/`. | Keeps frontmatter tidy. It cannot validate. `kb check` does that. |
 | **Omnisearch** | Defaults. | Better full-text search in the app. |
 
-**Optional:** OKF Enforcer (on-save OKF validation, still young), Excalidraw,
-and Tasks.
+**Optional:** OKF Enforcer (on-save OKF validation, still young), and Tasks.
+
+**Plugins that create files without OKF frontmatter:**
+
+- **Excalidraw:** drawings are `.excalidraw.md` files. Add `type: Drawing`
+  and a title in the drawing's frontmatter, and declare the `Drawing` type
+  in `schema/vocabulary.yaml`. Or keep drawings as `.excalidraw` files, which
+  have no `.md` extension.
+- **Web Clipper:** give the template the properties `type: Source`, `title`,
+  `description`, `resource: {{url}}`, `status: draft` and `generated`, and
+  point it at `sources/`.
+- **Note composer (extract to new note):** add the frontmatter by hand, or
+  run the `knowledge-page` Templater template on the new note.
 
 **Avoid:**
 

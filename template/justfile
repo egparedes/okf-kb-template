@@ -1,5 +1,7 @@
 # Task runner for the knowledge base. `just` lists recipes.
 
+set shell := ["bash", "-cu"]
+
 kb := "uv run --quiet kb"
 # Independent OKF v0.2 validator (scaccogatto/okf-skills), pinned to a reviewed commit.
 okf_validator := "https://raw.githubusercontent.com/scaccogatto/okf-skills/68ce7a0c07f66ca9a6b0beb68937d75314d5e8a5/skills/validate/scripts/okf_validate.py"
@@ -27,9 +29,9 @@ fix:
 index:
     {{kb}} index
 
-# Independent second opinion on OKF conformance (strict: warnings fail)
+# Independent second opinion on OKF conformance (fails on spec violations; warnings such as wanted pages are tolerated, as OKF §11 requires)
 validate-okf:
-    uv run --quiet {{okf_validator}} kb --strict
+    uv run --quiet {{okf_validator}} kb
 
 # Health report: trust tiers, stale pages, orphans, uncited pages, wanted pages
 report:
@@ -51,13 +53,15 @@ find *args:
 links-online:
     lychee --no-progress --root-dir "{{justfile_directory()}}/kb" --exclude-path kb/.obsidian 'kb/**/*.md'
 
-# Search: qmd hybrid search when set up, otherwise ripgrep
+# Search: qmd hybrid search when set up, otherwise ripgrep over the words of the query
 [positional-arguments]
 search +query:
     @if command -v qmd >/dev/null && qmd collection list 2>/dev/null | grep -q '\bkb\b'; then \
         qmd query "$*" -c kb; \
     else \
-        rg --ignore-case --files-with-matches --glob '!**/index.md' -- "$*" kb || true; \
+        args=(); for term in $*; do term="${term//[^[:alnum:]_-]/}"; [ ${#term} -ge 3 ] && args+=(-e "$term"); done; \
+        [ ${#args[@]} -eq 0 ] && args=(-F -e "$*"); \
+        rg --ignore-case --count-matches --glob '!**/index.md' "${args[@]}" kb | sort -t: -k2 -nr | head -20 || true; \
     fi
 
 # One-time qmd setup: collection, per-folder contexts from taxonomy, embeddings

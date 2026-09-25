@@ -1,4 +1,4 @@
-# Ingested sources, newest first.
+# Ingested sources, most recently published first.
 filters:
   and:
     - type == "Source"
@@ -12,5 +12,5 @@ views:
       - note.resource
       - file.mtime
     sort:
-      - property: file.mtime
+      - property: note.published
         direction: DESC

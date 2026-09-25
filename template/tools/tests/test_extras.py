@@ -197,7 +197,7 @@ def test_zotero_local_api_fetch_and_new_source(repo: Path, server, monkeypatch) 
     monkeypatch.setenv("ZOTERO_LOCAL_API", f"{base}/api/users/0")
     b = bundle(repo)
     out = resources.fetch(b, "zotero:williams2009roofline", repo / ".cache" / "sources")
-    assert out.name == "williams2009roofline.md" and "roofline model" in out.read_text()
+    assert out.name == "williams-2009-roofline.md" and "roofline model" in out.read_text()
     fm = resources.zotero_source_frontmatter(ITEM, resources.Settings.load(b))
     path = pages.new_page(b, "Source", "sources/williams2009roofline.md", fm.pop("title"), fm.pop("description"),
                           [], "test/0", status="draft", resource=fm.pop("resource"), extra=fm)
@@ -301,3 +301,138 @@ def test_zotero_offline_database_snapshot(repo: Path, monkeypatch, tmp_path: Pat
     assert zotero.item("williams2009roofline")["title"] == "Roofline model"
     out = resources.fetch(bundle(repo), "zotero:williams2009roofline", repo / ".cache")
     assert "offline full text" in out.read_text() and "database snapshot" in out.read_text()
+
+
+# -- round-2 review regressions ----------------------------------------------------
+
+
+def _roots(repo: Path, tmp_path: Path, monkeypatch, deny: str) -> Path:
+    base = tmp_path / "docs"
+    (base / "Personal").mkdir(parents=True)
+    (base / "pub").mkdir()
+    (base / "[Zotero]").mkdir()
+    (base / "Personal" / "secret.md").write_text("secret")
+    (base / "pub" / "ok.md").write_text("public")
+    (base / "[Zotero]" / "z.md").write_text("zotero")
+    (base / "pub" / "link").symlink_to(base / "Personal")
+    (repo / "schema" / "resources.yaml").write_text(f"roots:\n  docs: Docs.\ndeny: {deny}\n")
+    monkeypatch.setenv("KB_ROOT_DOCS", str(base))
+    return base
+
+
+@pytest.mark.parametrize("ref", [
+    "file:docs/Personal/secret.md", "file:docs/pub/../Personal/secret.md", "file:docs/./Personal/secret.md",
+    "file:docs/pub/link/secret.md", "file:docs/[Zotero]/z.md",
+])
+def test_deny_cannot_be_bypassed(repo: Path, tmp_path: Path, monkeypatch, ref: str) -> None:
+    _roots(repo, tmp_path, monkeypatch, "['docs/Personal', 'docs/[Zotero]/**']")
+    with pytest.raises(SystemExit, match="deny"):
+        resources.fetch(bundle(repo), ref, repo / ".cache")
+    assert "public" in resources.fetch(bundle(repo), "file:docs/pub/ok.md", repo / ".cache").read_text()
+
+
+def test_local_deny_patterns_and_denied_locators(repo: Path, tmp_path: Path, monkeypatch) -> None:
+    _roots(repo, tmp_path, monkeypatch, "[]")
+    (repo / ".env").write_text("KB_DENY=docs/pub/ok.md ; docs/Personal\n")
+    monkeypatch.delenv("KB_DENY", raising=False)
+    with pytest.raises(SystemExit, match="deny"):
+        resources.fetch(bundle(repo), "file:docs/pub/ok.md", repo / ".cache")
+    write(repo, "systems/t.md", "T", extra='locators: ["file:docs/Personal/secret.md"]\n')
+    assert "H060" in [d.code for d in Checker(bundle(repo)).check_all()]
+
+
+def test_env_parsing(repo: Path, monkeypatch) -> None:
+    for var in ("A_ONE", "A_TWO", "A_THREE", "A_FOUR"):
+        monkeypatch.delenv(var, raising=False)
+    (repo / ".env").write_text("A_ONE=/x/y   # comment\nexport A_TWO=two\nA_THREE=\"quoted # kept\"\nA_FOUR='x\n")
+    resources.load_env(repo)
+    import os
+    assert (os.environ["A_ONE"], os.environ["A_TWO"], os.environ["A_THREE"], os.environ["A_FOUR"]) == ("/x/y", "two", "quoted # kept", "'x")
+
+
+def test_malformed_resources_config_is_a_diagnostic(repo: Path) -> None:
+    (repo / "schema" / "resources.yaml").write_text("roots: [a, b]\ndeny: nope\n")
+    assert [d.code for d in Checker(bundle(repo)).check_all()].count("H061") == 2
+
+
+@pytest.mark.parametrize("args", [("systems/a.md", "systems/a.md"), ("log.md", "systems/a.md"), ("../outside.md", "systems/a.md")])
+def test_merge_refuses_unsafe_targets(repo: Path, args) -> None:
+    write(repo, "systems/a.md", "A")
+    (repo / "kb" / "log.md").write_text("# Log\n")
+    (repo / "outside.md").write_text("---\ntype: Concept\n---\n")
+    with pytest.raises(SystemExit):
+        linkfix.merge(bundle(repo), *args, "test/0")
+    assert (repo / "kb/systems/a.md").exists() and (repo / "kb/log.md").exists() and (repo / "outside.md").exists()
+
+
+def test_merge_drops_verified_and_cleans_empty_folders(repo: Path) -> None:
+    write(repo, "data/old/x.md", "X")
+    write(repo, "systems/y.md", "Y", extra="verified: { by: human:me, at: 2026-01-01T00:00:00Z }\n")
+    indexgen.write(bundle(repo))
+    assert (repo / "kb/data/old/index.md").exists()
+    plan = linkfix.merge(bundle(repo), "data/old/x.md", "systems/y.md", "test/0", dry_run=True)
+    assert plan[-1].startswith("(dry run")
+    linkfix.merge(bundle(repo), "data/old/x.md", "systems/y.md", "test/0")
+    indexgen.write(bundle(repo))
+    assert "verified" not in bundle(repo).by_rel["systems/y.md"].frontmatter
+    assert not (repo / "kb/data/old/index.md").exists()
+
+
+def test_names_keep_c_family_distinct(repo: Path) -> None:
+    write(repo, "programming/c.md", "C")
+    write(repo, "programming/cpp.md", "C++")
+    write(repo, "programming/csharp.md", "C#")
+    assert dupes.find(bundle(repo)) == []
+
+
+def test_unlinked_folds_accents_and_scales(repo: Path) -> None:
+    import time
+
+    write(repo, "systems/ecoles.md", "Écoles normales")
+    write(repo, "systems/ref.md", "Ref", "About ecoles normales here. See [x][r].\n\n[r]: /systems/other.md\n")
+    write(repo, "systems/other.md", "Other thing")
+    found = unlinked.find(bundle(repo))
+    assert [(m.page, m.target) for m in found] == [("/systems/ref.md", "/systems/ecoles.md")]
+    for i in range(400):
+        write(repo, f"data/p{i}.md", f"Topic number {i} alpha", f"Mentions topic number {i + 1} alpha and more text. " * 3)
+    start = time.perf_counter()
+    unlinked.find(bundle(repo))
+    assert time.perf_counter() - start < 5
+    with pytest.raises(SystemExit, match="not knowledge pages"):
+        unlinked.find(bundle(repo), only=["/nope.md"])
+
+
+def test_wikilinks_and_future_timestamps_are_flagged(repo: Path) -> None:
+    write(repo, "systems/a.md", "A", "See [[B]] and ![[img.png]] but not `[[code]]`.",
+          extra="verified: { by: human:me, at: 2999-01-01T00:00:00Z }\n")
+    diagnostics = [d.code for d in Checker(bundle(repo)).check_all()]
+    assert diagnostics.count("H032") == 2 and "W041" in diagnostics
+
+
+def test_zotero_helpers() -> None:
+    assert resources.citekey_slug("hoppeProgressiveMeshes1996") == "hoppe-progressive-meshes-1996"
+    assert resources.citekey_slug("müllerÜber2019") == "muller-uber-2019"
+    assert resources._citekey({"extra": "tex.x: 1\nCitation Key: smith2020\n"}) == "smith2020"
+    assert resources._published("2009-04-00 April 2009") == "2009-04"
+    assert resources._published("1996-00-00 1996") == "1996"
+
+
+def test_http_errors_become_messages(repo: Path, server, monkeypatch) -> None:
+    base, routes = server
+
+    class Redirect(_Fake):
+        def do_GET(self):  # noqa: N802
+            self.send_response(301)
+            self.send_header("Location", "https://elsewhere.example/api")
+            self.end_headers()
+
+    monkeypatch.setenv("KARAKEEP_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("KARAKEEP_API_KEY", "k")
+    with pytest.raises(SystemExit, match="cannot reach"):
+        resources.fetch(bundle(repo), "https://example.org/x", repo / ".cache")
+    httpd = HTTPServer(("127.0.0.1", 0), Redirect)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    monkeypatch.setenv("KARAKEEP_URL", f"http://127.0.0.1:{httpd.server_port}")
+    with pytest.raises(SystemExit, match="redirects"):
+        resources.fetch(bundle(repo), "https://example.org/x", repo / ".cache")
+    httpd.shutdown()

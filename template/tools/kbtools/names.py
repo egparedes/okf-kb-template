@@ -20,7 +20,12 @@ def fold(text: str) -> str:
 
 
 def tokens(name: str) -> tuple[str, ...]:
-    """Normalized content words; a naive plural strip keeps 'stencils' == 'stencil'."""
+    """Normalized content words; a naive plural strip keeps 'stencils' == 'stencil'.
+
+    `C++` and `C#` stay distinct from `C` (-> 'cpp', 'csharp').
+    """
+    name = re.sub(r"(\w)\+\+", r"\1pp", name)
+    name = re.sub(r"(\w)#", r"\1sharp", name)
     words = [w for w in _NON_WORD.split(fold(name).replace("_", " ")) if w]
     out = []
     for word in words:

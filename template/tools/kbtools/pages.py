@@ -37,7 +37,7 @@ def new_page(
     description: str,
     tags: list[str],
     by: str | None,
-    status: str = "stable",
+    status: str = "draft",
     resource: str | None = None,
     extra: dict | None = None,
     body_intro: str = "",

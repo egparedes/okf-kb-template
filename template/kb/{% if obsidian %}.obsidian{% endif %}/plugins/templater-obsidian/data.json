@@ -4,6 +4,13 @@
   "auto_jump_to_cursor": true,
   "trigger_on_file_creation_mode": "folder",
   "folder_templates": [
-    { "folder": "journal", "template": "_templates/journal-entry.md" }
+    {
+      "folder": "journal",
+      "template": "_templates/journal-entry.md"
+    },
+    {
+      "folder": "/",
+      "template": "_templates/knowledge-page.md"
+    }
   ]
 }

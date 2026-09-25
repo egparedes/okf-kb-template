@@ -33,8 +33,9 @@ touch 5-15 pages.
    - Record the canonical URL, author and publication date.
 
 3. **Write the Source page.**
-   - Zotero sources already have one, created by `kb zotero new-source`
-     (named `sources/<citekey>.md`, status `draft`).
+   - Zotero sources already have one, created by `kb zotero new-source`.
+     It is named `sources/<slug>.md`, where the slug is the citation key in
+     kebab-case, and has status `draft`.
    - Otherwise create it:
      ```sh
      uv run kb new Source sources/<slug>.md --title "…" --description "…" --resource <url> --tags …
@@ -64,8 +65,9 @@ touch 5-15 pages.
    - **Create** pages with `uv run kb new <Type> <path> …`, choosing folders
      per `AGENTS.md`, or **update** existing pages by integrating the new
      knowledge into the right section. Don't append a "From source X" blob.
-   - Add the source to the page's `sources` (id = the source slug, resource =
-     `/sources/<slug>.md`) and cite each claim you add with `[^<slug>]`.
+   - Add the source to the page's `sources` (`id: <slug>` = the Source page's
+     file name, `resource: /sources/<slug>.md`) and cite each claim you add
+     with `[^<slug>]`.
    - **Conflict:** when the source contradicts the page, keep both claims,
      cite both, and add a short `**Conflict:**` paragraph saying which is
      newer or better supported. Add the `contradicts` relation if one page

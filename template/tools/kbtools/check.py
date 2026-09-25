@@ -15,12 +15,14 @@ from pathlib import PurePosixPath
 import jsonschema
 
 from . import indexgen
-from .bundle import Bundle, Document, load_yaml
-from .mdlinks import find_links, footnote_defs, footnote_refs, reference_definitions, resolve
+from .bundle import Bundle, Document
+from .mdlinks import find_links, footnote_defs, footnote_refs, mask_code, reference_definitions, resolve
+from .resources import Settings, deny_patterns, load_env, read_config
 
 KEBAB = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 DATE_HEADING = re.compile(r"^## (\d{4}-\d{2}-\d{2})\s*$")
 INDEX_ENTRY = re.compile(r"^[*-] \[(?:[^\]\\]|\\.)+\]\([^)\s]+\)( - .+)?$")
+WIKILINK = re.compile(r"!?\[\[[^\]\n]+\]\]")
 RELATION_VALUE = re.compile(r"^\[(?P<text>[^\]]+)\]\((?P<target>[^)\s]+)\)$")
 
 
@@ -45,9 +47,10 @@ class Checker:
         self.config = bundle.config
         self.validator = jsonschema.Draft202012Validator(self.config.schema)
         self.known_keys = set(self.config.schema.get("properties", {}))
-        resources = bundle.repo_root / "schema" / "resources.yaml"
-        data = (load_yaml(resources.read_text(encoding="utf-8")) or {}) if resources.is_file() else {}
+        load_env(bundle.repo_root)
+        data, self.resource_errors = read_config(bundle.repo_root)
         self.roots = set((data.get("roots") or {}).keys())
+        self.deny = Settings(roots={}, deny=deny_patterns(data), zotero_user_id=None, zotero_group_id=None)
         self.diagnostics: list[Diagnostic] = []
 
     def report(self, doc_or_path: Document | str, line: int, code: str, message: str) -> None:
@@ -57,6 +60,8 @@ class Checker:
     # -- entry points -------------------------------------------------------
 
     def check_all(self) -> list[Diagnostic]:
+        for error in self.resource_errors:
+            self.report("../schema/resources.yaml", 1, "H061", error)
         for doc in self.bundle.documents:
             self.check_document(doc)
         self.check_folders()
@@ -99,6 +104,8 @@ class Checker:
         self.check_citations(doc)
         self.check_links(doc)
         self.check_reference_links(doc)
+        self.check_wikilinks(doc)
+        self.check_timestamps(doc)
         self.check_relations(doc)
         self.check_locators(doc)
         self.check_staleness(doc)
@@ -170,6 +177,27 @@ class Checker:
             if not link.target.startswith("/"):
                 self.report(doc, line, "W031", f"link `{link.target}` should be bundle-absolute (`/{target}`); run `just fix`")
 
+    def check_wikilinks(self, doc: Document) -> None:
+        masked = mask_code(doc.body)
+        for m in WIKILINK.finditer(masked):
+            line = masked.count("\n", 0, m.start()) + 1 + doc.body_line_offset
+            self.report(doc, line, "H032", f"`{m.group(0)[:60]}` is a wikilink or embed, not an OKF link; use [text](/path.md)")
+
+    def check_timestamps(self, doc: Document) -> None:
+        now = datetime.now(timezone.utc)
+        events = [("generated.at", (doc.frontmatter.get("generated") or {}).get("at") if isinstance(doc.frontmatter.get("generated"), dict) else None)]
+        verified = doc.frontmatter.get("verified")
+        for event in verified if isinstance(verified, list) else [verified] if isinstance(verified, dict) else []:
+            if isinstance(event, dict):
+                events.append(("verified.at", event.get("at")))
+        for where, value in events:
+            try:
+                instant = datetime.fromisoformat(str(value).replace("Z", "+00:00")) if value else None
+            except ValueError:
+                continue
+            if instant and instant.tzinfo and instant > now:
+                self.report(doc, 1, "W041", f"{where} {value} is in the future")
+
     def check_reference_links(self, doc: Document) -> None:
         for line in reference_definitions(doc.body):
             self.report(doc, line + doc.body_line_offset, "W033",
@@ -201,6 +229,8 @@ class Checker:
                 root = locator[5:].split("/", 1)[0]
                 if root not in self.roots:
                     self.report(doc, 1, "W060", f"locator root `{root}` is not declared in schema/resources.yaml")
+                elif self.deny.denied(locator[5:]):
+                    self.report(doc, 1, "H060", f"locator `{locator}` points at denied material; remove it")
 
     def check_staleness(self, doc: Document) -> None:
         stale_after = doc.frontmatter.get("stale_after")

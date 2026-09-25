@@ -255,3 +255,24 @@ def test_path_arguments_accept_bundle_and_repo_paths(repo: Path) -> None:
     assert b.path_arg("systems/a.md") == b.path_arg("kb/systems/a.md") == (repo / "kb/systems/a.md").resolve()
     (repo / "README.md").write_text("x")
     assert b.path_arg(str(repo / "README.md")) is None
+
+
+def test_stop_hook_checks_only_this_sessions_edits(repo: Path, monkeypatch, capsys) -> None:
+    import io
+    import json as _json
+    import subprocess
+
+    from kbtools import hooks
+
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    write(repo, "systems/human.md", "---\ntitle: human draft without type\n---\n")
+    agent = write(repo, "systems/agent.md", page("Agent"))
+    indexgen.write(fresh(repo))
+    monkeypatch.setattr("sys.stdin", io.StringIO(_json.dumps({"tool_input": {"file_path": str(agent)}})))
+    assert hooks.post_edit(fresh(repo)) == 0
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert hooks.stop(fresh(repo)) == 2  # knowledge edit without a log entry
+    assert "log.md" in capsys.readouterr().err
+    pages.add_log_entry(fresh(repo), "update", "agent page")
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert hooks.stop(fresh(repo)) == 0  # the human's broken draft does not block the agent

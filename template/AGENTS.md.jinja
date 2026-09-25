@@ -63,6 +63,7 @@ depends_on: ["[Consistency models](/systems/distributed/consistency-models.md)"]
 
 - Create pages with `uv run kb new <Type> <folder/slug.md> --title … --description … --tags … --by <tool>/<model>`
 {% if claude_code %}  (Claude Code sets `KB_ACTOR`).{% else %}  (or set `KB_ACTOR`).{% endif %} The skeleton gives you the type's sections.
+  New pages start as `status: draft`; set `stable` when they are complete.
 - **Citations.** Every non-obvious claim carries a footnote `[^id]` matching
   a `sources[].id`. The footnote definition links the Source page:
   `[^id]: [Title](/sources/slug.md)`. What you add from your own knowledge
@@ -70,8 +71,9 @@ depends_on: ["[Consistency models](/systems/distributed/consistency-models.md)"]
 - **Trust.** Add `verified: { by: human:{{ owner_id }}, at: … }` only when the
   human says they reviewed that page. Never mark your own work verified.
 - **External material.**
-  - Source pages from Zotero carry `zotero: { key, citekey }` and are named
-    by citation key.
+  - Source pages from Zotero carry `zotero: { key, citekey }`. They are
+    named by the kebab-case slug of the citation key, and that slug is their
+    `sources[].id`.
   - Files in synced folders are referenced with
     `locators: ["file:<root>/<path>"]`.
   - Web articles are resolved through their `resource` URL.
@@ -84,7 +86,8 @@ depends_on: ["[Consistency models](/systems/distributed/consistency-models.md)"]
 
 - Link other pages with standard markdown links using **bundle-absolute**
   targets: `[CAP theorem](/systems/distributed/cap-theorem.md)`. Wikilinks
-  (`[[…]]`) are not part of OKF.
+  and embeds (`[[…]]`, `![[…]]`) are not part of OKF, and `kb check` rejects
+  them.
 - A link to a page that doesn't exist yet is allowed: it marks a wanted page.
 - **Typed relations** are frontmatter lists of markdown links, using the keys
   in `schema/vocabulary.yaml`. Each target must also be linked in the body,

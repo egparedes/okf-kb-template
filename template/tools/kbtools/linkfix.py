@@ -167,11 +167,17 @@ def merge(bundle: Bundle, old_rel: str, into_rel: str, actor: str, dry_run: bool
 
     old_rel, into_rel = _bundle_rel(old_rel), _bundle_rel(into_rel)
     old, into = bundle.root / old_rel, bundle.root / into_rel
-    if not old.is_file() or not into.is_file():
-        raise SystemExit("kb: both pages must exist")
+    root = bundle.root.resolve()
+    for path in (old, into):
+        if root not in path.resolve().parents or not path.is_file():
+            raise SystemExit(f"kb: {path} is not a page in the bundle")
+    if old.resolve() == into.resolve():
+        raise SystemExit("kb: cannot merge a page into itself")
     old_doc, into_doc = parse_document(old, bundle.root), parse_document(into, bundle.root)
-    if old_doc.frontmatter_error or into_doc.frontmatter_error:
-        raise SystemExit("kb: fix the frontmatter of both pages first")
+    if old_doc.is_reserved or into_doc.is_reserved:
+        raise SystemExit("kb: index.md and log.md cannot be merged")
+    if old_doc.frontmatter_error or into_doc.frontmatter_error or not old_doc.type or not into_doc.type:
+        raise SystemExit("kb: both pages need valid frontmatter with a type")
     fm, extra = dict(into_doc.frontmatter), old_doc.frontmatter
     aliases = _union(fm.get("aliases") or [], extra.get("aliases") or [])
     if old_doc.title != into_doc.title and old_doc.title not in aliases:
@@ -196,10 +202,17 @@ def merge(bundle: Bundle, old_rel: str, into_rel: str, actor: str, dry_run: bool
             fm[key] = values
         else:
             fm.pop(key, None)
+    fm.pop("verified", None)  # merged content has not been reviewed yet
     fm["generated"] = {"by": actor, "at": now_utc()}
     plan = [f"merge metadata of kb/{old_rel} into kb/{into_rel}", f"delete kb/{old_rel}"]
     if dry_run:
-        return plan + ["(dry run: nothing written)"]
+        linking = sorted(
+            str(d.rel) for d in bundle.documents
+            if d.rel.name != "index.md" and str(d.rel) != old_rel
+            and any(resolve(unquote(t.split("#")[0]), d.folder) == old_rel
+                    for t in [l.target for l in find_links(d.body) if not l.is_external] + _FM_LINK.findall(d.text[: d.fm_end]))
+        )
+        return plan + [f"would update links in kb/{rel}" for rel in linking] + ["(dry run: nothing written)"]
     header = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True, width=1000)
     into.write_text(f"---\n{header}---\n{into_doc.body}", encoding="utf-8")
     old.unlink()

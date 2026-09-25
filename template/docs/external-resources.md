@@ -14,8 +14,13 @@ Settings live in two places:
 
 - **`schema/resources.yaml` (committed):** the file roots, deny patterns, and
   your Zotero user id for the web API.
-- **`.env` (gitignored; copy `.env.example`):** secrets and machine paths.
-  Claude Code is denied reading `.env`, and the `kb` tooling reads it itself.
+- **`.env` (gitignored; copy `.env.example`):** secrets, machine paths, and
+  deny patterns that would reveal sensitive names (`KB_DENY`).
+  - Agents are told never to read it, and Claude Code's Read tool is denied
+    it.
+  - A shell command could still print it, so keep only what this checkout
+    needs.
+  - The `kb` tooling reads it itself.
 
 ## Zotero
 
@@ -25,8 +30,11 @@ Settings live in two places:
    dialog asks for it.
 2. Recommended: install **Better BibTeX**, set a citation-key pattern, and
    **pin all keys** so that they never change and sync to zotero.org.
-   Citation keys then name Source pages (`sources/<citekey>.md`) and serve
-   as their `sources[].id`.
+   - The citation key is converted to kebab-case, the **source slug**:
+     `hoppeProgressiveMeshes1996` becomes `hoppe-progressive-meshes-1996`.
+   - The slug names the Source page (`sources/<slug>.md`) and is the
+     `sources[].id` that pages cite as `[^<slug>]`.
+   - The exact key stays in `zotero.citekey`.
 3. Optional fallback for when Zotero is closed, or on other machines:
    - create a **read-only** API key at zotero.org/settings/keys ("Allow
      library access" only);
@@ -66,12 +74,26 @@ uv run kb fetch https://example.org/post           # archived text into .cache/s
    `talks: My talks - one dated folder per talk.`
 2. Map it on each machine in `.env`: `KB_ROOT_TALKS=~/Documents/Talks`.
 3. Pages point into it with
-   `locators: ["file:talks/2019-06-12 PASC/slides.pdf"]`.
+   `locators: ["file:talks/[2019.06.12] PASC Minisymposium/slides.pdf"]`.
 
-`kb check` warns about locators whose root is undeclared. Paths matching a
-`deny` pattern are never resolved.
+`kb check` warns about locators whose root is undeclared, and reports an
+error for locators that point at denied material.
+
+**Deny patterns:**
+
+- **Scope:** they apply to the *resolved* path, after `..`, `.` and
+  symlinks. They also match any parent folder, so `docs/Private` covers
+  everything inside it.
+- **Syntax:** `*`, `**` and `?` are wildcards. Brackets are literal:
+  `bibliography/[Zotero]/**` names the Zotero folder.
+- **Case:** matching is case-insensitive on macOS and Windows.
+- **Where to put them:** generic patterns go in `schema/resources.yaml`.
+  Patterns that would reveal sensitive names go in `KB_DENY` in `.env`,
+  separated by `;`.
+- Non-text files are converted with `markitdown[all]` (through `uvx` when
+  markitdown is not installed).
 
 ```sh
-uv run kb fetch "file:talks/2019-06-12 PASC/slides.pdf"   # converted with markitdown
-uv run kb open  "file:talks/2019-06-12 PASC/slides.pdf"
+uv run kb fetch "file:talks/[2019.06.12] PASC Minisymposium/slides.pdf"   # converted with markitdown
+uv run kb open  "file:talks/[2019.06.12] PASC Minisymposium/slides.pdf"
 ```

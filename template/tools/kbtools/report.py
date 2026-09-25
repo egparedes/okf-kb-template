@@ -66,10 +66,6 @@ def build(bundle: Bundle) -> str:
 
     section("Stale pages", [str(d.rel) for d in concepts if _is_stale(d, now)])
     section(
-        "Orphans (no inbound links from pages)",
-        [str(d.rel) for d in knowledge if d.type not in ("Source", "Template") and inbound[str(d.rel)] == 0],
-    )
-    section(
         "Uncited knowledge pages (no `sources`)",
         [str(d.rel) for d in knowledge if d.type not in ("Source", "Person", "Organization") and not d.frontmatter.get("sources")],
     )

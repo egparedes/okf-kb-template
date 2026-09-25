@@ -18,8 +18,15 @@ def _payload() -> dict:
         return {}
 
 
+TOUCHED = ".cache/kb-touched.txt"
+
+
+def _touched(bundle: Bundle) -> Path:
+    return bundle.repo_root / TOUCHED
+
+
 def post_edit(bundle: Bundle) -> int:
-    """After Write/Edit: validate the touched file if it is part of the bundle."""
+    """After Write/Edit: remember the file and validate it if it is part of the bundle."""
     payload = _payload()
     tool_input = payload.get("tool_input") or {}
     file_path = tool_input.get("file_path") or (payload.get("tool_response") or {}).get("filePath")
@@ -28,6 +35,10 @@ def post_edit(bundle: Bundle) -> int:
     path = Path(file_path).resolve()
     if path.suffix != ".md" or not path.is_file() or bundle.root not in path.parents:
         return 0
+    touched = _touched(bundle)
+    touched.parent.mkdir(parents=True, exist_ok=True)
+    with touched.open("a", encoding="utf-8") as fh:
+        fh.write(f"{path}\n")
     errors = [d for d in Checker(bundle).check_files([bundle.document(path)]) if d.is_error]
     if not errors:
         return 0
@@ -58,28 +69,39 @@ def _changed_files(repo_root: Path) -> list[str]:
 
 
 def stop(bundle: Bundle) -> int:
-    """Before the agent finishes: the bundle must validate and knowledge edits must be logged."""
+    """Before the agent finishes: the pages it edited must validate, and knowledge edits must be logged.
+
+    Only files this session wrote through Write/Edit are checked, so notes the
+    human is editing in Obsidian never block an unrelated agent session.
+    """
     payload = _payload()
     if payload.get("stop_hook_active"):
         return 0
-    changed = _changed_files(bundle.repo_root)
-    if not changed:
+    touched_file = _touched(bundle)
+    if not touched_file.is_file():
         return 0
+    touched = sorted({Path(p) for p in touched_file.read_text(encoding="utf-8").splitlines() if p.strip()})
+    touched = [p for p in touched if p.is_file()]
     problems: list[str] = []
-    errors = [d for d in Checker(bundle).check_all() if d.is_error]
+    checker = Checker(bundle)
+    errors = [d for d in checker.check_files([bundle.document(p) for p in touched]) if d.is_error]
+    checker.diagnostics = []
+    checker.check_indexes()
+    errors += checker.diagnostics
     problems += [str(d) for d in errors[:30]]
     if len(errors) > 30:
         problems.append(f"... and {len(errors) - 30} more (run `just check`)")
-    personal = tuple(f"kb/{folder}/" for folder in bundle.config.personal_folders)
+    personal = tuple(bundle.root / folder for folder in bundle.config.personal_folders)
     knowledge_edits = [
-        f for f in changed
-        if f.endswith(".md") and f.rsplit("/", 1)[-1] != "index.md" and f != "kb/log.md" and not f.startswith(personal)
+        p for p in touched
+        if p.name not in ("index.md", "log.md") and not any(folder in p.parents for folder in personal)
     ]
-    if knowledge_edits and "kb/log.md" not in changed:
+    if knowledge_edits and "kb/log.md" not in _changed_files(bundle.repo_root):
         problems.append(
             "knowledge pages changed but kb/log.md has no entry: run `uv run kb log <Op> \"<message with /links>\"`"
         )
     if not problems:
+        touched_file.unlink()
         return 0
     print("Before finishing, fix the knowledge base:", file=sys.stderr)
     for problem in problems:

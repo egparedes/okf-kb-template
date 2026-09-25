@@ -30,7 +30,7 @@ def folders_to_index(bundle: Bundle) -> list[str]:
     """
     folders = {""}
     for doc in bundle.documents:
-        if any(part.startswith((".", "_")) for part in doc.rel.parts[:-1]):
+        if doc.is_reserved or any(part.startswith((".", "_")) for part in doc.rel.parts[:-1]):
             continue
         parent = doc.rel.parent
         while str(parent) != ".":
@@ -131,9 +131,26 @@ def generate(bundle: Bundle) -> dict[Path, str]:
     }
 
 
+def _stale_index_files(bundle: Bundle, expected: dict[Path, str]) -> list[Path]:
+    """Generated index.md files left behind in folders that no longer hold pages."""
+    stale = []
+    for path in bundle.root.rglob("index.md"):
+        rel = path.relative_to(bundle.root)
+        if path in expected or any(part.startswith(".") for part in rel.parts):
+            continue
+        siblings = [p for p in path.parent.rglob("*.md") if p.name not in ("index.md", "log.md")]
+        if not siblings:
+            stale.append(path)
+    return stale
+
+
 def write(bundle: Bundle) -> list[Path]:
     changed = []
-    for path, content in generate(bundle).items():
+    expected = generate(bundle)
+    for path in _stale_index_files(bundle, expected):
+        path.unlink()
+        changed.append(path)
+    for path, content in expected.items():
         if not path.exists() or path.read_text(encoding="utf-8") != content:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")

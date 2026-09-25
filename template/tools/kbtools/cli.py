@@ -135,7 +135,7 @@ def _cmd_unlinked(bundle: Bundle, args: argparse.Namespace) -> int:
         for m in found:
             print(f"{m.page}:{m.line}  \"{m.text}\" -> {m.target}\n    {m.snippet}")
         _, ambiguous = unlinked.vocabulary(bundle, args.min_len)
-        for name, owners in sorted(ambiguous.items()):
+        for name, owners in [] if args.pages else sorted(ambiguous.items()):
             print(f"ambiguous name \"{name}\": {', '.join('/' + o for o in owners)} (add distinguishing titles or aliases)")
         print(f"kb unlinked: {len(found)} unlinked mention(s)", file=sys.stderr)
     return 0
@@ -242,7 +242,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--title", required=True)
     p.add_argument("--description", required=True, help="one sentence")
     p.add_argument("--tags", help="comma-separated kebab-case tags")
-    p.add_argument("--status", default="stable", choices=["draft", "stable", "deprecated"])
+    p.add_argument("--status", default="draft", choices=["draft", "stable", "deprecated"],
+                   help="new pages start as draft; set stable when complete")
     p.add_argument("--resource", help="canonical URL (required for Source pages)")
     p.add_argument("--by", help="actor, e.g. claude-code/<model> (default: $KB_ACTOR)")
     p.set_defaults(func=_cmd_new)
