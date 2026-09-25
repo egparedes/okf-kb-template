@@ -533,7 +533,7 @@ def resolve_file(settings: Settings, rest: str) -> Path:
     inside = path.relative_to(base).as_posix()
     for candidate in (f"{root}/{inside}".rstrip("/."), f"{root}/{relative}"):
         if settings.denied(candidate):
-            raise ResourceError(f"kb: `{rest}` matches a deny pattern in schema/resources.yaml")
+            raise ResourceError(f"kb: `{rest}` matches a deny pattern (schema/resources.yaml or KB_DENY)")
     if not path.exists():
         raise ResourceError(f"kb: {path} does not exist on this machine")
     return path
