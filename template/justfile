@@ -1,6 +1,6 @@
 # Task runner for the knowledge base. `just` lists recipes.
 
-set shell := ["bash", "-cu"]
+set shell := ["bash", "-c"]
 
 kb := "uv run --quiet kb"
 # Independent OKF v0.2 validator (scaccogatto/okf-skills), pinned to a reviewed commit.
