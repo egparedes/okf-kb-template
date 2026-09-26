@@ -37,6 +37,7 @@ ZOTERO_KEY = re.compile(r"^[A-Z0-9]{8}$")
 LOCAL_ZOTERO = "http://localhost:23119/api/users/0"
 WEB_ZOTERO = "https://api.zotero.org"
 TIMEOUT = 20
+USER_AGENT = "kb-cli (okf-kb-template)"  # some proxies (e.g. Cloudflare) reject Python's default agent
 _CITEKEY_IN_EXTRA = re.compile(r"^\s*Citation Key:\s*(\S+)\s*$", re.M | re.I)
 
 
@@ -168,7 +169,9 @@ _OPENER = urllib.request.build_opener(_NoRedirect)
 def _get(url: str, headers: dict[str, str] | None = None, data: dict | None = None) -> tuple[int, object]:
     """(status, parsed JSON) for a JSON API call; network failures raise ResourceError."""
     body = json.dumps(data).encode() if data is not None else None
-    request = urllib.request.Request(url, data=body, headers={"Accept": "application/json", **(headers or {})})
+    request = urllib.request.Request(
+        url, data=body, headers={"Accept": "application/json", "User-Agent": USER_AGENT, **(headers or {})}
+    )
     if body is not None:
         request.add_header("Content-Type", "application/json")
     try:
@@ -447,7 +450,9 @@ class KaraKeep:
         key = os.environ.get("KARAKEEP_API_KEY")
         if not base or not key:
             raise ResourceError("kb: set KARAKEEP_URL (cloud or self-hosted address) and KARAKEEP_API_KEY in .env")
-        self.api = base.rstrip("/") + ("" if base.rstrip("/").endswith("/api/v1") else "/api/v1")
+        # Accept the server address with or without /api or /api/v1.
+        root = re.sub(r"/api(/v1)?$", "", base.rstrip("/"))
+        self.api = f"{root}/api/v1"
         self.headers = {"Authorization": f"Bearer {key}"}
 
     def find(self, url: str) -> str | None:

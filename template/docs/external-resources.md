@@ -58,7 +58,8 @@ uv run kb open zotero:ABCD2345                   # select the item in Zotero
 
 ## KaraKeep
 
-Set `KARAKEEP_URL` and `KARAKEEP_API_KEY` in `.env`. The same two settings
+Set `KARAKEEP_URL` (the server address, e.g. `https://cloud.karakeep.app`;
+a trailing `/api` or `/api/v1` is accepted too) and `KARAKEEP_API_KEY` in `.env`. The same two settings
 work for the hosted service and for a self-hosted instance. Pages never
 store bookmark ids, which differ per instance: resolution goes by the page's
 `resource` URL. Moving to another instance therefore only changes `.env`.

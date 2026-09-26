@@ -459,3 +459,19 @@ def test_zotero_lookup_by_slug(repo: Path, server, monkeypatch) -> None:
     monkeypatch.setenv("ZOTERO_LOCAL_API", f"{base}/api/users/0")
     zotero = resources.Zotero(resources.Settings.load(bundle(repo)))
     assert zotero.item("williams-2009-roofline")["key"] == "ABCD2345"
+
+
+@pytest.mark.parametrize("suffix", ["", "/", "/api", "/api/", "/api/v1"])
+def test_karakeep_address_forms_and_user_agent(repo: Path, server, monkeypatch, suffix: str) -> None:
+    base, routes = server
+    seen = {}
+
+    def check(q, h):
+        seen["ua"] = h.get("User-Agent")
+        return 200, {"bookmarkId": "bm1"}
+
+    routes[("GET", "/api/v1/bookmarks/check-url")] = check
+    monkeypatch.setenv("KARAKEEP_URL", base + suffix)
+    monkeypatch.setenv("KARAKEEP_API_KEY", "k")
+    assert resources.KaraKeep().find("https://example.org") == "bm1"
+    assert seen["ua"] == resources.USER_AGENT
