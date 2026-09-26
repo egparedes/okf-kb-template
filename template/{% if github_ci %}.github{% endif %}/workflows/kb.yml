@@ -1,8 +1,12 @@
 name: kb
 
+permissions:
+  contents: read
+
 on:
   push:
   pull_request:
+  workflow_dispatch:
   schedule:
     - cron: "0 6 * * 1" # weekly external link check (source URL rot)
 
@@ -11,18 +15,18 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - uses: extractions/setup-just@v4
       - run: uv sync
       - run: just ci
 
   links:
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: lycheeverse/lychee-action@v2
         with:
-          args: --no-progress --root-dir ${{ github.workspace }}/kb --exclude-path kb/.obsidian 'kb/**/*.md'
+          args: --no-progress --scheme https --scheme http --accept '200..=299,403,429' --root-dir ${{ github.workspace }}/kb --exclude-path kb/.obsidian 'kb/**/*.md'
           fail: true

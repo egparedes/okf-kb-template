@@ -41,14 +41,13 @@ enabled, but Obsidian only loads them once installed.
 - **Excalidraw:** set its file format to plain `.excalidraw`, not
   `.excalidraw.md`. Files without the `.md` extension stay outside OKF;
   embed them from pages with a markdown image link.
-- **Web Clipper:** in the template, set:
-  - the note name to a kebab-case form of the title, e.g.
-    `{{title|lower|replace:" ":"-"}}`, saved into `sources/`;
-  - properties `type: Source`, `title`, `description`, `resource: {{url}}`,
-    `status: draft`, `tags: []`;
-  - `generated`, typed as text, to `{ by: human:<id>, at: {{time|date:"YYYY-MM-DDTHH:mm:ssZ"}} }`.
-
-  Then ask an agent to finish the page with the `kb-ingest` skill.
+- **Web Clipper:** in the template, set the note name to
+  `{{title|kebab}}` and the location to `sources/`. Add text properties
+  `type: Source`, `title`, `description`, `resource: {{url}}` and
+  `status: draft`. Leave out `tags` and `generated`: the Clipper writes text
+  properties as quoted strings, which `kb check` rejects for those two.
+  Then ask an agent to finish the page with the `kb-ingest` skill, which adds
+  them. The page validates only after that, so don't commit it first.
 - **Note composer (extract to new note):** add the frontmatter by hand, or
   run the `knowledge-page` Templater template on the new note.
 
@@ -81,8 +80,15 @@ outside OKF:
 
 ## Caveat: Templater runs code
 
-The vault-wide folder template runs whenever Obsidian creates a file. Files
-that arrive from outside (a `git pull`, a sync) normally already have
-content, and Templater leaves those alone. But avoid committing pages whose
-text contains Templater tags (`<% … %>`) outside `_templates/`: they would
-be executed when opened as templates.
+With "Trigger Templater on new file creation" enabled, Templater also runs
+the `<% … %>` commands in any *new, non-empty* `.md` file of up to 100 KB
+that appears in the vault, for example after a `git pull`. Keep Templater
+syntax out of pages outside `_templates/`; `kb check` does not look for it.
+
+## First launch
+
+Obsidian writes a few more settings files on first launch
+(`appearance.json`, `types.json`, `data.json` of plugins you configure).
+Commit the ones you want to share across machines. `.gitignore` keeps
+per-device workspace state out, and shares only the Templater plugin
+settings. Allow others explicitly after checking they hold no API keys.

@@ -248,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--by", help="actor, e.g. claude-code/<model> (default: $KB_ACTOR)")
     p.set_defaults(func=_cmd_new)
 
-    p = sub.add_parser("report", help="health report: trust, staleness, orphans, gaps")
+    p = sub.add_parser("report", help="health report: trust, staleness, uncited pages, wanted pages")
     p.set_defaults(func=_cmd_report)
 
     p = sub.add_parser("find", help="list pages by frontmatter (type, tags, status, folder, trust)")
@@ -294,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("action", choices=["search", "show", "new-source"])
     p.add_argument("query", nargs="+", help="search words, or an item key / citation key")
     p.add_argument("--limit", type=int, default=20)
-    p.add_argument("--path", help="new-source: bundle path (default sources/<citekey>.md)")
+    p.add_argument("--path", help="new-source: bundle path (default sources/<slug>.md, the kebab-case citation key)")
     p.add_argument("--tags", help="new-source: comma-separated tags")
     p.add_argument("--by", help="new-source: actor (default: $KB_ACTOR)")
     p.set_defaults(func=_cmd_zotero)

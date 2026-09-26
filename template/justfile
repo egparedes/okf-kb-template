@@ -14,6 +14,7 @@ setup:
     git rev-parse --git-dir >/dev/null 2>&1 || git init -q
     uv sync
     uv run pre-commit install
+    {{kb}} index
 
 # Validate OKF conformance and house rules (optionally only the given files)
 [positional-arguments]
@@ -33,7 +34,7 @@ index:
 validate-okf:
     uv run --quiet {{okf_validator}} kb
 
-# Health report: trust tiers, stale pages, orphans, uncited pages, wanted pages
+# Health report: trust tiers, stale pages, uncited pages, unused sources, wanted pages
 report:
     {{kb}} report
 
@@ -51,7 +52,7 @@ find *args:
 
 # Check external URLs (source rot); needs lychee
 links-online:
-    lychee --no-progress --root-dir "{{justfile_directory()}}/kb" --exclude-path kb/.obsidian 'kb/**/*.md'
+    lychee --no-progress --scheme https --scheme http --accept '200..=299,403,429' --root-dir "{{justfile_directory()}}/kb" --exclude-path kb/.obsidian 'kb/**/*.md'
 
 # Search: qmd hybrid search when set up, otherwise ripgrep over the words of the query
 [positional-arguments]

@@ -11,7 +11,7 @@ __pycache__/
 kb/.obsidian/workspace*.json
 kb/.obsidian/graph.json.bak
 kb/.obsidian/plugins/*/*
-!kb/.obsidian/plugins/*/data.json
+!kb/.obsidian/plugins/templater-obsidian/data.json
 kb/.obsidian/themes/
 kb/.trash/
 kb/.smart-env/
@@ -25,3 +25,5 @@ kb/.smart-env/
 
 # Secrets and machine-specific paths (see .env.example)
 .env
+.env.*
+!.env.example

@@ -40,9 +40,14 @@ Requirements: [uv](https://docs.astral.sh/uv/), [just](https://just.systems), gi
 (hybrid search).
 
 ```sh
-just setup    # uv sync + pre-commit install
-just ci       # kb check, independent OKF validator, tests, index freshness
+cp .env.example .env   # then fill in paths and keys for this machine
+just setup             # git init if needed, uv sync, pre-commit, indexes
+just ci                # kb check, independent OKF validator, tests, index freshness
 ```
+
+`copier update` fetches the template from `_src_path` in
+`.copier-answers.yml`. If that repository is private, git needs GitHub
+credentials (e.g. `gh auth setup-git`).
 {% if obsidian %}
 Open `kb/` (not the repository root) as the vault, then follow
 [docs/obsidian-setup.md](docs/obsidian-setup.md).
@@ -61,7 +66,7 @@ Talk to your agent from the repository root:
 | `just check` | OKF v0.2 conformance and house rules |
 | `just fix` | Normalize links to `/…` form and regenerate every `index.md` |
 | `just validate-okf` | Independent OKF validator (okf-skills, pinned) |
-| `just report` | Trust tiers, stale pages, orphans, uncited and wanted pages |
+| `just report` | Trust tiers, stale pages, uncited pages and wanted pages |
 | `just find --type Concept --tag x` | Frontmatter queries |
 | `just search "question"` | qmd hybrid search, falling back to ripgrep |
 | `just health` | Link graph (index hubs excluded), duplicate candidates, unlinked mentions |

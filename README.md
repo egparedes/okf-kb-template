@@ -31,6 +31,12 @@ the first `log.md` entry and generates the `index.md` files. Generate from a
 **clean, tagged** template: `.copier-answers.yml` records the tag, and
 `copier update` needs that tag to exist.
 
+The template repository is private: `copier` then needs git credentials for
+GitHub (e.g. `gh auth setup-git`, or use `git@github.com:egparedes/okf-kb-template.git`).
+Push tags with the commits (`git push origin main --tags`) so that generated
+knowledge bases can record and update to release tags. If you render with
+`run_setup=false`, `just setup` generates the indexes afterwards.
+
 To pull later template changes into a knowledge base:
 
 ```sh
@@ -91,3 +97,15 @@ just render    # renders defaults into /tmp/okf-kb-preview
 
 Tag releases (`v0.1.0`, …). Generated knowledge bases record the tag in
 `.copier-answers.yml`, and `copier update` moves between tags.
+
+## Credits
+
+- The workflow follows Andrej Karpathy's LLM wiki pattern.
+- The file format follows Google's Open Knowledge Format.
+- Independent conformance checks use scaccogatto/okf-skills, pinned and
+  fetched at run time.
+- The maintenance analytics (`kb graph`, `kb dupes`, `kb unlinked`) are
+  inspired by Ar9av/obsidian-wiki and reimplemented deterministically.
+- `tools/retrieval-eval/questions.yaml` is a hand-maintained set of
+  questions for judging whether a heavier search tier is worth enabling. No
+  tool reads it yet.

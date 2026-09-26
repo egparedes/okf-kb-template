@@ -6,5 +6,7 @@
 - `KB_ACTOR` is set in `.claude/settings.json`, so `uv run kb new` fills
   `generated.by`. Update it there when the model changes.
 - Hooks: after each Write/Edit in `kb/`, the edited file is validated. On
-  stop, the whole bundle must pass `kb check`, and knowledge edits need a
-  `log.md` entry. Hook output tells you exactly what to fix.
+  stop, every page this session changed (via Write/Edit or `kb` commands)
+  must pass `kb check`, the indexes above them must be fresh, and knowledge
+  edits need a `log.md` entry. Hook output tells you exactly what to fix;
+  run `just check` for the whole bundle.

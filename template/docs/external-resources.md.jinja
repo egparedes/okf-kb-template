@@ -16,8 +16,8 @@ Settings live in two places:
   your Zotero user id for the web API.
 - **`.env` (gitignored; copy `.env.example`):** secrets, machine paths, and
   deny patterns that would reveal sensitive names (`KB_DENY`).
-  - Agents are told never to read it, and Claude Code's Read tool is denied
-    it.
+  - Agents are told never to read it{% if claude_code %}, and Claude Code's Read tool is denied
+    it{% endif %}.
   - A shell command could still print it, so keep only what this checkout
     needs.
   - The `kb` tooling reads it itself.
@@ -75,7 +75,7 @@ uv run kb fetch https://example.org/post           # archived text into .cache/s
    `talks: My talks - one dated folder per talk.`
 2. Map it on each machine in `.env`: `KB_ROOT_TALKS=~/Documents/Talks`.
 3. Pages point into it with
-   `locators: ["file:talks/[2019.06.12] PASC Minisymposium/slides.pdf"]`.
+   `locators: ["file:talks/2024-05-conference-talk/slides.pdf"]`.
 
 `kb check` warns about locators whose root is undeclared, and reports an
 error for locators that point at denied material.
@@ -87,7 +87,7 @@ error for locators that point at denied material.
   everything inside it.
 - **Syntax:** `*`, `**` and `?` are wildcards. Brackets are literal:
   `bibliography/[Zotero]/**` names the Zotero folder.
-- **Case:** matching is case-insensitive on macOS and Windows.
+- **Case:** matching ignores case on every platform.
 - **Where to put them:** generic patterns go in `schema/resources.yaml`.
   Patterns that would reveal sensitive names go in `KB_DENY` in `.env`,
   separated by `;`.
@@ -95,6 +95,6 @@ error for locators that point at denied material.
   markitdown is not installed).
 
 ```sh
-uv run kb fetch "file:talks/[2019.06.12] PASC Minisymposium/slides.pdf"   # converted with markitdown
-uv run kb open  "file:talks/[2019.06.12] PASC Minisymposium/slides.pdf"
+uv run kb fetch "file:talks/2024-05-conference-talk/slides.pdf"   # converted with markitdown
+uv run kb open  "file:talks/2024-05-conference-talk/slides.pdf"
 ```
