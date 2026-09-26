@@ -18,6 +18,9 @@ bundle valid and supports two further jobs:
   deterministic candidates that the agent then judges.
 - **External material:** Zotero, KaraKeep and synced file roots, resolved on
   demand so that binary files never enter the repository.
+- **Imports:** `kb import` converts an Obsidian vault or Logseq graph
+  (wikilinks, embeds, properties, file names) into bundle pages, driven by a
+  mapping file with a dry run first (`docs/importing.md`).
 
 ## Use
 

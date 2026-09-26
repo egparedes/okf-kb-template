@@ -26,6 +26,8 @@ asks questions. Every edit must keep `kb/` a conformant bundle.
 - **Ingest**: a URL or document to add, or "read/add/summarize this" → skill `kb-ingest`.
 - **Query**: a question the knowledge base should answer → skill `kb-query`.
 - **Maintain**: lint, health check, cleanup, reorganizing → skill `kb-maintain`.
+- **Import**: bringing in existing notes from Obsidian or Logseq →
+  `uv run kb import … --dry-run` with a mapping file; see `docs/importing.md`.
 - **Personal notes**: folders in the "Personal"{% if obsidian %} and "Vault"{% endif %} group{% if obsidian %}s{% endif %} of
   `schema/taxonomy.yaml` belong to the human. Edit them when asked. When you
   write on the human's behalf, `generated.by` is still you.

@@ -8,8 +8,9 @@ import sys
 import json
 import os
 import subprocess
+from pathlib import Path
 
-from . import dupes, graph, hooks, indexgen, linkfix, pages, report, resources, unlinked
+from . import dupes, graph, hooks, importer, indexgen, linkfix, pages, report, resources, unlinked
 from .bundle import Bundle
 from .check import Checker, exit_code
 
@@ -203,6 +204,21 @@ def _cmd_open(bundle: Bundle, args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_import(bundle: Bundle, args: argparse.Namespace) -> int:
+    mapping = importer.Mapping.load(Path(args.map), args.by)
+    redirects = Path(args.redirects) if args.redirects else None
+    plan, lines = importer.run(bundle, Path(args.source), args.into, mapping, args.dry_run, redirects)
+    print("\n".join(lines))
+    if plan.errors:
+        return 1
+    if args.dry_run:
+        print("(dry run: nothing written)")
+    else:
+        for path in indexgen.write(Bundle(bundle.root, bundle.repo_root)):
+            print(f"wrote {path.relative_to(bundle.repo_root)}")
+    return 0
+
+
 def _cmd_hook(bundle: Bundle, args: argparse.Namespace) -> int:
     return hooks.post_edit(bundle) if args.event == "post-edit" else hooks.stop(bundle)
 
@@ -312,6 +328,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("ref")
     p.add_argument("--print", action="store_true", help="only print what would be opened")
     p.set_defaults(func=_cmd_open)
+
+    p = sub.add_parser("import", help="convert an Obsidian vault or Logseq graph into the bundle (see docs/importing.md)")
+    p.add_argument("source", help="vault or graph directory (never modified)")
+    p.add_argument("--into", required=True, help="bundle folder that relative `to` paths start from")
+    p.add_argument("--map", required=True, help="mapping file (YAML): rules for paths, types and properties")
+    p.add_argument("--dry-run", action="store_true", help="print the plan and issues, write nothing")
+    p.add_argument("--by", help="actor for generated.by (default: `actor` in the mapping)")
+    p.add_argument("--redirects", help="where to write the source -> bundle path table (default .cache/import/)")
+    p.set_defaults(func=_cmd_import)
 
     p = sub.add_parser("hook", help="Claude Code hook entry points")
     p.add_argument("event", choices=["post-edit", "stop"])
