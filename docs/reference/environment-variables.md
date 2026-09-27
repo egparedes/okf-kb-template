@@ -32,6 +32,11 @@ cp .env.example .env
 | `KB_REPO_ROOT` | `kb` | Repository root to use instead of searching upwards from the current directory. The launcher sets it for each call. Never export it globally: it pins every `kb` call to one knowledge base. |
 | `CLAUDECODE` | `kb` | Set to `1` by Claude Code for the commands its agent runs. When set, commands that change pages record them for the Stop hook. |
 
+No variable names the knowledge-base folder. `kb`, `just` and CI read it
+from `[tool.kb] bundle` in `pyproject.toml` (see
+[Repository layout](repository-layout.md#the-knowledge-base-folder)); for a
+single call, `kb --bundle PATH` overrides it.
+
 ### Launcher (v0.4.0)
 
 | Variable | Meaning |

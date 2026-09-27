@@ -7,13 +7,16 @@ maintain, following Andrej Karpathy's
 pattern: you bring sources and questions, and the agent compiles them into
 interlinked pages.
 
-The pages live in one folder, `kb/`, which is at the same time:
+The pages live in one folder of the repository, the knowledge-base folder,
+which is at the same time:
 
 - an [Open Knowledge Format (OKF) v0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)
   bundle: plain markdown files with YAML frontmatter that any OKF reader
   can load, valid at every commit;
 - an [Obsidian](https://obsidian.md) vault, for reading and writing by hand
-  (optional).
+  (optional). Obsidian names the vault after the folder, and the folder is
+  named after the knowledge base (`my-kb/` below) unless you choose another
+  name.
 
 You work with a command-line agent such as
 [Claude Code](https://github.com/anthropics/claude-code),
@@ -51,7 +54,7 @@ You need [git](https://git-scm.com), [uv](https://docs.astral.sh/uv/) and
 uvx copier copy --trust gh:egparedes/okf-kb-template my-kb
 cd my-kb
 just setup
-just obsidian-setup           # then open kb/ with Open folder as vault
+just obsidian-setup           # then open my-kb/ with Open folder as vault
 claude    # or codex, or gemini
 ```
 

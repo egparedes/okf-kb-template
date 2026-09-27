@@ -63,6 +63,18 @@ If you want to change a managed file for good, change it in your own fork of
 the template and update from the fork. Local edits to managed files survive
 updates only as long as Copier can merge them.
 
+## Updating to v0.5.0
+
+- **Knowledge-base folder:** Copier asks the new question `bundle_dir`, the
+  name of the knowledge-base folder, with the default `kb`. Accept it: your
+  knowledge base keeps its `kb/` folder, and `pyproject.toml` records the
+  name in `[tool.kb] bundle = "kb"`. Answering another name here does not
+  move your pages.
+- **Optional rename:** to give the folder, and so the Obsidian vault,
+  another name, commit the update first, then run
+  `just rename-bundle <name>`. See
+  [Rename the knowledge-base folder](rename-the-knowledge-base-folder.md).
+
 ## Updating to v0.4.0
 
 - **Search:** the qmd collection is now named after the knowledge base

@@ -45,9 +45,9 @@ def post_edit(bundle: Bundle) -> int:
     return 2
 
 
-def _changed_files(repo_root: Path) -> list[str]:
+def _changed_files(repo_root: Path, prefix: str) -> list[str]:
     result = subprocess.run(
-        ["git", "status", "--porcelain", "-z", "--untracked-files=all", "--", "kb"],
+        ["git", "status", "--porcelain", "-z", "--untracked-files=all", "--", prefix],
         cwd=repo_root,
         capture_output=True,
         text=True,
@@ -97,9 +97,10 @@ def stop(bundle: Bundle) -> int:
         p for p in touched
         if p.name not in ("index.md", "log.md") and not any(folder in p.parents for folder in personal)
     ]
-    if knowledge_edits and "kb/log.md" not in _changed_files(bundle.repo_root):
+    if knowledge_edits and bundle.show("log.md") not in _changed_files(bundle.repo_root, bundle.prefix):
         problems.append(
-            "knowledge pages changed but kb/log.md has no entry: run `uv run kb log <Op> \"<message with /links>\"`"
+            f"knowledge pages changed but {bundle.show('log.md')} has no entry: "
+            "run `uv run kb log <Op> \"<message with /links>\"`"
         )
     if not problems:
         touched_file.unlink()

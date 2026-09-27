@@ -26,7 +26,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Find the knowledge-base folder
+        run: |
+          n=$(sed -n '/^\[tool\.kb\]/,/^\[/s/^bundle = "\(.*\)"$/\1/p' pyproject.toml)
+          echo "BUNDLE=${n:-kb}" >> "$GITHUB_ENV"
       - uses: lycheeverse/lychee-action@v2
         with:
-          args: --no-progress --scheme https --scheme http --accept '200..=299,403,429' --root-dir ${{ github.workspace }}/kb --exclude-path kb/.obsidian 'kb/**/*.md'
+          args: --no-progress --scheme https --scheme http --accept '200..=299,403,429' --root-dir ${{ github.workspace }}/${{ env.BUNDLE }} --exclude-path ${{ env.BUNDLE }}/.obsidian '${{ env.BUNDLE }}/**/*.md'
           fail: true

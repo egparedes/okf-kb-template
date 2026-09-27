@@ -3,7 +3,8 @@
 A [Copier](https://copier.readthedocs.io) template for personal knowledge
 bases that LLM agents maintain, following Andrej Karpathy's
 [LLM wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
-pattern. The pages live in `kb/`, which is both a conformant
+pattern. The pages live in one folder of the repository (named after the
+knowledge base by default; `kb/` before v0.5.0), which is both a conformant
 [Open Knowledge Format v0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)
 bundle and, optionally, an [Obsidian](https://obsidian.md) vault. You work
 with a command-line agent (Claude Code, Codex, Gemini CLI) through three
@@ -22,7 +23,7 @@ Requirements: git, [uv](https://docs.astral.sh/uv/) and
 uvx copier copy --trust gh:egparedes/okf-kb-template my-kb
 cd my-kb
 just setup
-just obsidian-setup           # then open kb/ with Open folder as vault
+just obsidian-setup           # then open my-kb/ with Open folder as vault
 claude    # or codex, or gemini
 ```
 

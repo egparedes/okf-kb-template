@@ -19,6 +19,7 @@ nav = [
     { "Install the kb launcher" = "how-to/install-the-cli-launcher.md" },
     { "Run several knowledge bases" = "how-to/multiple-knowledge-bases.md" },
     { "Set up Obsidian" = "how-to/set-up-obsidian.md" },
+    { "Rename the knowledge-base folder" = "how-to/rename-the-knowledge-base-folder.md" },
     { "Connect Zotero" = "how-to/connect-zotero.md" },
     { "Connect KaraKeep" = "how-to/connect-karakeep.md" },
     { "Link local files" = "how-to/link-local-files.md" },

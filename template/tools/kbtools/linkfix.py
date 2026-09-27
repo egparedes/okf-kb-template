@@ -71,9 +71,8 @@ def fix(bundle: Bundle, docs: list[Document] | None = None) -> list[Document]:
     return changed
 
 
-def _bundle_rel(path: str) -> str:
-    path = path.lstrip("/")
-    return path[3:] if path.startswith("kb/") else path
+def _bundle_rel(bundle: Bundle, path: str) -> str:
+    return bundle.rel(path)
 
 
 def retarget(bundle: Bundle, old_rel: str, new_rel: str, moved_from: str | None = None) -> list[str]:
@@ -134,7 +133,7 @@ def retarget(bundle: Bundle, old_rel: str, new_rel: str, moved_from: str | None 
 
 def move(bundle: Bundle, old_rel: str, new_rel: str) -> list[str]:
     """Move a page and rewrite every link to it; its own relative links are rebased."""
-    old_rel, new_rel = _bundle_rel(old_rel), _bundle_rel(new_rel)
+    old_rel, new_rel = _bundle_rel(bundle, old_rel), _bundle_rel(bundle, new_rel)
     if not new_rel.endswith(".md"):
         new_rel += ".md"
     source, dest = bundle.root / old_rel, bundle.root / new_rel
@@ -168,7 +167,7 @@ def merge(bundle: Bundle, old_rel: str, into_rel: str, actor: str, dry_run: bool
 
     from .pages import now_utc
 
-    old_rel, into_rel = _bundle_rel(old_rel), _bundle_rel(into_rel)
+    old_rel, into_rel = _bundle_rel(bundle, old_rel), _bundle_rel(bundle, into_rel)
     old, into = bundle.root / old_rel, bundle.root / into_rel
     root = bundle.root.resolve()
     for path in (old, into):
@@ -207,7 +206,7 @@ def merge(bundle: Bundle, old_rel: str, into_rel: str, actor: str, dry_run: bool
             fm.pop(key, None)
     fm.pop("verified", None)  # merged content has not been reviewed yet
     fm["generated"] = {"by": actor, "at": now_utc()}
-    plan = [f"merge metadata of kb/{old_rel} into kb/{into_rel}", f"delete kb/{old_rel}"]
+    plan = [f"merge metadata of {bundle.show(old_rel)} into {bundle.show(into_rel)}", f"delete {bundle.show(old_rel)}"]
     if dry_run:
         linking = sorted(
             str(d.rel) for d in bundle.documents
@@ -215,10 +214,10 @@ def merge(bundle: Bundle, old_rel: str, into_rel: str, actor: str, dry_run: bool
             and any(resolve(unquote(t.split("#")[0]), d.folder) == old_rel
                     for t in [l.target for l in find_links(d.body) if not l.is_external] + _FM_LINK.findall(d.text[: d.fm_end]))
         )
-        return plan + [f"would update links in kb/{rel}" for rel in linking] + ["(dry run: nothing written)"]
+        return plan + [f"would update links in {bundle.show(rel)}" for rel in linking] + ["(dry run: nothing written)"]
     header = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True, width=1000)
     into.write_text(f"---\n{header}---\n{into_doc.body}", encoding="utf-8")
     old.unlink()
     changed = retarget(bundle, old_rel, into_rel)
     record_touched(bundle.repo_root, [into, *(bundle.root / rel for rel in changed)])
-    return plan + [f"updated links in kb/{rel}" for rel in changed]
+    return plan + [f"updated links in {bundle.show(rel)}" for rel in changed]

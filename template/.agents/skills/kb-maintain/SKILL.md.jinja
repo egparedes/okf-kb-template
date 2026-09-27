@@ -35,7 +35,7 @@ duplicates, weak pages and missing connections.
    - **Drafts:** complete them, or merge them into a related page.
 
 4. **Semantic pass.**
-   - Review the 10 most recently changed pages (`git log --name-only -20 -- kb`)
+   - Review the 10 most recently changed pages (`git log --name-only -20 -- {{ bundle_dir }}`)
      and 5 random ones.
    - Check claims against the cited sources.
    - Look for `**Conflict:**` paragraphs that newer sources now settle.
@@ -45,7 +45,7 @@ duplicates, weak pages and missing connections.
        `alternative_to`, or record the pair in `schema/distinct.yaml`
        (`distinct: [[/a.md, /b.md], ...]`; create the file if needed).
      - Otherwise, with the human's confirmation and a clean
-       `git status -- kb`, merge the text into the better page, then run
+       `git status -- {{ bundle_dir }}`, merge the text into the better page, then run
        `uv run kb merge <old> <into>` (try `--dry-run` first). The merged page
        loses `verified`: it needs a new review.
    - **Missing links** (`uv run kb unlinked`): link a mention where a reader

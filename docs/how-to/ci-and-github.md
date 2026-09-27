@@ -6,7 +6,7 @@ contains `.github/workflows/kb.yml`. It has two jobs.
 | Job | Runs on | What it does |
 |---|---|---|
 | `validate` | every push and pull request, and manual runs | Installs uv and just, runs `uv sync` and `just ci`: `kb check`, the independent OKF validator, the tooling tests, and `kb index --check` |
-| `links` | every Monday at 06:00 UTC, and manual runs | Checks the external `http` and `https` URLs in `kb/**/*.md` with [lychee](https://lychee.cli.rs) and fails on dead links |
+| `links` | every Monday at 06:00 UTC, and manual runs | Checks the external `http` and `https` URLs in the pages of the knowledge-base folder with [lychee](https://lychee.cli.rs) and fails on dead links |
 
 Both jobs have read-only access to the repository.
 
@@ -46,7 +46,10 @@ URLs that no longer answer.
 - Only `http` and `https` URLs are checked. Links between pages are
   checked by `kb check` instead, where a link to a missing page is allowed
   as a wanted page.
-- `kb/.obsidian/` is excluded.
+- The `.obsidian/` folder of the vault is excluded.
+- The job reads the folder's name from `[tool.kb] bundle` in
+  `pyproject.toml` (`kb` when it is missing), so it needs no change after
+  [a rename](rename-the-knowledge-base-folder.md).
 
 To run it now instead of waiting for Monday, open *Actions → kb → Run
 workflow*. A manual run starts both jobs.

@@ -48,7 +48,7 @@ Every non-obvious claim carries a footnote whose label is a `sources[].id`.
 The chain from claim to origin has three links:
 
 1. the footnote in the text points to a source id;
-2. the source's `resource` is a Source page in `kb/sources/`, which
+2. the source's `resource` is a Source page in `/sources/`, which
    summarizes the source and lists the pages it fed;
 3. the Source page's own `resource` is the canonical URL, and possibly a
    `zotero` pointer, `locators` to a file, or an `archived` snapshot.

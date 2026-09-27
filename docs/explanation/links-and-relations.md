@@ -14,8 +14,8 @@ This one form has to work for three readers.
 - **OKF consumers.** OKF uses standard markdown links and recommends
   bundle-root paths. `[[wikilinks]]` are not part of the specification; an
   OKF reader sees them as plain text.
-- **Obsidian.** With `kb/` as the vault root, Obsidian resolves `/…` against
-  the same folder. See [the vault is the bundle](design-overview.md#the-vault-is-the-bundle).
+- **Obsidian.** With the knowledge-base folder as the vault root, Obsidian
+  resolves `/…` against the same folder. See [the vault is the bundle](design-overview.md#the-vault-is-the-bundle).
 - **The `kb` tool and agents.** An absolute path is the same string on every
   page that links to the target, so `rg "/systems/distributed/cap-theorem.md"`
   finds every inbound link, and `kb mv` can rewrite them all.

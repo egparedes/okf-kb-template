@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from kbtools import indexgen, linkfix, pages
-from kbtools.bundle import Bundle
+from kbtools.bundle import Bundle, bundle_dir
 from kbtools.check import Checker
 
 REPO = Path(__file__).resolve().parents[2]
@@ -199,7 +199,7 @@ def test_new_page_is_valid(repo: Path) -> None:
 
 
 def test_repository_bundle_is_clean() -> None:
-    diagnostics = Checker(Bundle(REPO / "kb", REPO)).check_all()
+    diagnostics = Checker(Bundle(REPO / bundle_dir(REPO), REPO)).check_all()
     assert [str(d) for d in diagnostics if d.is_error] == []
 
 
@@ -291,3 +291,31 @@ def test_kb_commands_in_agent_sessions_are_tracked(repo: Path, monkeypatch) -> N
     created.write_text(created.read_text() + "\nSee [[Wiki]].\n")  # edited via Bash, not the Edit tool
     monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
     assert hooks.stop(fresh(repo)) == 2
+
+
+def test_bundle_folder_comes_from_pyproject(tmp_path: Path) -> None:
+    assert bundle_dir(tmp_path) == "kb"  # no pyproject.toml
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\n\n[tool.kb]\nbundle = "my-notes"\n')
+    assert bundle_dir(tmp_path) == "my-notes"
+    shutil.copytree(FIXTURES / "schema", tmp_path / "schema")
+    shutil.copy(REPO / "schema" / "frontmatter.schema.json", tmp_path / "schema")
+    (tmp_path / "my-notes" / "systems").mkdir(parents=True)
+    page_path = tmp_path / "my-notes" / "systems" / "a.md"
+    page_path.write_text(page("A", "Broken [link](/nowhere.md)."))
+    b = Bundle(tmp_path / "my-notes", tmp_path)
+    assert b.prefix == "my-notes" and b.show("log.md") == "my-notes/log.md"
+    assert b.rel("my-notes/systems/a.md") == b.rel("/systems/a.md") == "systems/a.md"
+    assert b.path_arg("my-notes/systems/a.md") == page_path.resolve()
+    shown = [str(d) for d in Checker(b).check_files([b.document(page_path)])]
+    assert any(line.startswith("my-notes/systems/a.md:") for line in shown), shown
+
+
+def test_prefix_that_is_also_a_folder_inside_the_bundle(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text('[tool.kb]\nbundle = "notes"\n')
+    shutil.copytree(FIXTURES / "schema", tmp_path / "schema")
+    shutil.copy(REPO / "schema" / "frontmatter.schema.json", tmp_path / "schema")
+    (tmp_path / "notes" / "notes").mkdir(parents=True)  # a domain folder named like the bundle
+    b = Bundle(tmp_path / "notes", tmp_path)
+    assert b.rel("notes/new-page.md") == "notes/new-page.md"  # the domain folder exists: read inside the bundle
+    assert b.rel("notes/notes/new-page.md") == "notes/new-page.md"  # notes/notes/ does not exist inside
+    assert b.rel("/notes/x.md") == "notes/x.md"

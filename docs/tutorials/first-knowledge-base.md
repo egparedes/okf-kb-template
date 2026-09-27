@@ -2,8 +2,9 @@
 
 In this tutorial you create a knowledge base, open it in Obsidian, let an
 agent ingest one web page, ask it a question, and make the first commit.
-At the end you have a git repository whose `kb/` folder is a valid Open
-Knowledge Format bundle with a few real pages in it.
+At the end you have a git repository `my-kb/` with a knowledge-base folder
+inside it, also called `my-kb/`, that is a valid Open Knowledge Format
+bundle with a few real pages in it.
 
 ## 1. Install the prerequisites
 
@@ -44,8 +45,14 @@ uvx copier copy --trust gh:egparedes/okf-kb-template my-kb
 ```
 
 `--trust` allows the template to run two commands after copying: one writes
-the first entry of `kb/log.md`, the other generates the `index.md` files.
+the first entry of the log, `log.md`, the other generates the `index.md`
+files.
 Without them the new bundle would not be valid.
+
+Copier may first print
+`MissingFileWarning: File not found; returning empty dict: .copier-answers.yml`.
+It is expected on a first copy (Copier looks for the answers of an earlier
+copy, and there is none yet); ignore it.
 
 Copier asks these questions. Press Enter to accept the default shown.
 
@@ -57,31 +64,43 @@ Copier asks these questions. Press Enter to accept the default shown.
 | Your id for OKF actors | `alice` (your pages will be signed `human:alice`) |
 | Default actor for agent-written pages | `claude-code/claude-opus-5-5` |
 | Knowledge-domain folders | see below |
-| Configure `kb/` as an Obsidian vault? | `Yes` |
+| Folder that holds the knowledge base itself | `my-kb` (the default: the slug) |
+| Configure the knowledge-base folder as an Obsidian vault? | `Yes` |
 | Add Claude Code settings, hooks and CLAUDE.md? | `Yes` if you use Claude Code |
 | Add a GitHub Actions workflow? | `Yes` |
 | Run the post-copy tasks? | `Yes` |
 
-The domains are the top-level topic folders of `kb/`. The answer is YAML;
-type it on one line:
+The domains are the top-level topic folders of the knowledge-base folder.
+The answer is YAML; type it on one line:
 
 ```yaml
 {ai: {title: AI and machine learning, description: Models, training, evaluation and LLM tooling.}, general: {title: General, description: Knowledge that does not fit a more specific domain yet.}}
 ```
 
-You can change them later in `schema/taxonomy.yaml`. The
-[Copier questions reference](../reference/copier-questions.md) describes
-every question.
+You can change them later in `schema/taxonomy.yaml`.
+
+The next question names the **knowledge-base folder**: the folder inside
+the repository that holds the pages. It is the OKF bundle and the Obsidian
+vault, and Obsidian names the vault after it. This tutorial keeps the
+default, so the repository `my-kb/` contains a folder `my-kb/`, and every
+path below that starts with `my-kb/` is relative to the repository root. If
+you choose another name, such as `notes`, read `notes/` wherever the
+tutorial says `my-kb/`. The name cannot be one of your domains, such as
+`ai`. You can rename the folder later with
+[`just rename-bundle`](../how-to/rename-the-knowledge-base-folder.md).
+
+The [Copier questions reference](../reference/copier-questions.md)
+describes every question.
 
 Copier lists the files it creates and ends with the two tasks:
 
 ```text
  > Running task 1 of 2: uv run --quiet kb log Initialization "Created the knowledge base from okf-kb-template."
-logged in kb/log.md
+logged in my-kb/log.md
  > Running task 2 of 2: uv run --quiet kb index
-wrote kb/index.md
-wrote kb/ai/index.md
-wrote kb/entities/index.md
+wrote my-kb/index.md
+wrote my-kb/ai/index.md
+wrote my-kb/entities/index.md
 …
 ```
 
@@ -113,7 +132,7 @@ just check
 kb check: 0 error(s), 0 warning(s) in 12 file(s)
 ```
 
-Look at `kb/index.md`. It lists your domains, then the Library folders
+Look at `my-kb/index.md`. It lists your domains, then the Library folders
 (`sources`, `syntheses`, `entities`) and the Personal folders (`projects`,
 `journal`). It is generated: you never edit it by hand.
 
@@ -126,7 +145,7 @@ just obsidian-setup
 ```
 
 The command downloads the two required community plugins, Templater and
-Better Markdown Links, into `kb/.obsidian/plugins/`, and checks their SHA-256
+Better Markdown Links, into `my-kb/.obsidian/plugins/`, and checks their SHA-256
 checksums:
 
 ```text
@@ -136,10 +155,12 @@ better-markdown-links: installed 5.1.0 (Better Markdown Links, MIT)
 Two steps are left in Obsidian (they are not stored in the vault):
   1. On first open, choose "Trust author and enable plugins".
   2. Settings → Templater → turn on "Trigger Templater on new file creation".
-Open kb/ as the vault (Open folder as vault), not the repository root.
+Open my-kb/ as the vault (Open folder as vault), not the repository root.
 ```
 
-In Obsidian, choose *Open folder as vault* and select the `kb/` folder.
+In Obsidian, choose *Open folder as vault* and select the knowledge-base
+folder, `my-kb/my-kb/` (the `my-kb/` folder inside the repository). The
+vault appears as "my-kb" in Obsidian's vault switcher.
 Later, `just obsidian-setup --open` reopens the vault from the terminal.
 Then do the two steps:
 
@@ -150,7 +171,7 @@ Then do the two steps:
    creation**. Obsidian keeps this switch per device, so no script can set
    it. With it on, every new note gets valid frontmatter.
 
-The vault is `kb/`, not the repository root. That matters for links: see
+The vault is the knowledge-base folder, not the repository root. That matters for links: see
 [Links and relations](../explanation/links-and-relations.md).
 
 ## 5. Ingest a first source
@@ -168,14 +189,14 @@ template follows is a good first source:
 
 The agent follows the `kb-ingest` skill. Expect it to:
 
-1. search `kb/sources/` for an existing page about the URL;
+1. search `my-kb/sources/` for an existing page about the URL;
 2. fetch the text into `.cache/sources/` (without KaraKeep configured, it
    fetches the page itself);
-3. create a Source page such as `kb/sources/karpathy-llm-wiki.md` with a
+3. create a Source page such as `my-kb/sources/karpathy-llm-wiki.md` with a
    summary and key points;
 4. create or update the pages the source covers, for example a Concept page
-   in `kb/ai/`, citing the source with footnotes such as `[^karpathy-llm-wiki]`;
-5. run `just fix` and `just check`, and add a line to `kb/log.md` with
+   in `my-kb/ai/`, citing the source with footnotes such as `[^karpathy-llm-wiki]`;
+5. run `just fix` and `just check`, and add a line to `my-kb/log.md` with
    `uv run kb log Ingest …`;
 6. report the key takeaways and the pages it created or updated.
 
@@ -208,11 +229,11 @@ In the same session, ask:
 > What does the knowledge base say about how an LLM wiki differs from
 > retrieval-augmented generation?
 
-The agent follows the `kb-query` skill: it reads `kb/index.md` and the
+The agent follows the `kb-query` skill: it reads `my-kb/index.md` and the
 folder indexes, narrows with `just find` and `rg`, reads the pages, and
 answers with links to them and to their sources. It marks anything it adds
 from its own knowledge. If the answer draws on three or more pages, it files
-it back as a Synthesis page in `kb/syntheses/`.
+it back as a Synthesis page in `my-kb/syntheses/`.
 
 ## 7. Check the bundle
 
@@ -223,7 +244,7 @@ just check
 ```
 
 ```text
-kb/ai/llm-wiki.md:21: W030 broken link `/ai/retrieval-augmented-generation.md` (not-yet-written page?)
+my-kb/ai/llm-wiki.md:21: W030 broken link `/ai/retrieval-augmented-generation.md` (not-yet-written page?)
 …
 kb check: 0 error(s), 2 warning(s) in 16 file(s)
 ```
@@ -254,8 +275,8 @@ stops. Run `git add -A` and commit again.
 
 ## What you have now
 
-- a git repository whose `kb/` folder is an OKF v0.2 bundle and an Obsidian
-  vault;
+- a git repository whose knowledge-base folder, `my-kb/`, is an OKF v0.2
+  bundle and an Obsidian vault;
 - a Source page, the pages it fed, and a log entry;
 - checks that run on every agent edit, every commit and, once you push to
   GitHub, every push.

@@ -1,9 +1,10 @@
 # Check codes
 
-`kb check` prints one line per problem:
+`kb check` prints one line per problem, with the path from the repository
+root (here the knowledge-base folder is `my-kb/`):
 
 ```text
-kb/ai/llm-wiki.md:18: H032 `[[Other]]` is a wikilink or embed, not an OKF link; use [text](/path.md)
+my-kb/ai/llm-wiki.md:18: H032 `[[Other]]` is a wikilink or embed, not an OKF link; use [text](/path.md)
 ```
 
 The code's letter gives its kind:
@@ -22,7 +23,7 @@ run.
 
 | Code | Meaning | Fix |
 |---|---|---|
-| O001 | The page has no YAML frontmatter, the block is not closed with `---`, the YAML does not parse, or it is not a mapping. | Add or repair the frontmatter. Files that are not pages belong outside `kb/` or in `.cache/`. |
+| O001 | The page has no YAML frontmatter, the block is not closed with `---`, the YAML does not parse, or it is not a mapping. | Add or repair the frontmatter. Files that are not pages belong outside the knowledge-base folder or in `.cache/`. |
 | O002 | The frontmatter has no non-empty `type`. | Add a `type` from `schema/vocabulary.yaml`. |
 | O003 | An `index.md` other than the root one has frontmatter, or the root `index.md` has keys other than `okf_version`. | Run `just index`; never edit indexes by hand. |
 | O004 | An `index.md` line is neither a heading nor a `* [Title](url) - description` entry. | Run `just index`. |
@@ -39,7 +40,7 @@ run.
 | H013 | The type requires a key that is missing, e.g. `resource` on a Source page. | Add the key. |
 | H020 | A footnote `[^id]` does not match any `sources[].id`. | Add the source to `sources`, or fix the label. |
 | H021 | A footnote `[^id]` has no definition. | Add `[^id]: [Title](/sources/<id>.md)` at the end of the page. |
-| H030 | A link escapes the bundle (e.g. `../../README.md`). | Link inside `kb/`, or use an external URL. |
+| H030 | A link escapes the bundle (e.g. `../../README.md`). | Link inside the knowledge-base folder, or use an external URL. |
 | H031 | A relation target is not linked from the body. | Link it in a sentence that explains the relation. |
 | H032 | A wikilink or embed (`[[…]]`, `![[…]]`) outside code. | Write `[text](/path.md)`, or `![alt](/path.png)` for images. |
 | H040 | An `index.md` is missing or out of date. | Run `just index` (or `just fix`). |

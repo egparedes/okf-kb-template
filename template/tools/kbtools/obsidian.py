@@ -1,9 +1,9 @@
 """`kb obsidian setup`: install the vault's community plugins from pinned releases.
 
-The vault lists its plugins in `kb/.obsidian/community-plugins.json`. For
+The vault lists its plugins in `<bundle>/.obsidian/community-plugins.json`. For
 each one pinned in `tools/obsidian-plugins.json`, the release files are
 downloaded from GitHub, checked against their SHA-256, and written to
-`kb/.obsidian/plugins/<id>/`. Plugin code stays out of git (`.gitignore`).
+`<bundle>/.obsidian/plugins/<id>/`. Plugin code stays out of git (`.gitignore`).
 
 Two steps stay manual, because Obsidian keeps them outside the vault:
 trusting the vault's plugins on first open, and Templater's per-device
@@ -111,7 +111,7 @@ def setup(bundle: Bundle, add: list[str], force: bool = False, open_vault: bool 
     config = bundle.root / ".obsidian"
     listing = config / "community-plugins.json"
     if not listing.is_file():
-        raise SystemExit("kb: kb/.obsidian/community-plugins.json not found; this knowledge base has no Obsidian configuration")
+        raise SystemExit(f"kb: {bundle.show('.obsidian/community-plugins.json')} not found; this knowledge base has no Obsidian configuration")
     pins = load_pins(bundle)
     original = _read_listing(listing)
     unknown_add = [p for p in add if p not in pins]
@@ -129,12 +129,12 @@ def setup(bundle: Bundle, add: list[str], force: bool = False, open_vault: bool 
         print(f"{plugin}: {install(config / 'plugins' / plugin, spec, force=force, fetch=fetch)} ({spec['name']}, {spec['license']})")
     if enabled != original:  # only after every download verified
         listing.write_text(json.dumps(enabled, indent=2) + "\n", encoding="utf-8")
-        print("updated kb/.obsidian/community-plugins.json")
+        print(f"updated {bundle.show('.obsidian/community-plugins.json')}")
     print(
         "\nTwo steps are left in Obsidian (they are not stored in the vault):\n"
         "  1. On first open, choose \"Trust author and enable plugins\".\n"
         "  2. Settings → Templater → turn on \"Trigger Templater on new file creation\".\n"
-        "Open kb/ as the vault (Open folder as vault), not the repository root."
+        f"Open {bundle.prefix}/ as the vault (Open folder as vault), not the repository root."
     )
     if open_vault:
         uri = "obsidian://open?path=" + quote(str(bundle.root), safe="")

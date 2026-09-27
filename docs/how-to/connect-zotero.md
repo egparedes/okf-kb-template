@@ -23,7 +23,7 @@ The citation key names the Source page. It is converted to kebab-case, the
 
 | Citation key | Source slug | Source page | Citation in pages |
 |---|---|---|---|
-| `hoppeProgressiveMeshes1996` | `hoppe-progressive-meshes-1996` | `kb/sources/hoppe-progressive-meshes-1996.md` | `[^hoppe-progressive-meshes-1996]` |
+| `hoppeProgressiveMeshes1996` | `hoppe-progressive-meshes-1996` | `/sources/hoppe-progressive-meshes-1996.md` | `[^hoppe-progressive-meshes-1996]` |
 
 The exact key stays in the page's `zotero.citekey`.
 

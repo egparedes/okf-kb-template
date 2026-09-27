@@ -96,7 +96,7 @@ def find(bundle: Bundle, only: list[str] | None = None, min_len: int = 4, includ
     pages = _scope(bundle, include_personal)
     wanted = None
     if only:
-        wanted = {p.lstrip("/").removeprefix("kb/") for p in only}
+        wanted = {bundle.rel(p) for p in only}
         unknown = sorted(wanted - set(pages))
         if unknown:
             raise SystemExit(f"kb: not knowledge pages in scope: {', '.join(unknown)}")

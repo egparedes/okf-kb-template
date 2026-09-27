@@ -1,4 +1,4 @@
-# Controlled vocabulary for kb/ (the OKF bundle). This file belongs to this
+# Controlled vocabulary for the knowledge base (the OKF bundle). This file belongs to this
 # knowledge base: the template creates it once and never overwrites it.
 #
 # OKF leaves `type` values open; this file is the house vocabulary that

@@ -1,13 +1,21 @@
 # Set up Obsidian
 
 This guide applies when you answered *Yes* to the Obsidian question: the
-template then configures `kb/` as a vault. You need Obsidian 1.13.7 or later,
-the minimum version of the pinned plugins.
+template then configures the knowledge-base folder as a vault. That folder
+is named after `kb_name` by default (`kb/` in knowledge bases created before
+v0.5.0); below it is `<folder>/`, and `just --evaluate bundle` prints its
+name. You need Obsidian 1.13.7 or later, the minimum version of the pinned
+plugins.
 
-!!! important "Open `kb/`, not the repository root"
+!!! important "Open the knowledge-base folder, not the repository root"
     Pages link to each other with bundle-absolute paths such as
     `/ai/llm-wiki.md`. Obsidian resolves a leading `/` against the vault
-    root, so the links only work when the vault root is `kb/`.
+    root, so the links only work when the vault root is the knowledge-base
+    folder.
+
+Obsidian names the vault after the folder. To give the vault another name,
+[rename the knowledge-base folder](rename-the-knowledge-base-folder.md)
+before you open it in Obsidian: after a rename, Obsidian sees a new vault.
 
 ## Run the setup command
 
@@ -15,22 +23,22 @@ the minimum version of the pinned plugins.
 just obsidian-setup
 ```
 
-Then, in Obsidian, choose *Open folder as vault* and select `kb/`. Later,
+Then, in Obsidian, choose *Open folder as vault* and select `<folder>/`. Later,
 `just obsidian-setup --open` reopens it from the terminal.
 
 `just obsidian-setup` runs `uv run kb obsidian setup`. It:
 
-1. reads the plugin list in `kb/.obsidian/community-plugins.json`;
+1. reads the plugin list in `<folder>/.obsidian/community-plugins.json`;
 2. downloads each listed plugin that has a pin in
    `tools/obsidian-plugins.json` from its GitHub release into
-   `kb/.obsidian/plugins/<id>/` (`main.js`, `manifest.json`, and
+   `<folder>/.obsidian/plugins/<id>/` (`main.js`, `manifest.json`, and
    `styles.css` when the plugin has one);
 3. verifies the SHA-256 checksum of each file against the pin;
 4. reports listed plugins without a pin, which you install from Obsidian;
 5. with `--open`, opens the vault through
-   `obsidian://open?path=<absolute path of kb/>`. This only works for a vault
-   that Obsidian already knows. The first time, use *Open folder as vault*
-   and choose `kb/`;
+   `obsidian://open?path=<absolute path of the folder>`. This only works
+   for a vault that Obsidian already knows. The first time, use *Open folder
+   as vault* and choose `<folder>/`;
 6. prints the manual steps below.
 
 The command is idempotent:
@@ -49,10 +57,11 @@ from the list, the command adds it back.
 
 | Plugin | ID | Configure | Role |
 |---|---|---|---|
-| [Templater](https://github.com/SilentVoid13/Templater) | `templater-obsidian` | Preconfigured, apart from the trigger (below). | Gives new notes valid OKF frontmatter, through the templates in `kb/_templates/`. |
+| [Templater](https://github.com/SilentVoid13/Templater) | `templater-obsidian` | Preconfigured, apart from the trigger (below). | Gives new notes valid OKF frontmatter, through the templates in `<folder>/_templates/`. |
 | [Better Markdown Links](https://github.com/mnaoumov/obsidian-better-markdown-links) | `better-markdown-links` | Keep "Use leading slash for absolute paths" on (the default). | Writes links in the bundle-absolute `/…` form. |
 
-The output names each plugin, what happened, and its licence:
+The output names each plugin, what happened, and its licence. Here the
+repository is `~/my-kb` and its knowledge-base folder is `my-kb/`:
 
 ```text
 templater-obsidian: installed 2.25.1 (Templater, AGPL-3.0)
@@ -61,8 +70,8 @@ better-markdown-links: installed 5.1.0 (Better Markdown Links, MIT)
 Two steps are left in Obsidian (they are not stored in the vault):
   1. On first open, choose "Trust author and enable plugins".
   2. Settings → Templater → turn on "Trigger Templater on new file creation".
-Open kb/ as the vault (Open folder as vault), not the repository root.
-opening obsidian://open?path=%2Fhome%2Falice%2Fmy-kb%2Fkb (works once Obsidian knows the vault; otherwise use Open folder as vault)
+Open my-kb/ as the vault (Open folder as vault), not the repository root.
+opening obsidian://open?path=%2Fhome%2Falice%2Fmy-kb%2Fmy-kb (works once Obsidian knows the vault; otherwise use Open folder as vault)
 ```
 
 ## Do the two manual steps
@@ -77,7 +86,7 @@ opening obsidian://open?path=%2Fhome%2Falice%2Fmy-kb%2Fkb (works once Obsidian k
    so no script can set it. Do it once per device.
 
 The folder templates are already configured in the committed
-`kb/.obsidian/plugins/templater-obsidian/data.json`: journal notes use
+`<folder>/.obsidian/plugins/templater-obsidian/data.json`: journal notes use
 `_templates/journal-entry.md` and every other new note uses
 `_templates/knowledge-page.md`. With the trigger on, a blank new note, or a
 click on a link to a page that does not exist yet, gets a valid OKF
@@ -110,7 +119,7 @@ plugins → Browse*. Two that work with the bundle are OKF Enforcer
 
 ## What is already configured
 
-The template commits these settings in `kb/.obsidian/`. They belong to the
+The template commits these settings in `<folder>/.obsidian/`. They belong to the
 knowledge base: template updates never overwrite them.
 
 | Setting | Value | Why |
@@ -126,7 +135,7 @@ knowledge base: template updates never overwrite them.
 | Graph filter | `-file:index.md -file:log.md -path:_templates` | Generated indexes would otherwise be hubs that distort the graph. |
 | Core plugins | Bases, Daily notes, Backlinks, Outgoing links, Outline, Page preview, Properties, Bookmarks, Footnotes view, … | Core Templates is off; Templater replaces it. |
 
-`kb/_views/` holds three Bases dashboards. Bases files are YAML, not
+`<folder>/_views/` holds three Bases dashboards. Bases files are YAML, not
 markdown, so they are outside the bundle:
 
 - `knowledge.base`: every knowledge page by type, plus recent changes;

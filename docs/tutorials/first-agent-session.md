@@ -3,7 +3,9 @@
 This tutorial continues from [Your first knowledge base](first-knowledge-base.md).
 You ingest two more sources, look at how the agent folds them into existing
 pages, ask a question whose answer is filed back, run a maintenance pass,
-and record your own review of a page.
+and record your own review of a page. As in that tutorial, the
+knowledge-base folder is `my-kb/`; if you named it differently, use your
+name in the paths below.
 
 You talk to the agent in plain language. The agent decides which workflow
 applies from `AGENTS.md`, and each workflow is a skill in `.agents/skills/`:
@@ -42,7 +44,7 @@ a colleague's:
 
 ```sh
 git status --short
-git diff kb/
+git diff my-kb/
 ```
 
 Things to look at:
@@ -53,7 +55,7 @@ Things to look at:
 - **Relations:** a frontmatter key such as `depends_on` lists markdown
   links, and each target is also linked in the body, in a sentence that
   says why.
-- **The log:** `kb/log.md` has a new line under today's date.
+- **The log:** `my-kb/log.md` has a new line under today's date.
 
 If something is wrong, tell the agent. It fixes the page, and the hooks
 check it again.
@@ -63,7 +65,7 @@ check it again.
 > Compare how the LLM wiki pattern and OKF each handle links between pages.
 
 The answer draws on several pages, so the `kb-query` skill files it back:
-the agent creates `kb/syntheses/<slug>.md` with `type: Synthesis`, whose
+the agent creates `my-kb/syntheses/<slug>.md` with `type: Synthesis`, whose
 `sources` are the pages it used. The next person, or agent, who asks a
 similar question finds the answer in the index.
 

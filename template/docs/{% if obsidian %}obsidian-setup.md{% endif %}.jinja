@@ -1,10 +1,10 @@
 # Obsidian setup
 
-Open **`kb/`** as the vault, not the repository root. OKF links such as
+Open **`{{ bundle_dir }}/`** as the vault, not the repository root. OKF links such as
 `/systems/dns.md` are bundle-root paths, and Obsidian resolves a leading `/`
 against the vault root. The two only agree when they are the same folder.
 
-## Already configured (committed in `kb/.obsidian/`)
+## Already configured (committed in `{{ bundle_dir }}/.obsidian/`)
 
 | Setting | Value | Why |
 |---|---|---|
@@ -26,7 +26,7 @@ just obsidian-setup                         # required plugins; --open opens a v
 just obsidian-setup --add omnisearch,obsidian-linter   # add optional ones
 ```
 
-The command installs every plugin listed in `kb/.obsidian/community-plugins.json`
+The command installs every plugin listed in `{{ bundle_dir }}/.obsidian/community-plugins.json`
 that `tools/obsidian-plugins.json` pins. It downloads the pinned GitHub
 release and checks each file's SHA-256. Plugin code is never committed, and
 running the command again is safe.
@@ -59,8 +59,8 @@ The pinned plugins need Obsidian 1.13.7 or later.
   `.excalidraw.md`. Files without the `.md` extension stay outside OKF;
   embed them from pages with a markdown image link.
 - **Web Clipper:** in the template, set the note name to
-  `{{title|kebab}}` and the location to `sources/`. Add text properties
-  `type: Source`, `title`, `description`, `resource: {{url}}` and
+  `{% raw %}{{title|kebab}}{% endraw %}` and the location to `sources/`. Add text properties
+  `type: Source`, `title`, `description`, `resource: {% raw %}{{url}}{% endraw %}` and
   `status: draft`. Leave out `tags` and `generated`: the Clipper writes text
   properties as quoted strings, which `kb check` rejects for those two.
   Then ask an agent to finish the page with the `kb-ingest` skill, which adds

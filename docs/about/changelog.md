@@ -3,6 +3,39 @@
 Releases are git tags. A knowledge base records its tag in
 `.copier-answers.yml`; see [Update from the template](../how-to/update-from-the-template.md).
 
+## v0.5.0
+
+- **Configurable knowledge-base folder.** The folder that holds the bundle
+  and is the Obsidian vault is no longer always `kb/`. The new Copier
+  question [`bundle_dir`](../reference/copier-questions.md#bundle_dir),
+  asked after `domains`, names it, after `kb_name` by default, so each vault
+  gets its own name in Obsidian. It cannot be the name of a domain or of a
+  standard folder such as `sources`. The name is recorded in
+  `[tool.kb] bundle` in `pyproject.toml`, and the `kb` command, the new
+  `bundle` just variable and CI read it from there. The `kb` command keeps its name. See
+  [Repository layout](../reference/repository-layout.md#the-knowledge-base-folder).
+- **`just rename-bundle NEW`** renames the folder of an existing knowledge
+  base: it moves the folder with `git mv`, re-renders the template-managed
+  files that name it, stages the result for review, warns about local edits
+  the re-render reverted, and regenerates the indexes. If the re-render
+  fails, it puts everything back.
+  [How-to](../how-to/rename-the-knowledge-base-folder.md).
+- `kb` messages show paths as `<folder>/…`, and path arguments accept a
+  leading `<folder>/` as well as `/` (unless the path also exists inside the
+  bundle; see [the kb command line](../reference/cli.md#finding-the-knowledge-base)).
+- `.gitignore`, `.pre-commit-config.yaml`, `AGENTS.md`, `CLAUDE.md`, the
+  skills, `README.md` and `docs/obsidian-setup.md` are rendered with the
+  folder name.
+- On a first `copier copy`, Copier prints a harmless `MissingFileWarning`
+  about `.copier-answers.yml`: the template reads the previous answers, if
+  any, to choose the default of `bundle_dir`.
+
+**Upgrading.** `copier update` asks `bundle_dir` with the default `kb`:
+accept it, and nothing moves. Existing knowledge bases keep `kb/`. To give
+the folder, and so the Obsidian vault, another name, commit the update and
+then run `just rename-bundle <name>`. See
+[Updating to v0.5.0](../how-to/update-from-the-template.md#updating-to-v050).
+
 ## v0.4.0
 
 - **Global launcher.** An optional `kb` command (package `okf-kb`, in

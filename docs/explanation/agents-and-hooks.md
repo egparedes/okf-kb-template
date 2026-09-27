@@ -50,7 +50,7 @@ Code then shows the hook's message to the agent, which fixes the problem and
 continues.
 
 **After each Write or Edit** (`kb hook post-edit`): if the file is a `.md`
-file inside `kb/`, the hook records its path and runs `kb check` on that
+file inside the knowledge-base folder, the hook records its path and runs `kb check` on that
 file. Errors go straight back to the agent, while it still has the page in
 mind. Warnings, such as wanted pages, do not block.
 
@@ -61,7 +61,7 @@ pages *this session* changed.
 - The `index.md` of each changed page's folder, and every index above it up
   to the root, must be current.
 - If any changed page is a knowledge page (not in a personal area, not an
-  index or the log), `kb/log.md` must have uncommitted changes, meaning the
+  index or the log), the bundle's `log.md` must have uncommitted changes, meaning the
   session logged its work.
 
 If a check fails, the agent is sent back with the list of problems, fixes

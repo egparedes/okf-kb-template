@@ -6,19 +6,19 @@ repos:
         name: kb fix-links (bundle-absolute links)
         entry: uv run --quiet kb fix-links
         language: system
-        files: ^kb/.*\.md$
+        files: ^{{ bundle_dir }}/.*\.md$
         pass_filenames: false
       - id: kb-index
         name: kb index (regenerate index.md files)
         entry: uv run --quiet kb index
         language: system
-        files: ^(kb/.*\.md|schema/.*)$
+        files: ^({{ bundle_dir }}/.*\.md|schema/.*)$
         pass_filenames: false
       - id: kb-check
         name: kb check (OKF v0.2 + house rules)
         entry: uv run --quiet kb check
         language: system
-        files: ^(kb/.*|schema/.*)$
+        files: ^({{ bundle_dir }}/.*|schema/.*)$
         pass_filenames: false
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -27,5 +27,5 @@ repos:
         files: ^schema/
       - id: check-json
       - id: end-of-file-fixer
-        files: ^kb/.*\.md$
+        files: ^{{ bundle_dir }}/.*\.md$
       - id: check-merge-conflict

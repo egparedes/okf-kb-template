@@ -148,7 +148,7 @@ class Mapping:
             description_skip=list(data.get("description_skip") or []),
             unresolved=unresolved,
             max_bytes=int(data.get("max_bytes") or DEFAULT_MAX_BYTES),
-            links={str(k).casefold(): "/" + str(v).strip("/").removeprefix("kb/") for k, v in (data.get("links") or {}).items()},
+            links={str(k).casefold(): "/" + str(v).strip("/") for k, v in (data.get("links") or {}).items()},
         )
 
 
@@ -176,6 +176,7 @@ class Plan:
     issues: list[tuple[str, str]] = field(default_factory=list)
     outputs: dict[str, str] = field(default_factory=dict)  # dest -> text (notes) or "" (copied files)
     names: dict[str, list[str]] | None = None  # wikilink name index, built on first use
+    prefix: str = "kb"  # the bundle folder, for display
 
     @property
     def imported(self) -> list[Item]:
@@ -226,8 +227,9 @@ def build_plan(bundle: Bundle, source: Path, into: str, mapping: Mapping) -> Pla
     source = source.resolve()
     if not source.is_dir():
         raise SystemExit(f"kb import: {source} is not a directory")
-    into = into.strip("/").removeprefix("kb/")
-    plan = Plan(source=source, into=into, mapping=mapping)
+    into = bundle.rel(into).strip("/")
+    mapping.links = {name: "/" + bundle.rel(target) for name, target in mapping.links.items()}
+    plan = Plan(source=source, into=into, mapping=mapping, prefix=bundle.prefix)
     for path in sorted(p for p in source.rglob("*") if p.is_file()):
         src = path.relative_to(source).as_posix()
         if _matches(src, list(ALWAYS_EXCLUDED)) or any(part.startswith(".") for part in PurePosixPath(src).parts):
@@ -252,12 +254,12 @@ def build_plan(bundle: Bundle, source: Path, into: str, mapping: Mapping) -> Pla
         if item.note and name in RESERVED:
             plan.errors.append(f"{item.src}: `{name}` is reserved in OKF; map it to another name")
         if item.dest in seen:
-            plan.errors.append(f"{item.src} and {seen[item.dest]} both map to kb/{item.dest}")
+            plan.errors.append(f"{item.src} and {seen[item.dest]} both map to {bundle.show(item.dest)}")
         seen[item.dest] = item.src
         if (bundle.root / item.dest).exists():
-            plan.errors.append(f"{item.src}: kb/{item.dest} already exists")
+            plan.errors.append(f"{item.src}: {bundle.show(item.dest)} already exists")
         if bundle.root.resolve() not in (bundle.root / item.dest).resolve().parents:
-            plan.errors.append(f"{item.src}: kb/{item.dest} is outside the bundle")
+            plan.errors.append(f"{item.src}: {bundle.show(item.dest)} is outside the bundle")
     return plan
 
 
@@ -749,12 +751,12 @@ def report(plan: Plan) -> list[str]:
     notes = sorted((i for i in plan.imported if i.note), key=lambda i: i.dest)
     files = sorted((i for i in plan.imported if not i.note), key=lambda i: i.dest)
     skipped = sorted((i for i in plan.items.values() if not i.dest), key=lambda i: i.src)
-    lines = [f"kb import: {plan.source} -> kb/{plan.into or ''}"]
+    lines = [f"kb import: {plan.source} -> {plan.prefix}/{plan.into or ''}"]
     lines.append(f"\nnotes ({len(notes)}):")
-    lines += [f"  {i.src} -> kb/{i.dest}  [{i.type or '?'}] {i.title}" for i in notes]
+    lines += [f"  {i.src} -> {plan.prefix}/{i.dest}  [{i.type or '?'}] {i.title}" for i in notes]
     if files:
         lines.append(f"\nfiles ({len(files)}):")
-        lines += [f"  {i.src} -> kb/{i.dest}" for i in files]
+        lines += [f"  {i.src} -> {plan.prefix}/{i.dest}" for i in files]
     if skipped:
         lines.append(f"\nnot imported ({len(skipped)}):")
         lines += [f"  {i.src}: {i.reason}" for i in skipped]

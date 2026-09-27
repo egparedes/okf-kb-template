@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import posixpath
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 
@@ -33,13 +33,14 @@ class Diagnostic:
     line: int
     code: str
     message: str
+    prefix: str = field(default="kb", compare=False)  # the bundle folder, for display
 
     @property
     def is_error(self) -> bool:
         return not self.code.startswith("W")
 
     def __str__(self) -> str:
-        path = self.path[3:] if self.path.startswith("../") else f"kb/{self.path}"
+        path = self.path[3:] if self.path.startswith("../") else f"{self.prefix}/{self.path}"
         return f"{path}:{self.line}: {self.code} {self.message}"
 
 
@@ -57,7 +58,7 @@ class Checker:
 
     def report(self, doc_or_path: Document | str, line: int, code: str, message: str) -> None:
         path = str(doc_or_path.rel) if isinstance(doc_or_path, Document) else doc_or_path
-        self.diagnostics.append(Diagnostic(path, line, code, message))
+        self.diagnostics.append(Diagnostic(path, line, code, message, self.bundle.prefix))
 
     # -- entry points -------------------------------------------------------
 

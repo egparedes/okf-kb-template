@@ -11,6 +11,8 @@ or know the basics.
 - [Run several knowledge bases](multiple-knowledge-bases.md) on one machine.
 - [Set up Obsidian](set-up-obsidian.md): plugins, settings, writing by hand,
   Web Clipper.
+- [Rename the knowledge-base folder](rename-the-knowledge-base-folder.md),
+  and with it the Obsidian vault.
 - [Enable search](enable-search.md) with qmd.
 - [Use CI on GitHub](ci-and-github.md).
 

@@ -49,13 +49,13 @@ def _cmd_index(bundle: Bundle, args: argparse.Namespace) -> int:
 def _cmd_fix_links(bundle: Bundle, args: argparse.Namespace) -> int:
     docs = [bundle.document(p) for p in map(bundle.path_arg, args.paths) if p] if args.paths else None
     for doc in linkfix.fix(bundle, docs):
-        print(f"fixed links in kb/{doc.rel}")
+        print(f"fixed links in {bundle.show(doc.rel)}")
     return 0
 
 
 def _cmd_mv(bundle: Bundle, args: argparse.Namespace) -> int:
     for rel in linkfix.move(bundle, args.old, args.new):
-        print(f"updated links in kb/{rel}")
+        print(f"updated links in {bundle.show(rel)}")
     for path in indexgen.write(Bundle(bundle.root, bundle.repo_root)):
         print(f"wrote {path.relative_to(bundle.repo_root)}")
     return 0
@@ -93,7 +93,7 @@ def _cmd_find(bundle: Bundle, args: argparse.Namespace) -> int:
             continue
         if args.status and fm.get("status", "stable") != args.status:
             continue
-        if args.folder and not str(doc.rel).startswith(args.folder.strip("/") + "/"):
+        if args.folder and not str(doc.rel).startswith(bundle.rel(args.folder).strip("/") + "/"):
             continue
         if args.trust and report.trust_tier(doc) != args.trust:
             continue
@@ -228,7 +228,7 @@ def _cmd_hook(bundle: Bundle, args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kb", description=__doc__)
-    parser.add_argument("--bundle", help="bundle root (default: <repo>/kb)")
+    parser.add_argument("--bundle", help="bundle root (default: the folder named in [tool.kb] bundle, else <repo>/kb)")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("check", help="validate OKF conformance and house rules")
@@ -250,7 +250,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("new", help="new bundle-relative path")
     p.set_defaults(func=_cmd_mv)
 
-    p = sub.add_parser("log", help="add an entry to kb/log.md under today's date")
+    p = sub.add_parser("log", help="add an entry to the bundle's log.md under today's date")
     p.add_argument("op", help=f"operation, e.g. {', '.join(pages.LOG_OPS)}")
     p.add_argument("message", nargs="+", help="entry text; link pages as [Title](/path.md)")
     p.set_defaults(func=_cmd_log)

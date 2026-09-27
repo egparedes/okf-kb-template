@@ -4,7 +4,7 @@
 
 This knowledge base is maintained mostly by LLM agents, following Karpathy's
 [LLM wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
-pattern. `kb/` is a conformant
+pattern. `{{ bundle_dir }}/` is a conformant
 [Open Knowledge Format v0.2](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)
 bundle{% if obsidian %} and, at the same time, an [Obsidian](https://obsidian.md) vault{% endif %}.
 Agents compile sources into pages; you curate sources, read and ask questions.
@@ -23,12 +23,12 @@ schema/                 vocabulary (types, relations, extra fields), taxonomy (f
 tools/kbtools/          the `kb` CLI: check, index, fix-links, mv, merge, new, log, find, report,
                         graph, dupes, unlinked, zotero, karakeep, fetch, open
 justfile                task runner (`just` lists recipes)
-kb/                     OKF bundle root{% if obsidian %} == Obsidian vault root{% endif %}
+{{ (bundle_dir ~ '/').ljust(23) }} OKF bundle root{% if obsidian %} == Obsidian vault root{% endif %}
 ```
 
 **Owned by this knowledge base:** `schema/vocabulary.yaml`,
 `schema/taxonomy.yaml`, `schema/resources.yaml`, this README and everything
-in `kb/`.
+in `{{ bundle_dir }}/`.
 Copier never overwrites these files.
 
 **Managed by the template:** the rest (tooling, skills, AGENTS.md, CI).
@@ -51,13 +51,13 @@ just ci                # kb check, independent OKF validator, tests, index fresh
 `.copier-answers.yml`. If that repository is private, git needs GitHub
 credentials (e.g. `gh auth setup-git`).
 {% if obsidian %}
-Obsidian: open `kb/`, not the repository root, as the vault.
+Obsidian: open `{{ bundle_dir }}/`, not the repository root, as the vault.
 
 ```sh
 just obsidian-setup          # installs the pinned community plugins
 ```
 
-Then open `kb/` with *Open folder as vault*, choose "Trust author and enable plugins", and in *Settings → Templater*
+Then open `{{ bundle_dir }}/` with *Open folder as vault*, choose "Trust author and enable plugins", and in *Settings → Templater*
 turn on "Trigger Templater on new file creation". Details are in
 [docs/obsidian-setup.md](docs/obsidian-setup.md).
 {% endif %}

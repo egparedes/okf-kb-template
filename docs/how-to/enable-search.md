@@ -3,8 +3,9 @@
 Agents find pages in three tiers, each switched on only when the one below
 stops being enough:
 
-1. **Navigate:** read `kb/index.md` and the folder indexes, then run `rg`
-   over `kb/`. Always available.
+1. **Navigate:** read the root `index.md` of the knowledge-base folder and
+   the folder indexes, then run `rg` over the knowledge-base folder. Always
+   available.
 2. **Filter:** query frontmatter with `just find` (type, tag, status,
    folder, trust tier). Always available.
 3. **Search:** hybrid search with [qmd](https://github.com/tobi/qmd), which
@@ -25,7 +26,9 @@ agent.
     just search-setup
     ```
 
-    This adds a collection over `kb/**/*.md`, one context per folder taken
+    This adds a collection over the Markdown files of the knowledge-base
+    folder (`<folder>/**/*.md`, where `<folder>` is the
+    [`bundle` variable](../reference/just-recipes.md#variables)), one context per folder taken
     from `schema/taxonomy.yaml`, and computes the embeddings with local
     models.
 
@@ -41,8 +44,12 @@ agent.
     just search-reindex
     ```
 
-The index lives outside the repository and can be rebuilt from `kb/` at
-any time.
+The index lives outside the repository and can be rebuilt from the
+knowledge-base folder at any time. The collection records the folder's
+path: after you
+[rename the knowledge-base folder](rename-the-knowledge-base-folder.md), run
+`qmd collection remove <collection> && just search-setup`, where
+`<collection>` is the [collection name](#the-collection-name).
 
 ## The collection name
 
@@ -66,8 +73,8 @@ qmd collection list               # check that it is there
 ```
 
 First check with `qmd collection list` that `kb` points at this knowledge
-base's `kb/` folder: if you ran several knowledge bases before v0.4.0, it may
-belong to another one. `qmd collection rename kb <kb_name>` is faster than
+base's folder (always `kb/` before v0.5.0): if you ran several knowledge
+bases before v0.4.0, it may belong to another one. `qmd collection rename kb <kb_name>` is faster than
 removing it, because it keeps the embeddings and the folder contexts.
 
 ## Is qmd worth it?

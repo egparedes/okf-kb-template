@@ -1,9 +1,9 @@
-# Folder map for kb/ (bundle-relative directory paths). This file belongs to
+# Folder map for {{ bundle_dir }}/ (bundle-relative directory paths). This file belongs to
 # this knowledge base: the template creates it once and never overwrites it.
 #
 # The index generator takes folder titles and descriptions from here, and the
 # bundle-root index.md groups top-level folders by `group` in `root_groups`
-# order. Every folder under kb/ needs an entry (`kb check` warns otherwise).
+# order. Every folder under {{ bundle_dir }}/ needs an entry (`kb check` warns otherwise).
 # Group{% if obsidian %}s "Personal" and "Vault" are{% else %} "Personal" is{% endif %} owned by the human: agents edit {% if obsidian %}them{% else %}it{% endif %} only
 # when asked, and health reports skip {% if obsidian %}them{% else %}it{% endif %}.
 #

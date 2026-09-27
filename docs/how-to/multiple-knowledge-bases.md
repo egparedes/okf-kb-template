@@ -13,7 +13,7 @@ is per repository.
 | Scratch space (fetched sources, drafts) | `.cache/` |
 | git hooks | `.git/hooks/pre-commit` |
 | Claude Code settings, hooks and `KB_ACTOR` | `.claude/settings.json` |
-| Obsidian vault and its plugins | `kb/` and `kb/.obsidian/` |
+| Obsidian vault and its plugins | the knowledge-base folder and its `.obsidian/` |
 | Search collection | a qmd collection named after the knowledge base |
 
 ## What they share
@@ -27,7 +27,8 @@ and deny patterns, and maps them in its own `.env`.
 ## Steps
 
 1. Generate each knowledge base in its own directory, with its own
-   `kb_name`:
+   `kb_name`. Keep the default knowledge-base folder, which is named after
+   `kb_name`, or choose another name that is unique among your vaults:
 
     ```sh
     uvx copier copy --trust gh:egparedes/okf-kb-template ~/work-kb
@@ -42,9 +43,13 @@ and deny patterns, and maps them in its own `.env`.
    See [Enable search](enable-search.md).
 
 4. If you use Obsidian, run `just obsidian-setup` in each and open each
-   `kb/` with *Open folder as vault*. Obsidian
-   names a vault after its folder, so each one appears as `kb` in the vault
-   switcher; tell them apart by the path shown with the name.
+   knowledge-base folder (`~/work-kb/work-kb/`, `~/cooking-kb/cooking-kb/`)
+   with *Open folder as vault*. Obsidian names a vault after its folder, and
+   since v0.5.0 the folder is named after `kb_name` by default, so the
+   vaults appear as `work-kb` and `cooking-kb` in the vault switcher.
+   Knowledge bases created before v0.5.0 keep the folder `kb/`, so they all
+   appear as `kb`; give each a distinct name with
+   [`just rename-bundle`](rename-the-knowledge-base-folder.md).
 
 5. Optional: install the [launcher](install-the-cli-launcher.md) and register
    the knowledge bases by name, so that `kb -C work report` works from

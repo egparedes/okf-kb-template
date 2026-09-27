@@ -10,12 +10,12 @@ visible instead of silently filling them with your own knowledge.
 
 ## Steps
 
-1. **Navigate.** Read `kb/index.md`, then the `index.md` of each relevant
+1. **Navigate.** Read `{{ bundle_dir }}/index.md`, then the `index.md` of each relevant
    folder. Descriptions there are one sentence each, so scanning is cheap.
 
 2. **Narrow.** Use whichever of these fit the question:
    - frontmatter filters: `just find --type <Type> --tag <tag> --folder <folder>`;
-   - keyword search: `rg -il "<term>" kb`;
+   - keyword search: `rg -il "<term>" {{ bundle_dir }}`;
    - semantic search: `just search "<question>"`. It uses qmd when installed
      and falls back to ripgrep.
 

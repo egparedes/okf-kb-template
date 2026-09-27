@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import tomllib
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path, PurePosixPath
@@ -12,6 +13,7 @@ from typing import Any
 import yaml
 
 RESERVED = {"index.md", "log.md"}
+DEFAULT_BUNDLE_DIR = "kb"
 TOUCHED = ".cache/kb-touched.txt"
 
 
@@ -139,6 +141,16 @@ def find_repo_root(start: Path | None = None) -> Path:
     raise SystemExit("kb: cannot find repo root (a directory containing schema/vocabulary.yaml)")
 
 
+def bundle_dir(repo_root: Path) -> str:
+    """The bundle's folder inside the repository: `[tool.kb] bundle` in pyproject.toml (default `kb`)."""
+    try:
+        data = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return DEFAULT_BUNDLE_DIR
+    name = ((data.get("tool") or {}).get("kb") or {}).get("bundle")
+    return name.strip("/") if isinstance(name, str) and name.strip("/") else DEFAULT_BUNDLE_DIR
+
+
 @dataclass
 class Config:
     vocabulary: dict[str, Any]
@@ -212,17 +224,21 @@ class Config:
 
 
 class Bundle:
-    """An OKF bundle rooted at `root` (kb/), with house config from `repo_root`."""
+    """An OKF bundle rooted at `root` (the bundle folder), with house config from `repo_root`."""
 
     def __init__(self, root: Path, repo_root: Path):
         self.root = root.resolve()
         self.repo_root = repo_root.resolve()
         self.config = Config.load(self.repo_root)
+        # How the bundle folder is named in messages and accepted in path arguments, e.g. `kb`.
+        self.prefix = (
+            self.root.relative_to(self.repo_root).as_posix() if self.repo_root in self.root.parents else self.root.name
+        )
 
     @classmethod
     def discover(cls, bundle: str | None = None) -> Bundle:
         repo_root = find_repo_root()
-        root = Path(bundle).resolve() if bundle else repo_root / "kb"
+        root = Path(bundle).resolve() if bundle else repo_root / bundle_dir(repo_root)
         if not root.is_dir():
             raise SystemExit(f"kb: bundle directory not found: {root}")
         return cls(root, repo_root)
@@ -245,9 +261,28 @@ class Bundle:
     def document(self, path: Path) -> Document:
         return parse_document(path.resolve(), self.root)
 
+    def show(self, rel: object) -> str:
+        """A bundle-relative path as the user sees it from the repository root, e.g. `kb/log.md`."""
+        return f"{self.prefix}/{rel}"
+
+    def rel(self, arg: str) -> str:
+        """A bundle path argument without a leading `/` or bundle-folder prefix.
+
+        When the bundle also holds a folder named like the prefix (a domain
+        `notes/` inside a bundle `notes/`), the reading inside the bundle wins
+        if that path, or its folder, exists.
+        """
+        arg = arg.lstrip("/")
+        if not arg.startswith(self.prefix + "/"):
+            return arg
+        inside = self.root / arg
+        if inside.exists() or inside.parent.is_dir():
+            return arg
+        return arg[len(self.prefix) + 1 :]
+
     def path_arg(self, arg: str) -> Path | None:
-        """A command-line path: relative to the cwd, the repo, or the bundle (`kb/` optional)."""
-        for candidate in (Path(arg), self.repo_root / arg, self.root / arg.lstrip("/").removeprefix("kb/")):
+        """A command-line path: relative to the cwd, the repo, or the bundle (bundle-folder prefix optional)."""
+        for candidate in (Path(arg), self.repo_root / arg, self.root / arg.lstrip("/"), self.root / self.rel(arg)):
             candidate = candidate.resolve()
             if candidate.is_file():
                 return candidate if self.root in candidate.parents else None

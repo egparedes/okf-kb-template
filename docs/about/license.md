@@ -28,7 +28,7 @@ redistribute or relicense any plugin code:
 
 - the template stores only a list of pins (plugin ID, version, SHA-256
   checksums) in `tools/obsidian-plugins.json`;
-- the downloaded files in `kb/.obsidian/plugins/<id>/` are excluded by
+- the downloaded files in `.obsidian/plugins/<id>/` of the vault are excluded by
   `.gitignore`, so they never enter your repository either.
 
 Each plugin keeps its own licence, recorded with its pin:

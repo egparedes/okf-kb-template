@@ -11,13 +11,13 @@ touch 5-15 pages.
 
 ## Steps
 
-1. **Dedupe.** Search `kb/sources` for the canonical URL, the Zotero item key
-   and the citation key (`rg -l "<url>|<KEY>|<citekey>" kb/sources`). If a
+1. **Dedupe.** Search `{{ bundle_dir }}/sources` for the canonical URL, the Zotero item key
+   and the citation key (`rg -l "<url>|<KEY>|<citekey>" {{ bundle_dir }}/sources`). If a
    Source page already exists, treat this as a re-ingest: update that page
    and continue from step 4.
 
 2. **Fetch.** Get the text into `.cache/sources/` (gitignored scratch, never
-   part of `kb/`). Pick the branch that matches the source; setup is in
+   part of `{{ bundle_dir }}/`). Pick the branch that matches the source; setup is in
    `docs/external-resources.md`.
    - **Paper, book or report:** it belongs in Zotero. If it is not there
      (`uv run kb zotero search <words>`), ask the human to add it. Then:
@@ -50,8 +50,8 @@ touch 5-15 pages.
    - Set `status: stable` when the summary is complete.
 
 4. **Map the impact.**
-   - Read `kb/index.md`, then the index of each relevant domain folder.
-   - Run `just find --tag <tag>` and `rg -il "<term>" kb` for each key term
+   - Read `{{ bundle_dir }}/index.md`, then the index of each relevant domain folder.
+   - Run `just find --tag <tag>` and `rg -il "<term>" {{ bundle_dir }}` for each key term
      in the source.
    - After compiling, run `uv run kb unlinked <pages you touched>` to find
      mentions of existing pages that should become links.

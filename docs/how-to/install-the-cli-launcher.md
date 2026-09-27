@@ -29,7 +29,7 @@ uses. That version comes from the knowledge base itself; see
 Every argument after the options goes to the knowledge base's own `kb`:
 
 ```sh
-cd ~/notes-kb/kb/ai
+cd ~/notes-kb/notes-kb/ai       # a folder inside the knowledge-base folder
 kb find --type Concept          # the knowledge base that contains this directory
 kb -C ~/notes-kb check          # an explicit path
 kb -C work report               # a registered name (see below)

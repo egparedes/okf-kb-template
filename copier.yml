@@ -8,6 +8,9 @@ _subdirectory: template
 _templates_suffix: .jinja
 _preserve_symlinks: true
 _answers_file: .copier-answers.yml
+# The previous answers, when updating: tells a new knowledge base from an existing one (see bundle_dir).
+_external_data:
+  previous: .copier-answers.yml
 
 # Created once, then owned by the knowledge base: never overwritten on update.
 _skip_if_exists:
@@ -16,10 +19,10 @@ _skip_if_exists:
   - schema/taxonomy.yaml
   - tools/retrieval-eval/questions.yaml
   - schema/resources.yaml
-  - kb/log.md
-  - kb/.obsidian/*.json
-  - kb/.obsidian/plugins/*/data.json
-  - kb/_views/*.base
+  - "{{ bundle_dir }}/log.md"
+  - "{{ bundle_dir }}/.obsidian/*.json"
+  - "{{ bundle_dir }}/.obsidian/plugins/*/data.json"
+  - "{{ bundle_dir }}/_views/*.base"
 
 _tasks:
   - command: uv run --quiet kb log Initialization "Created the knowledge base from okf-kb-template."
@@ -75,9 +78,22 @@ domains:
       title: General
       description: Knowledge that does not fit a more specific domain yet.
 
+bundle_dir:
+  type: str
+  help: >-
+    Folder that holds the knowledge base itself (the OKF bundle, and the Obsidian vault,
+    which Obsidian names after this folder). Knowledge bases created before v0.5.0 keep `kb`.
+  default: "{{ 'kb' if _external_data.previous._commit is defined else kb_name }}"
+  validator: >-
+    {%- if not (bundle_dir | regex_search('^[a-z0-9]+(-[a-z0-9]+)*$')) -%}Use lowercase kebab-case
+    {%- elif bundle_dir in ['schema', 'tools', 'docs', 'imports', 'template', 'launcher', 'site'] -%}`{{ bundle_dir }}` is already a folder of the repository
+    {%- elif bundle_dir in ['sources', 'syntheses', 'entities', 'projects', 'journal'] -%}`{{ bundle_dir }}` is a standard folder inside the knowledge base; pick another name
+    {%- elif domains is mapping and bundle_dir in domains -%}`{{ bundle_dir }}` is also a domain folder; pick another name (e.g. `{{ bundle_dir }}-kb`)
+    {%- endif -%}
+
 obsidian:
   type: bool
-  help: Configure kb/ as an Obsidian vault (settings, Templater templates, Bases views)?
+  help: Configure the knowledge-base folder as an Obsidian vault (settings, Templater templates, Bases views)?
   default: true
 
 claude_code:

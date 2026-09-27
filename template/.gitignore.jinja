@@ -1,0 +1,29 @@
+# Scratch space for agents (fetched source text, drafts). Never part of {{ bundle_dir }}/.
+.cache/
+
+# Python tooling
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Obsidian: keep shared config, ignore per-device state and plugin code
+{{ bundle_dir }}/.obsidian/workspace*.json
+{{ bundle_dir }}/.obsidian/graph.json.bak
+{{ bundle_dir }}/.obsidian/plugins/*/*
+!{{ bundle_dir }}/.obsidian/plugins/templater-obsidian/data.json
+{{ bundle_dir }}/.obsidian/themes/
+{{ bundle_dir }}/.trash/
+{{ bundle_dir }}/.smart-env/
+
+# Local search indexes (rebuildable)
+.qmd/
+.ck/
+
+# Local Claude Code overrides
+.claude/settings.local.json
+
+# Secrets and machine-specific paths (see .env.example)
+.env
+.env.*
+!.env.example

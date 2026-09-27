@@ -35,7 +35,7 @@ after every edit, whoever makes it.
 flowchart LR
     S[Sources: URLs, papers, files] -->|ingest| A[Agent + skills]
     H[You] -->|questions, reviews| A
-    A -->|writes pages| B["kb/ (OKF bundle = Obsidian vault)"]
+    A -->|writes pages| B["knowledge-base folder (OKF bundle = Obsidian vault)"]
     H -->|reads, writes by hand| B
     B -->|kb check: hooks, pre-commit, CI| B
     B --> C[Any OKF reader or agent]
@@ -43,9 +43,9 @@ flowchart LR
 
 ## The vault is the bundle
 
-`kb/` is at the same time the OKF bundle root and the Obsidian vault root.
-Everything else stays outside it: agent instructions, skills, schema,
-tooling.
+One folder of the repository, the knowledge-base folder, is at the same
+time the OKF bundle root and the Obsidian vault root. Everything else stays
+outside it: agent instructions, skills, schema, tooling.
 
 The reason is links. OKF recommends bundle-root links such as
 `/sources/brewer-2012.md`. Obsidian resolves a link that starts with `/`
@@ -62,12 +62,23 @@ Two alternatives were rejected:
 - **Author in Obsidian's native style and compile to OKF in CI**, with
   `[[wikilinks]]` and a plugin for typed links. The repository itself would
   not be a bundle, and the compiler would be one more program to maintain.
-- **Make the repository root the vault, with `kb/` as a sub-folder.**
+- **Make the repository root the vault, with the bundle as a sub-folder.**
   Bundle-root links would then not resolve in Obsidian.
+
+The folder's name is not part of the bundle: a link `/sources/brewer-2012.md`
+is relative to the bundle root, whatever the folder is called. Until v0.5.0
+it was always `kb/`. But Obsidian names a vault after its folder, so every
+knowledge base appeared as "kb" in the vault switcher. Since v0.5.0 the
+name is the Copier answer `bundle_dir`, which defaults to the knowledge
+base's `kb_name`. It is recorded in the `[tool.kb]` table of
+`pyproject.toml`, where the tooling, the justfile and CI read it.
+Knowledge bases created earlier keep `kb/`, and `just rename-bundle`
+renames the folder later (see
+[Rename the knowledge-base folder](../how-to/rename-the-knowledge-base-folder.md)).
 
 Consequences:
 
-- every `.md` file under `kb/` needs frontmatter, including Obsidian
+- every `.md` file in the knowledge-base folder needs frontmatter, including Obsidian
   templates, which have `type: Template`;
 - Obsidian must delete to the system trash, because a `.trash/` folder
   would put non-conforming files into the bundle;
@@ -79,7 +90,7 @@ Every folder of the bundle has an `index.md`, and none of them is written by
 hand. `kb index` generates them from each page's `title` and `description`
 and from the folder titles and descriptions in `schema/taxonomy.yaml`.
 
-Indexes are the agents' first navigation layer: reading `kb/index.md` and
+Indexes are the agents' first navigation layer: reading the root `index.md` and
 then one folder's index costs a few hundred tokens and shows every page
 with a one-sentence summary. That only works if the indexes are complete
 and current, which is why they are generated, and why `kb check` fails
@@ -91,7 +102,7 @@ can be copied out and still have working indexes.
 
 ## The log
 
-`kb/log.md` is OKF's update log: `## YYYY-MM-DD` sections, newest first,
+`log.md`, at the root of the bundle, is OKF's update log: `## YYYY-MM-DD` sections, newest first,
 one line per operation. The agent adds an entry after each ingest, filed
 query or lint pass, with links to the pages concerned, through
 `kb log`, which keeps the format valid. The log is the human-readable
@@ -102,7 +113,7 @@ history of the knowledge; git holds the line-level history.
 Agents find pages in three tiers, and a heavier tier is enabled only when
 the lighter ones fail:
 
-1. navigate `index.md` files, then `rg` over `kb/`;
+1. navigate `index.md` files, then `rg` over the knowledge-base folder;
 2. filter by frontmatter with `kb find` (type, tags, status, folder, trust);
 3. hybrid search with qmd (keywords, local embeddings, reranking), with its
    index outside git.

@@ -45,8 +45,7 @@ def new_page(
     spec = bundle.config.types.get(type_name)
     if spec is None:
         raise SystemExit(f"kb: unknown type `{type_name}`; see schema/vocabulary.yaml")
-    rel_path = rel_path.lstrip("/")
-    rel_path = rel_path[3:] if rel_path.startswith("kb/") else rel_path
+    rel_path = bundle.rel(rel_path)
     if not rel_path.endswith(".md"):
         rel_path += ".md"
     path = bundle.root / rel_path

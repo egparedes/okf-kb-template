@@ -1,6 +1,8 @@
 # Page frontmatter and schema files
 
-Every `.md` file in `kb/`, except `index.md` and `log.md`, is a page. It
+Every `.md` file in the knowledge-base folder (named after `kb_name` by
+default; `kb/` in knowledge bases created before v0.5.0), except `index.md`
+and `log.md`, is a page. It
 starts with a YAML frontmatter block. OKF itself only requires a non-empty
 `type`; the template adds a *house profile* that `kb check` enforces.
 
@@ -133,8 +135,9 @@ fields:
 
 ## `schema/taxonomy.yaml`
 
-Owned by the knowledge base. It describes the folders of `kb/`; the index
-generator takes titles and descriptions from it.
+Owned by the knowledge base. It describes the subfolders of the
+knowledge-base folder; the index generator takes titles and descriptions
+from it.
 
 ```yaml
 root_groups: [Knowledge domains, Library, Personal, Vault]

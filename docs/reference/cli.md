@@ -15,17 +15,39 @@ configured default.
 
 `kb` looks for the repository root, the nearest directory at or above the
 current one that contains `schema/vocabulary.yaml`. `KB_REPO_ROOT`, when
-set, overrides the search. The bundle is `<root>/kb` unless `--bundle` says
-otherwise.
+set, overrides the search.
+
+The bundle is the knowledge-base folder: `<root>/<folder>`, where `<folder>`
+is `bundle` in the `[tool.kb]` table of `pyproject.toml`. It is named after
+`kb_name` by default, and is `kb` when the table or the key is missing, as in
+knowledge bases created before v0.5.0. `--bundle` overrides it. See
+[Repository layout](repository-layout.md#the-knowledge-base-folder).
 
 | Global option | Meaning |
 |---|---|
-| `--bundle PATH` | Bundle root (default: `<repo>/kb`). Goes before the command. |
+| `--bundle PATH` | Bundle root (default: the knowledge-base folder, `<repo>/<folder>`). Goes before the command. |
 
-Paths given to `check`, `fix-links` and `find --folder` may be relative to
-the current directory, to the repository root, or to the bundle (with or
-without a leading `kb/` or `/`). `new`, `mv`, `merge` and `zotero --path`
-take bundle paths only (a leading `kb/` or `/` is accepted).
+Paths given to `check` and `fix-links` may be relative to the current
+directory, to the repository root, or to the bundle (with or without a
+leading `<folder>/` or `/`). `new`, `mv`, `merge`, `unlinked`,
+`import --into` and `zotero --path` take bundle paths only (a leading
+`<folder>/` or `/` is accepted), and so do `find --folder` and the
+`links:` values of an [import mapping](import-mapping.md). With a
+knowledge-base folder named `my-kb`, `my-kb/ai/llm.md`, `/ai/llm.md` and
+`ai/llm.md` name the same page.
+
+A leading `<folder>/` is stripped only when the path does not also exist
+inside the bundle: if the path, or its parent folder, exists inside the
+knowledge-base folder, it is read as a bundle path. So when the bundle
+holds a folder with the same name as itself, such as a domain `my-kb/` in
+the knowledge-base folder `my-kb/`, `my-kb/page.md` means the page in that
+domain. Copier and `just rename-bundle` refuse such names, but a domain
+added later can still create one.
+
+Messages show pages as the repository sees them, `<folder>/<path>`, for
+example `my-kb/ai/llm.md:12: W030 …` or `wrote my-kb/index.md`. With
+`--bundle` pointing outside the repository, `<folder>` is the name of that
+directory.
 
 Exit status: 0 on success, 1 on failure. `kb check` and `kb index --check`
 use 1 for "problems found". Usage errors (an unknown option, a missing
@@ -44,7 +66,7 @@ set in the environment take precedence.
 | [`mv`](#kb-mv) | Move or rename a page and rewrite inbound links |
 | [`merge`](#kb-merge) | Fold a duplicate page into another |
 | [`new`](#kb-new) | Create a page skeleton with valid frontmatter |
-| [`log`](#kb-log) | Add an entry to `kb/log.md` |
+| [`log`](#kb-log) | Add an entry to the bundle's `log.md` |
 | [`find`](#kb-find) | List pages by frontmatter |
 | [`folders`](#kb-folders) | Print the indexed folders and their descriptions |
 | [`report`](#kb-report) | Health report |
@@ -175,7 +197,7 @@ uv run kb new Source sources/rfc-9110.md --title "RFC 9110: HTTP Semantics" \
 
 ### `kb log`
 
-Add `* **Op**: message` to `kb/log.md` under today's `## YYYY-MM-DD`
+Add `* **Op**: message` to `<folder>/log.md` under today's `## YYYY-MM-DD`
 heading (UTC), creating the heading if needed, newest first.
 
 ```sh
@@ -358,7 +380,7 @@ Exits 1 when the plan has errors; a real run then writes nothing.
 ### `kb obsidian setup`
 
 *New in v0.4.0.* Install the pinned Obsidian community plugins listed in
-`kb/.obsidian/community-plugins.json` and, optionally, open the vault. See
+`<folder>/.obsidian/community-plugins.json` and, optionally, open the vault. See
 [Set up Obsidian](../how-to/set-up-obsidian.md).
 
 ```sh
@@ -369,13 +391,14 @@ uv run kb obsidian setup [--add ID[,ID…]] [--force] [--open]
 |---|---|
 | `--add` | Also install these plugin IDs and add them to `community-plugins.json`. Each must be pinned in `tools/obsidian-plugins.json`; otherwise the command stops with "no pin for …". The required plugins are always added back to the list. |
 | `--force` | Download plugins again even when the pinned version is installed. |
-| `--open` | Open `kb/` in Obsidian through `obsidian://open?path=…` (a vault Obsidian already knows; the first time, use *Open folder as vault*). |
+| `--open` | Open the knowledge-base folder in Obsidian through `obsidian://open?path=…` (a vault Obsidian already knows; the first time, use *Open folder as vault*). |
 
 Plugins are downloaded from their GitHub releases, as pinned in
-`tools/obsidian-plugins.json`, into `kb/.obsidian/plugins/<id>/`, and their
+`tools/obsidian-plugins.json`, into `<folder>/.obsidian/plugins/<id>/`, and their
 SHA-256 checksums are verified. Listed IDs without a pin are reported. The
-command ends by printing the two manual steps: trusting the vault, and
-turning on Templater's trigger on new file creation.
+command ends by printing the two manual steps, trusting the vault and
+turning on Templater's trigger on new file creation, and the folder to open
+as the vault.
 
 ### `kb hook`
 
@@ -391,8 +414,8 @@ uv run kb hook stop
 
 | Event | Checks |
 |---|---|
-| `post-edit` | After a Write or Edit of a `.md` file in `kb/`: records the file and runs `kb check` on it. |
-| `stop` | Before the agent finishes: every page recorded this session passes `kb check`, the indexes above them are fresh, and knowledge edits have a `kb/log.md` entry. |
+| `post-edit` | After a Write or Edit of a `.md` file in the knowledge-base folder: records the file and runs `kb check` on it. |
+| `stop` | Before the agent finishes: every page recorded this session passes `kb check`, the indexes above them are fresh, and knowledge edits have a `log.md` entry. |
 
 ## The global launcher
 
