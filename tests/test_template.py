@@ -49,6 +49,9 @@ def test_rendered_knowledge_base_is_conformant(tmp_path: Path, variant: str) -> 
     run(["uv", "run", "--quiet", "pytest", "-q"], dst)
     leftovers = [p for p in dst.rglob("*") if "{%" in p.name or "{{" in p.name or p.suffix == ".jinja"]
     assert leftovers == []
+    if shutil.which("just"):
+        name = VARIANTS[variant].get("kb_name", "my-kb")
+        assert run(["just", "--evaluate", "qmd_collection"], dst).strip() == name
 
 
 @pytest.mark.parametrize("domains", [

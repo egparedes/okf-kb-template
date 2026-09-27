@@ -475,3 +475,31 @@ def test_karakeep_address_forms_and_user_agent(repo: Path, server, monkeypatch, 
     monkeypatch.setenv("KARAKEEP_API_KEY", "k")
     assert resources.KaraKeep().find("https://example.org") == "bm1"
     assert seen["ua"] == resources.USER_AGENT
+
+
+def test_dupes_never_pairs_journal_entries(repo: Path) -> None:
+    (repo / "schema" / "vocabulary.yaml").write_text(
+        (repo / "schema" / "vocabulary.yaml").read_text().replace(
+            "relations:", '  Journal Entry: { plural: Journal Entries, description: A day., folders: ["journal"] }\nrelations:'
+        )
+    )
+    write(repo, "journal/2024/2024-10-22.md", "Journal 2024-10-22", type_="Journal Entry")
+    write(repo, "journal/2024/2024-10-28.md", "Journal 2024-10-28", type_="Journal Entry")
+    assert dupes.find(Bundle(repo / "kb", repo), scope="all") == []
+
+
+def test_cli_karakeep_save_and_env_actor(repo: Path, server, monkeypatch, capsys) -> None:
+    from kbtools.cli import main
+
+    base, routes = server
+    routes[("GET", "/api/v1/bookmarks/check-url")] = lambda q, h: (200, {"bookmarkId": None})
+    routes[("POST", "/api/v1/bookmarks")] = lambda body, h: (201, {"id": "bm9"})
+    (repo / ".env").write_text(f"KARAKEEP_URL={base}\nKARAKEEP_API_KEY=secret\nKB_ACTOR=human:from-env\n")
+    monkeypatch.setenv("KB_REPO_ROOT", str(repo))
+    monkeypatch.setenv("KB_ACTOR", "unset-below")  # recorded, so the value .env loads is undone afterwards
+    monkeypatch.delenv("KB_ACTOR")
+    monkeypatch.delenv("CLAUDECODE", raising=False)
+    assert main(["karakeep", "save", "https://example.org/new"]) == 0
+    assert "saved: bm9" in capsys.readouterr().out
+    assert main(["new", "Concept", "systems/env-actor.md", "--title", "Env actor", "--description", "Uses .env."]) == 0
+    assert "by: human:from-env" in (repo / "kb" / "systems" / "env-actor.md").read_text()

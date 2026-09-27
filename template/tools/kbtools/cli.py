@@ -6,11 +6,10 @@ import argparse
 import sys
 
 import json
-import os
 import subprocess
 from pathlib import Path
 
-from . import dupes, graph, hooks, importer, indexgen, linkfix, pages, report, resources, unlinked
+from . import dupes, graph, hooks, importer, indexgen, linkfix, obsidian, pages, report, resources, unlinked
 from .bundle import Bundle
 from .check import Checker, exit_code
 
@@ -182,8 +181,7 @@ def _cmd_karakeep(bundle: Bundle, args: argparse.Namespace) -> int:
     if bookmark_id:
         print(f"already saved: {bookmark_id}")
     else:
-        saved = keep.save(args.url)
-        print(f"saved: {saved.get('id')} (archiving runs in the background)")
+        print(f"saved: {keep.save(args.url)} (archiving runs in the background)")
     return 0
 
 
@@ -199,7 +197,7 @@ def _cmd_open(bundle: Bundle, args: argparse.Namespace) -> int:
         print(target)
         return 0
     opener = "open" if sys.platform == "darwin" else "xdg-open"
-    subprocess.Popen([opener, target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=os.environ)
+    subprocess.Popen([opener, target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=resources.child_env())
     print(target)
     return 0
 
@@ -217,6 +215,11 @@ def _cmd_import(bundle: Bundle, args: argparse.Namespace) -> int:
         for path in indexgen.write(Bundle(bundle.root, bundle.repo_root)):
             print(f"wrote {path.relative_to(bundle.repo_root)}")
     return 0
+
+
+def _cmd_obsidian(bundle: Bundle, args: argparse.Namespace) -> int:
+    add = [p.strip() for p in (args.add or "").split(",") if p.strip()]
+    return obsidian.setup(bundle, add, force=args.force, open_vault=args.open)
 
 
 def _cmd_hook(bundle: Bundle, args: argparse.Namespace) -> int:
@@ -338,12 +341,20 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--redirects", help="where to write the source -> bundle path table (default .cache/import/)")
     p.set_defaults(func=_cmd_import)
 
+    p = sub.add_parser("obsidian", help="install the vault's pinned community plugins (see docs)")
+    p.add_argument("action", choices=["setup"])
+    p.add_argument("--add", help="comma-separated optional plugin ids to add, e.g. omnisearch,obsidian-linter")
+    p.add_argument("--force", action="store_true", help="download again even if the pinned version is installed")
+    p.add_argument("--open", action="store_true", help="then open the vault in Obsidian (obsidian:// URI)")
+    p.set_defaults(func=_cmd_obsidian)
+
     p = sub.add_parser("hook", help="Claude Code hook entry points")
     p.add_argument("event", choices=["post-edit", "stop"])
     p.set_defaults(func=_cmd_hook)
 
     args = parser.parse_args(argv)
     bundle = Bundle.discover(args.bundle)
+    resources.load_env(bundle.repo_root)  # .env settings such as KB_ACTOR apply to every command
     return args.func(bundle, args)
 
 

@@ -3,6 +3,8 @@
 set shell := ["bash", "-c"]
 
 kb := "uv run --quiet kb"
+# qmd keeps one index per user: name this knowledge base's collection after it (pyproject name `<kb_name>-tools`)
+qmd_collection := env("KB_QMD_COLLECTION", `n=$(sed -n 's/^name = "\(.*\)-tools"$/\1/p' pyproject.toml); echo "${n:-kb}"`)
 # Independent OKF v0.2 validator (scaccogatto/okf-skills), pinned to a reviewed commit.
 okf_validator := "https://raw.githubusercontent.com/scaccogatto/okf-skills/68ce7a0c07f66ca9a6b0beb68937d75314d5e8a5/skills/validate/scripts/okf_validate.py"
 
@@ -57,8 +59,8 @@ links-online:
 # Search: qmd hybrid search when set up, otherwise ripgrep over the words of the query
 [positional-arguments]
 search +query:
-    @if command -v qmd >/dev/null && qmd collection list 2>/dev/null | grep -q '\bkb\b'; then \
-        qmd query "$*" -c kb; \
+    @if command -v qmd >/dev/null && qmd collection list 2>/dev/null | grep -qF -- {{quote("(qmd://" + qmd_collection + "/)")}}; then \
+        qmd query "$*" -c {{quote(qmd_collection)}}; \
     else \
         args=(); for term in $*; do term="${term//[^[:alnum:]_-]/}"; [ ${#term} -ge 3 ] && args+=(-e "$term"); done; \
         [ ${#args[@]} -eq 0 ] && args=(-F -e "$*"); \
@@ -67,15 +69,19 @@ search +query:
 
 # One-time qmd setup: collection, per-folder contexts from taxonomy, embeddings
 search-setup:
-    qmd collection add kb --name kb --mask "**/*.md"
-    qmd context add qmd://kb "Knowledge base (OKF v0.2 bundle). Start from the index.md files."
-    {{kb}} folders | while IFS="$(printf '\t')" read -r folder description; do qmd context add "qmd://kb/$folder" "$description"; done
+    qmd collection add kb --name {{quote(qmd_collection)}} --mask "**/*.md"
+    qmd context add {{quote("qmd://" + qmd_collection)}} "Knowledge base (OKF v0.2 bundle). Start from the index.md files."
+    {{kb}} folders | while IFS="$(printf '\t')" read -r folder description; do qmd context add {{quote("qmd://" + qmd_collection)}}"/$folder" "$description"; done
     qmd embed
 
 # Refresh the qmd index after changes
 search-reindex:
     qmd update
     qmd embed
+
+# Install the vault's pinned Obsidian community plugins; e.g. `just obsidian-setup --open` or `--add omnisearch`
+obsidian-setup *args:
+    {{kb}} obsidian setup {{args}}
 
 # Run the tooling tests
 test:

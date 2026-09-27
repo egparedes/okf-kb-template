@@ -1,0 +1,124 @@
+[project]
+site_name = "OKF Knowledge Base Template"
+site_description = "A Copier template for LLM-maintained knowledge bases that are Open Knowledge Format bundles and Obsidian vaults."
+site_url = "https://egparedes.github.io/okf-kb-template/"
+repo_url = "https://github.com/egparedes/okf-kb-template"
+repo_name = "egparedes/okf-kb-template"
+edit_uri = "edit/main/docs/"
+copyright = "MIT-0 licensed"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Tutorials" = [
+    "tutorials/index.md",
+    { "Your first knowledge base" = "tutorials/first-knowledge-base.md" },
+    { "Your first agent session" = "tutorials/first-agent-session.md" },
+  ] },
+  { "How-to guides" = [
+    "how-to/index.md",
+    { "Install the kb launcher" = "how-to/install-the-cli-launcher.md" },
+    { "Run several knowledge bases" = "how-to/multiple-knowledge-bases.md" },
+    { "Set up Obsidian" = "how-to/set-up-obsidian.md" },
+    { "Connect Zotero" = "how-to/connect-zotero.md" },
+    { "Connect KaraKeep" = "how-to/connect-karakeep.md" },
+    { "Link local files" = "how-to/link-local-files.md" },
+    { "Import a vault" = "how-to/import-a-vault.md" },
+    { "Update from the template" = "how-to/update-from-the-template.md" },
+    { "Enable search" = "how-to/enable-search.md" },
+    { "Use CI on GitHub" = "how-to/ci-and-github.md" },
+    { "Maintain the knowledge base" = "how-to/maintain-the-knowledge-base.md" },
+  ] },
+  { "Reference" = [
+    "reference/index.md",
+    { "Copier questions" = "reference/copier-questions.md" },
+    { "kb command line" = "reference/cli.md" },
+    { "just recipes" = "reference/just-recipes.md" },
+    { "Page frontmatter and schema files" = "reference/page-frontmatter.md" },
+    { "Check codes" = "reference/check-codes.md" },
+    { "Import mapping" = "reference/import-mapping.md" },
+    { "Repository layout" = "reference/repository-layout.md" },
+    { "Environment variables" = "reference/environment-variables.md" },
+  ] },
+  { "Explanation" = [
+    "explanation/index.md",
+    { "Design overview" = "explanation/design-overview.md" },
+    { "Links and relations" = "explanation/links-and-relations.md" },
+    { "Provenance and trust" = "explanation/provenance-and-trust.md" },
+    { "External resources" = "explanation/external-resources.md" },
+    { "Maintenance analytics" = "explanation/maintenance-analytics.md" },
+    { "Agents and hooks" = "explanation/agents-and-hooks.md" },
+  ] },
+  { "About" = [
+    { "Licence" = "about/license.md" },
+    { "Changelog" = "about/changelog.md" },
+  ] },
+]
+
+[project.theme]
+language = "en"
+features = [
+  "content.action.edit",
+  "content.code.annotate",
+  "content.code.copy",
+  "content.footnote.tooltips",
+  "content.tabs.link",
+  "content.tooltips",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.instant.prefetch",
+  "navigation.path",
+  "navigation.sections",
+  "navigation.tabs",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/egparedes/okf-kb-template"
+
+[project.markdown_extensions]
+abbr = {}
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+tables = {}
+toc.permalink = true
+pymdownx.betterem = {}
+pymdownx.details = {}
+pymdownx.highlight.anchor_linenums = true
+pymdownx.highlight.line_spans = "__span"
+pymdownx.highlight.pygments_lang_class = true
+pymdownx.inlinehilite = {}
+pymdownx.keys = {}
+pymdownx.magiclink = {}
+# Includes files from the repository root, e.g. --8<-- "template/docs/importing.md".
+pymdownx.snippets.base_path = ["."]
+pymdownx.snippets.check_paths = true
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+pymdownx.tabbed.alternate_style = true
+pymdownx.tabbed.combine_header_slug = true
+pymdownx.tasklist.custom_checkbox = true

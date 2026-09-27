@@ -1,9 +1,4 @@
 [
   "templater-obsidian",
-  "better-markdown-links",
-  "obsidian-front-matter-title-plugin",
-  "folder-notes",
-  "breadcrumbs",
-  "obsidian-linter",
-  "omnisearch"
+  "better-markdown-links"
 ]

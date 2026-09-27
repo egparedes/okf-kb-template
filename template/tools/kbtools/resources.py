@@ -56,6 +56,9 @@ def _env_value(raw: str) -> str:
     return re.split(r"\s+#", raw, maxsplit=1)[0].strip()  # unquoted: drop an inline comment
 
 
+LOADED_FROM_DOTENV: set[str] = set()
+
+
 def load_env(repo_root: Path) -> None:
     """Load KEY=VALUE lines from `<repo>/.env` without overriding the real environment."""
     path = repo_root / ".env"
@@ -68,7 +71,16 @@ def load_env(repo_root: Path) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), _env_value(value))
+        key = key.strip()
+        if key not in os.environ:
+            os.environ[key] = _env_value(value)
+            LOADED_FROM_DOTENV.add(key)
+
+
+def child_env() -> dict[str, str]:
+    """Environment for programs we launch (openers): without .env secrets or launcher state."""
+    drop = LOADED_FROM_DOTENV | {"KB_REPO_ROOT", "OKF_KB_LAUNCHER"}
+    return {k: v for k, v in os.environ.items() if k not in drop}
 
 
 def read_config(repo_root: Path) -> tuple[dict, list[str]]:

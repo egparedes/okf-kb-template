@@ -1,0 +1,19 @@
+[project]
+name = "okf-kb"
+version = "0.4.0"
+description = "Global `kb` command: runs the kb tool of the knowledge base you are in (or name), from anywhere."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT-0"
+license-files = ["LICENSE"]
+dependencies = []
+
+[project.scripts]
+kb = "okf_kb:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/okf_kb"]

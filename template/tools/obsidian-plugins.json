@@ -1,0 +1,88 @@
+{
+  "_comment": "Community plugins that `kb obsidian setup` can install: GitHub release, version and SHA-256 of each file. Managed by okf-kb-template; plugin code is downloaded, never committed.",
+  "plugins": {
+    "templater-obsidian": {
+      "name": "Templater",
+      "repo": "silentvoid13/Templater",
+      "version": "2.25.1",
+      "license": "AGPL-3.0",
+      "required": true,
+      "sha256": {
+        "main.js": "eb86d9282694ce1f099154c320286fdd89473e60dc2441ee310f3ac331333e94",
+        "manifest.json": "b99280d2c4ab2cd22ad010c12faeedf255bcf385d127d973b89f85deb27d23fd",
+        "styles.css": "67a6dd2d1d6dedca1287c334ca884ec4196433f71ca47388a0bd3eac14cf8b5f"
+      }
+    },
+    "better-markdown-links": {
+      "name": "Better Markdown Links",
+      "repo": "mnaoumov/obsidian-better-markdown-links",
+      "version": "5.1.0",
+      "license": "MIT",
+      "required": true,
+      "sha256": {
+        "main.js": "83bfbf31cfcbddf06d2cd435d6f93fe6e2b707bdccaaa1990a5d6e5ab4af4782",
+        "manifest.json": "9db5668157f7814818342be3b99232f09cef09aa16c5e128eeee7a376d805216",
+        "styles.css": "6b0c86c91b1662d5d580fd5fb0bc2cfeae73bb7dce4a73969273c54aec12cc4b"
+      }
+    },
+    "obsidian-front-matter-title-plugin": {
+      "name": "Front Matter Title",
+      "repo": "snezhig/obsidian-front-matter-title",
+      "version": "4.2.1",
+      "license": "GPL-3.0",
+      "required": false,
+      "sha256": {
+        "main.js": "6e8bcaa981d647de2bf778a06e820f61a59bc4ae37ab3105707298c07c5a5acf",
+        "manifest.json": "2cb007b498a85fddc9b89e0a8b55ccbc53ffbac844fd11381be1fa0329681938"
+      }
+    },
+    "folder-notes": {
+      "name": "Folder notes",
+      "repo": "lostpaul/obsidian-folder-notes",
+      "version": "1.8.26",
+      "license": "AGPL-3.0",
+      "required": false,
+      "sha256": {
+        "main.js": "83d7b91819abac39626349c1b20aef2503a7cb4339334d52115650aec011a216",
+        "manifest.json": "d68704cb787fb687a3d6261a77e93d39c9409ef1dab4e37bfc67a6f96b493536",
+        "styles.css": "c736732880c7737a30f713d5496f36612a4f64cce96bab0315397ce14b975f6b"
+      }
+    },
+    "breadcrumbs": {
+      "name": "Breadcrumbs",
+      "repo": "michaelpporter/breadcrumbs",
+      "version": "4.21.13",
+      "license": "MIT",
+      "required": false,
+      "sha256": {
+        "main.js": "abd0dfe258daca3fb7750dbdd50970d9c851365dac6540849106ca3c39a0199f",
+        "manifest.json": "2aaf0d7686903f3359ea9f8e444d9ce6c1231259bc63a0e2ea83f0433de85e4e",
+        "styles.css": "674de457b453895a59e342466c378f5272d265900bf9e8b6d50d892cc37d5c60"
+      }
+    },
+    "obsidian-linter": {
+      "name": "Linter",
+      "repo": "platers/obsidian-linter",
+      "version": "1.33.0",
+      "license": "MIT",
+      "required": false,
+      "sha256": {
+        "main.js": "654a88cf653ce217897865e765576183d9988cd4c80679f577779820b3ea6a3f",
+        "manifest.json": "2fe4576c271ff16b79009f478a7aa5905d2e5b05a7b20e590a2f1896a6d1ffcb",
+        "styles.css": "aeda3a668070de1e48650d1613a96bd018e0b7b3aa5fabdc85263589f1198634"
+      }
+    },
+    "omnisearch": {
+      "name": "Omnisearch",
+      "repo": "scambier/obsidian-omnisearch",
+      "version": "1.31.0",
+      "license": "GPL-3.0",
+      "required": false,
+      "sha256": {
+        "main.js": "9f2456705d0840f3cccf62a8e99a6fdaf8901939936e44d4dd27fc6b2d522f31",
+        "manifest.json": "26b1ffc250b1d90605f60c132f783e3148dd399e5baf5862040671d86294bc85",
+        "styles.css": "c6a56b1a18ff867f12ebbb3a139060a249704281e1b449003ff487969621a2e6"
+      }
+    }
+  }
+}

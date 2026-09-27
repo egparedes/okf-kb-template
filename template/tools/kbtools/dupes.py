@@ -105,6 +105,8 @@ def find(bundle: Bundle, min_score: float = 0.6, body: bool = False, scope: str 
         da, db = docs[a], docs[b]
         if (da.type == "Source") != (db.type == "Source"):
             continue  # a Source summary legitimately shares names with the concept it feeds
+        if da.type == db.type == "Journal Entry":
+            continue  # dated titles look alike; journal entries are never merged
         signals: list[str] = []
         score = 0.0
         if set(names[a]) & set(names[b]):

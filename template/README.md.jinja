@@ -9,8 +9,10 @@ pattern. `kb/` is a conformant
 bundle{% if obsidian %} and, at the same time, an [Obsidian](https://obsidian.md) vault{% endif %}.
 Agents compile sources into pages; you curate sources, read and ask questions.
 
-It was generated from the `okf-kb-template` copier template (answers in
-`.copier-answers.yml`). Run `copier update --trust` to pull template changes.
+It was generated from the [okf-kb-template](https://github.com/egparedes/okf-kb-template)
+copier template (answers in `.copier-answers.yml`). Run `copier update --trust`
+to pull template changes. Full documentation:
+<https://egparedes.github.io/okf-kb-template/>.
 
 ## Layout
 
@@ -35,7 +37,7 @@ Change them upstream and run `copier update`.
 ## Setup
 
 Requirements: [uv](https://docs.astral.sh/uv/), [just](https://just.systems), git
-{%- if obsidian %} and Obsidian 1.12 or later{% endif %}. Optional:
+{%- if obsidian %} and Obsidian 1.13.7 or later{% endif %}. Optional:
 [lychee](https://lychee.cli.rs) (URL checks) and [qmd](https://github.com/tobi/qmd)
 (hybrid search).
 
@@ -49,9 +51,20 @@ just ci                # kb check, independent OKF validator, tests, index fresh
 `.copier-answers.yml`. If that repository is private, git needs GitHub
 credentials (e.g. `gh auth setup-git`).
 {% if obsidian %}
-Open `kb/` (not the repository root) as the vault, then follow
+Obsidian: open `kb/`, not the repository root, as the vault.
+
+```sh
+just obsidian-setup          # installs the pinned community plugins
+```
+
+Then open `kb/` with *Open folder as vault*, choose "Trust author and enable plugins", and in *Settings → Templater*
+turn on "Trigger Templater on new file creation". Details are in
 [docs/obsidian-setup.md](docs/obsidian-setup.md).
 {% endif %}
+To run `kb` from anywhere, or with several knowledge bases on one machine,
+install the optional global launcher:
+`uv tool install "git+https://github.com/egparedes/okf-kb-template#subdirectory=launcher"`.
+
 ## Daily use
 
 Talk to your agent from the repository root:

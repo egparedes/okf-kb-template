@@ -20,8 +20,9 @@ The dry run prints the plan and every issue:
   blocks.
 
 A real run refuses to start while the plan has errors: two notes with the
-same destination, an existing page, a reserved name (`index.md`, `log.md`)
-or a missing type. Afterwards it:
+same destination, an existing page, a reserved name (`index.md`, `log.md`),
+a destination outside the bundle, an unavailable placeholder, or a rule
+without a type. Afterwards it:
 
 - regenerates the indexes;
 - writes a redirect table (source path → bundle path) to
@@ -42,7 +43,7 @@ record of how the import was done.
 | `![[Note]]` (transclusion) | `[Note](/…)` (reported) |
 | relative, vault-path or bare-name markdown links | bundle-absolute links to the new paths |
 | reference-style link definitions (`[x]: path`) | unchanged (reported): rewrite them as inline links |
-| a wikilink to an excluded or missing note | its text only (reported); names listed under `links` point to existing pages, and `unresolved: wanted` links the rest as wanted pages |
+| a wikilink to an excluded or missing note | its text only (reported); names under `links` point to existing pages when no source file has that name, and `unresolved: wanted` links the rest as wanted pages |
 | a linked image without a `files` rule | copied to `<into>/assets/` |
 | a linked PDF or office document without a `files` rule | not copied (reported): reference it with a `file:` locator, or add a rule |
 | `%% comment %%` outside code | `<!-- comment -->` |
@@ -138,22 +139,26 @@ such as `exlude` does not silently import everything.
   Hidden folders, `.obsidian/`, `.trash/` and Logseq's `logseq/` are always
   skipped.
 - **Placeholders** in `to`:
-  - `{path}`: the source path without extension;
-  - `{dir}`, `{parent}`, `{stem}`, `{name}`, `{ext}`;
-  - `{date}`, `{yyyy}`, `{mm}`, `{dd}`: from a `YYYY-MM-DD` or `YYYY_MM_DD`
-    date in the name or path.
+    - `{path}`: the source path without extension;
+    - `{dir}`, `{parent}`, `{stem}`, `{name}`, `{ext}`;
+    - `{date}`, `{yyyy}`, `{mm}`, `{dd}`: from a `YYYY-MM-DD` or `YYYY_MM_DD`
+      date in the name or path.
 
-  `title` supports `{stem}`, `{parent}` and `{date}`.
+    `title` supports `{stem}`, `{parent}` and `{date}`.
 - **Relations:** each value of a `relation` property becomes a markdown link
-  to `target`, with `{value}` in kebab-case. It uses the target page's title
-  when that page is part of the import. `kb check` then requires each
-  target to be linked from the body (H031).
+  to `target`, with `{value}` in kebab-case. `target` is relative to
+  `--into` unless it starts with `/`. The link text is the target page's
+  title when that page is part of the import. Declare the relation key under
+  `relations` in `schema/vocabulary.yaml` (the example's `applies_to` is not a
+  default relation); `kb check` then requires each target to be linked from
+  the body (H031).
 - **Rewrite rules** run in order, with Python `re` and the flags
   `MULTILINE` and `DOTALL`. `.` therefore also matches newlines: use
   `[^\n]*` to stay on one line, and non-greedy `.*?` across lines.
-- **Types and keys:** every type must exist in `schema/vocabulary.yaml`, and
-  kept properties that the schema does not know are reported by `kb check`
-  (W010). Declare them under `fields` first, or drop them.
+- **Types and keys:** the importer does not check types against
+  `schema/vocabulary.yaml`, so `kb check` reports unknown ones afterwards
+  (H011). Kept properties that the schema does not know are reported as W010:
+  declare them under `fields` first, or drop them.
 
 ## After the import
 

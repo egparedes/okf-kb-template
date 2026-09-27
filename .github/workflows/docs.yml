@@ -1,0 +1,49 @@
+name: docs
+
+# Builds the documentation site (Zensical) on every change; deploys it to
+# GitHub Pages from main once the repository is public and Pages uses
+# "GitHub Actions" as its source (Settings -> Pages).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && !github.event.repository.private }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - if: env.PUBLISH == 'true'
+        uses: actions/configure-pages@v6
+      - uses: astral-sh/setup-uv@v10.2.0
+      - run: uv run --only-group docs zensical build --clean --strict
+      - if: env.PUBLISH == 'true'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
