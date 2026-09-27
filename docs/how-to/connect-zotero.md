@@ -35,7 +35,8 @@ Add the Zotero data directory to `.env`:
 ZOTERO_DATA_DIR=~/Zotero
 ```
 
-When Zotero is closed and no web API key is set, `kb` reads a read-only
+When both APIs fail (Zotero is closed, and the web API is not configured
+or does not answer), `kb` reads a read-only
 snapshot of `zotero.sqlite`, copied to a temporary directory, and takes full
 text from the storage cache (`.zotero-ft-cache` files).
 
@@ -61,7 +62,8 @@ Zotero.
       # group_id: 7654321   # to read a group library instead
     ```
 
-With Zotero File Storage, the web API also serves full text.
+The web API serves full text only for items whose full-text index was
+synced (Zotero's "Sync full-text content" setting).
 
 `kb` tries the local API first, then the web API, then the database
 snapshot.

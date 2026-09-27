@@ -8,7 +8,8 @@ uv run kb <command> [options]
 ```
 
 With the [global launcher](#the-global-launcher) installed, `kb <command>`
-works from any directory.
+works inside any knowledge base, and elsewhere with `-C`, `$KB_DIR` or a
+configured default.
 
 ## Finding the knowledge base
 
@@ -21,9 +22,10 @@ otherwise.
 |---|---|
 | `--bundle PATH` | Bundle root (default: `<repo>/kb`). Goes before the command. |
 
-Paths given to commands may be relative to the current directory, to the
-repository root, or to the bundle (with or without a leading `kb/` or `/`),
-unless stated otherwise.
+Paths given to `check`, `fix-links` and `find --folder` may be relative to
+the current directory, to the repository root, or to the bundle (with or
+without a leading `kb/` or `/`). `new`, `mv`, `merge` and `zotero --path`
+take bundle paths only (a leading `kb/` or `/` is accepted).
 
 Exit status: 0 on success, 1 on failure. `kb check` and `kb index --check`
 use 1 for "problems found". Usage errors (an unknown option, a missing

@@ -72,7 +72,7 @@ How patterns match:
 
 | Rule | Detail |
 |---|---|
-| What is matched | The *resolved* `root/path`, after `..`, `.` and symlinks are resolved. |
+| What is matched | `kb fetch` and `kb open` check the path both as written and resolved (symlinks included). `kb check` (H060) normalizes `..` and `.` but does not follow symlinks. |
 | Parent folders | A pattern also matches every parent folder, so `docs/Private` covers everything inside it. |
 | Wildcards | `*` and `**` both match any characters, including `/` (shell-style `fnmatch`); `?` matches one character. Brackets are literal: `bibliography/[Zotero]/**` names a folder called `[Zotero]`. |
 | Case | Ignored on every platform. |

@@ -33,8 +33,9 @@ itself.
 
 ## How pages point to KaraKeep
 
-They don't, directly. A page stores its canonical URL in `resource`, and
-`kb` finds the bookmark by that URL. Bookmark ids differ between KaraKeep
+They don't, directly. A page stores its canonical URL in `resource`. To
+read the archived copy, the agent passes that URL to `kb fetch`, which looks
+the bookmark up by URL. Bookmark ids differ between KaraKeep
 instances, so they are never stored. Moving to another instance only
 changes the two lines in `.env`.
 

@@ -9,8 +9,11 @@ machine-specific paths. It is gitignored; start from `.env.example`:
 cp .env.example .env
 ```
 
-- The `kb` tool loads it itself, on each run. Variables already set in the
-  real environment take precedence.
+- The `kb` tool loads it itself on each run, after finding the repository
+  root. Variables already set in the real environment take precedence.
+- Only `kb` reads `.env`. `KB_REPO_ROOT` has no effect there, and the
+  launcher (`KB_DIR`) and `just` (`KB_QMD_COLLECTION`) need these variables
+  in the shell environment.
 - Format: `KEY=value` lines. `export KEY=value`, single or double quotes,
   `#` comment lines and inline ` # comments` after unquoted values are
   accepted.
@@ -25,7 +28,7 @@ cp .env.example .env
 
 | Variable | Read by | Meaning |
 |---|---|---|
-| `KB_ACTOR` | `kb new`, `kb merge`, `kb zotero new-source` | Default actor for `generated.by` when `--by` is not given, e.g. `claude-code/claude-opus-5-5` or `human:alice`. Claude Code sets it from `.claude/settings.json` (the `agent_actor` answer). |
+| `KB_ACTOR` | `kb new`, `kb merge`, `kb zotero new-source` | Default actor for `generated.by` when `--by` is not given, e.g. `claude-code/claude-opus-5-5` or `human:alice`. Claude Code sets it from `.claude/settings.json` (the `agent_actor` answer); it can also be set in `.env`. |
 | `KB_REPO_ROOT` | `kb` | Repository root to use instead of searching upwards from the current directory. The launcher sets it for each call. Never export it globally: it pins every `kb` call to one knowledge base. |
 | `CLAUDECODE` | `kb` | Set to `1` by Claude Code for the commands its agent runs. When set, commands that change pages record them for the Stop hook. |
 
@@ -33,6 +36,7 @@ cp .env.example .env
 
 | Variable | Meaning |
 |---|---|
+| `OKF_KB_LAUNCHER` | Set by the launcher for the command it runs, to stop it from calling itself again when a knowledge base has no `kb` of its own. Don't set it yourself. |
 | `KB_DIR` | Knowledge base to use when `-C`/`--kb` is not given: a path or a registered name. Takes precedence over the current directory and the configured default. |
 | `XDG_CONFIG_HOME` | Base directory of the configuration file: `$XDG_CONFIG_HOME/okf-kb/config.toml`, default `~/.config/okf-kb/config.toml`. |
 
@@ -53,7 +57,7 @@ cp .env.example .env
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `ZOTERO_API_KEY` | none | Read-only web API key ("Allow library access" only). Enables the web API fallback. |
+| `ZOTERO_API_KEY` | none | Read-only web API key ("Allow library access" only). Enables the web API fallback, together with `zotero.user_id` or `group_id` in `schema/resources.yaml`, or `ZOTERO_USER_ID`. |
 | `ZOTERO_DATA_DIR` | none | Zotero data directory, e.g. `~/Zotero`. Enables the offline fallback: a read-only snapshot of `zotero.sqlite` and the full-text cache. |
 | `ZOTERO_USER_ID` | none | Numeric user id, used when `zotero.user_id` in `schema/resources.yaml` is empty. Prefer the file. |
 | `ZOTERO_LOCAL_API` | `http://localhost:23119/api/users/0` | Address of Zotero's local API. |
