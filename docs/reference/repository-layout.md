@@ -11,8 +11,10 @@ my-kb/
 ├── .copier-answers.yml          template source, version and answers (written by Copier)
 ├── .agents/skills/              kb-ingest, kb-query, kb-maintain (SKILL.md each)
 ├── .claude/
-│   ├── settings.json            hooks, KB_ACTOR, Read(.env) denied                   [claude_code]
+│   ├── settings.json            hooks, KB_ACTOR, reading .env denied                 [claude_code]
 │   └── skills -> ../.agents/skills                                                   [claude_code]
+├── .codex/hooks.json            hooks for Codex (new in v0.7.0)                      [codex]
+├── .gemini/settings.json        Gemini CLI reads AGENTS.md; hooks (new in v0.7.0)    [gemini_cli]
 ├── .github/workflows/kb.yml     validation on push, weekly link check                [github_ci]
 ├── .pre-commit-config.yaml      fix-links, index, check before each commit
 ├── .env.example                 template for the gitignored .env
@@ -46,8 +48,9 @@ my-kb/
 └── .venv/                       gitignored Python environment
 ```
 
-Items marked `[claude_code]`, `[github_ci]` or `[obsidian]` exist only when
-that [Copier question](copier-questions.md) was answered *Yes*.
+Items marked `[claude_code]`, `[codex]`, `[gemini_cli]`, `[github_ci]` or
+`[obsidian]` exist only when that [Copier question](copier-questions.md) was
+answered *Yes*.
 
 ## The knowledge-base folder
 
@@ -104,7 +107,7 @@ template, or in your fork of it, rather than locally.
 - the tooling: `tools/kbtools/`, `tools/tests/`, `pyproject.toml` with its tasks,
   `tools/obsidian-plugins.json`;
 - the agent layer: `AGENTS.md`, `CLAUDE.md`, `.agents/skills/`,
-  `.claude/settings.json`;
+  `.claude/settings.json`, `.codex/hooks.json`, `.gemini/settings.json`;
 - `.pre-commit-config.yaml`, `.github/workflows/kb.yml`,
   `.gitignore`, `.env.example`;
 - `schema/frontmatter.schema.json`;
@@ -144,7 +147,7 @@ editing a managed file.
 | Path | Why |
 |---|---|
 | `.env`, `.env.*` (except `.env.example`) | secrets and machine paths |
-| `.cache/` | fetched sources, drafts, import redirect tables, the hook's list of touched files |
+| `.cache/` | fetched sources, drafts, import redirect tables, the hooks' session state (`.cache/kb-hooks/`, `.cache/kb-touched.txt`) |
 | `.venv/`, `__pycache__/`, `.pytest_cache/` | Python environment |
 | `<folder>/.obsidian/plugins/*/*` except Templater's `data.json` | plugin code (downloaded, never redistributed) and plugin settings that may hold keys |
 | `<folder>/.obsidian/workspace*.json`, `<folder>/.obsidian/graph.json.bak`, `<folder>/.obsidian/themes/` | per-device state |

@@ -31,7 +31,8 @@ the repository.
 - **A `kb` command line** that validates the bundle, generates the
   `index.md` files, normalizes links, moves and merges pages, and writes the
   log.
-- **Enforcement at three points:** Claude Code hooks, a pre-commit hook and
+- **Enforcement at three points:** agent hooks (Claude Code, and optionally
+  Codex and Gemini CLI), a pre-commit hook and
   a GitHub Actions workflow all run `kb check`.
 - **Provenance:** every page records who wrote it and when, cites its
   sources in footnotes, and can carry a human review.

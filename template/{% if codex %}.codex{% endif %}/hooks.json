@@ -1,0 +1,40 @@
+{
+  "description": "Knowledge-base guardrails: kb check on the pages the agent changes, and a log.md entry for knowledge edits.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --quiet python -m kbtools.hooks pre-tool --agent codex || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --quiet python -m kbtools.hooks post-tool --agent codex || true",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --quiet python -m kbtools.hooks stop --agent codex",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

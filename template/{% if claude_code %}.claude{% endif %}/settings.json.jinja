@@ -1,18 +1,60 @@
 {
   "permissions": {
-    "deny": ["Read(./.env)"]
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(!.env.example)",
+      "Bash(* .env)",
+      "Bash(* .env *)",
+      "Bash(* ./.env)",
+      "Bash(* ./.env *)"
+    ]
   },
   "env": {
     "KB_ACTOR": "{{ agent_actor }}"
   },
   "hooks": {
-    "PostToolUse": [
+    "PreToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run --quiet kb hook post-edit",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run --quiet python -m kbtools.hooks pre-tool || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run --quiet python -m kbtools.hooks post-edit",
+            "timeout": 60
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run --quiet python -m kbtools.hooks post-tool",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run --quiet python -m kbtools.hooks post-tool",
             "timeout": 60
           }
         ]
@@ -23,7 +65,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run --quiet kb hook stop",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && uv run --quiet python -m kbtools.hooks stop",
             "timeout": 120
           }
         ]

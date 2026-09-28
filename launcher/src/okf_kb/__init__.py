@@ -37,7 +37,7 @@ def config_path() -> Path:
 
 
 def load_config(strict: bool = True) -> dict:
-    """The config file; with strict=False a broken file is ignored (an explicit -C does not need it)."""
+    """The config file; with strict=False a broken file reads as empty (a path in -C or $KB_DIR does not need it)."""
     path = config_path()
     if not path.is_file():
         return {}
@@ -81,6 +81,8 @@ def find_root(start: Path) -> Path | None:
 
 
 def resolve(selector: str | None, config: dict) -> Path:
+    """The knowledge base to run. `config` may come from a lenient read: the
+    file is read strictly (reporting a broken file) only when a lookup needs it."""
     names = registered(config)
     for label, value in (("-C", selector), ("$KB_DIR", os.environ.get("KB_DIR"))):
         if value is None or (label == "$KB_DIR" and not value):
@@ -90,12 +92,15 @@ def resolve(selector: str | None, config: dict) -> Path:
         path = names.get(value) or Path(os.path.expanduser(value))
         root = find_root(path.resolve()) if path.exists() else None
         if root is None:
+            names = registered(load_config(strict=True))  # a name, but the config file is unreadable?
             known = f" (registered: {', '.join(sorted(names))})" if names else ""
             raise SystemExit(f"kb: {label} {value!r} is neither a knowledge base nor a registered name{known}")
         return root
     root = find_root(Path.cwd().resolve())
     if root:
         return root
+    config = load_config(strict=True)
+    names = registered(config)
     default = config.get("default")
     if default:
         target = names.get(default)
@@ -125,7 +130,9 @@ def main(argv: list[str] | None = None) -> int:
         selector, args = args[1], args[2:]
     elif args[0].startswith("--kb="):
         selector, args = args[0].split("=", 1)[1], args[1:]
-    config = load_config(strict=selector is None or args[:1] == ["--list"])
+    # A path in -C or $KB_DIR, or the knowledge base around the cwd, does not need the
+    # config file, so a broken one is only reported when a name or the default is needed.
+    config = load_config(strict=args[:1] == ["--list"])
     if args[:1] == ["--list"]:
         for name, path in sorted(registered(config).items()):
             mark = "*" if name == config.get("default") else " "

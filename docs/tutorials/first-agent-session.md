@@ -58,7 +58,11 @@ Things to look at:
 - **The log:** `my-kb/log.md` has a new line under today's date.
 
 If something is wrong, tell the agent. It fixes the page, and the hooks
-check it again.
+check it again: after every edit and shell command that changes a page, and
+before the agent stops. Claude Code runs them as soon as you start it. Codex
+and Gemini CLI run them when the knowledge base was generated with the
+`codex` or `gemini_cli` answer and you approved the project's hooks; see
+[Agents and hooks](../explanation/agents-and-hooks.md#codex-and-gemini-cli).
 
 ## 3. Ask a question that spans pages
 

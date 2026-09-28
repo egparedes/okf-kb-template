@@ -71,6 +71,23 @@ def test_config_errors_and_guard(kbs: dict[str, Path], tmp_path: Path) -> None:
     ok = launch(["-C", str(kbs["one"]), "find"], tmp_path, tmp_path)  # an explicit -C does not need the config
     assert f"root={kbs['one']}" in ok.stdout
     assert "cannot read" in launch(["find"], tmp_path, tmp_path).stderr
+    assert "cannot read" in launch(["find"], tmp_path, tmp_path, KB_DIR="work").stderr  # a name needs the config
+
+
+@pytest.mark.parametrize("broken", ["this is [ not toml\n", 'knowledge-bases = "x"\n', 'default = 3\n'])
+def test_broken_config_is_not_needed_for_a_path(kbs: dict[str, Path], tmp_path: Path, broken: str) -> None:
+    (tmp_path / "config" / "okf-kb" / "config.toml").write_text(broken)
+    for args, cwd, env in (
+        (["find"], tmp_path, {"KB_DIR": str(kbs["one"])}),
+        (["-C", str(kbs["one"]), "find"], tmp_path, {}),
+        (["find"], kbs["one"] / "kb" / "deep", {}),
+    ):
+        result = launch(args, cwd, tmp_path, **env)
+        assert result.returncode == 0 and f"root={kbs['one']}" in result.stdout, result.stderr
+
+
+def test_config_relative_paths(kbs: dict[str, Path], tmp_path: Path) -> None:
+    config = tmp_path / "config" / "okf-kb" / "config.toml"
     (config.parent / "rel").mkdir()
     make_kb(config.parent / "rel" / "kb3")
     config.write_text('default = "gone"\n[knowledge-bases]\ngone = "/nonexistent"\nrel = "rel/kb3"\n')
