@@ -92,7 +92,12 @@ Two commands start other programs, and both are kept narrow:
   which would also start applications or mount network shares for other
   kinds of address. It therefore accepts only `http://` and `https://` URLs
   with a host, the `zotero://select/…` URLs it builds itself, and files
-  under a declared root.
+  under a declared root. A file the opener would run is refused too: a
+  program or shortcut by its extension and, on macOS and Linux, an
+  executable-bit file without extension or starting like a program
+  (`#!`, ELF, Mach-O, `MZ`); macOS `open` runs an extension-less executable
+  in Terminal. The executable bit alone is not enough, because SMB, WSL
+  `/mnt/c` and FAT mounts set it on every file.
 - `kb fetch` converts non-text files with markitdown, at a pinned version.
   The converter runs without the secrets loaded from `.env`, without API
   keys or tokens from the shell environment, and with a time limit.

@@ -48,7 +48,7 @@ lists which is which.
 
     ```sh
     uv run poe setup     # uv syncs the tooling; pre-commit hook, indexes
-    uv run poe ci        # kb check, independent OKF validator, tests, index freshness
+    uv run poe ci        # kb check, independent OKF validator, lint, tests, index freshness
     ```
 
     Updating to a release before v0.6.0, run `just setup` and `just ci`

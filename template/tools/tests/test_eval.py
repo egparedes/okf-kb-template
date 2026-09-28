@@ -40,13 +40,21 @@ def _page(title: str, description: str, body: str, tags: str = "[]", type_: str 
 def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     shutil.copytree(FIXTURES / "schema", tmp_path / "schema")
     shutil.copy(REPO / "schema" / "frontmatter.schema.json", tmp_path / "schema")
-    (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo-tools"\n\n[tool.kb]\nbundle = "kb"\n')
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "demo-tools"\n\n[tool.kb]\nbundle = "kb"\n', newline="\n"
+    )
     kb = tmp_path / "kb"
     (kb / "systems").mkdir(parents=True)
     (kb / "data").mkdir()
-    (kb / "systems" / "dns.md").write_text(_page("DNS", "Resolves host names to addresses.", "Recursive resolvers cache.", "[networking]"))
-    (kb / "systems" / "dhcp.md").write_text(_page("DHCP", "Leases addresses to hosts.", "Leases expire; see resolvers.", "[networking]"))
-    (kb / "data" / "parquet.md").write_text(_page("Parquet", "Columnar file format.", "Row groups and zstd compression."))
+    (kb / "systems" / "dns.md").write_text(
+        _page("DNS", "Resolves host names to addresses.", "Recursive resolvers cache.", "[networking]"), newline="\n"
+    )
+    (kb / "systems" / "dhcp.md").write_text(
+        _page("DHCP", "Leases addresses to hosts.", "Leases expire; see resolvers.", "[networking]"), newline="\n"
+    )
+    (kb / "data" / "parquet.md").write_text(
+        _page("Parquet", "Columnar file format.", "Row groups and zstd compression."), newline="\n"
+    )
     (tmp_path / "tools" / "retrieval-eval").mkdir(parents=True)
     monkeypatch.setenv("KB_REPO_ROOT", str(tmp_path))
     monkeypatch.delenv("KB_QMD_COLLECTION", raising=False)
@@ -56,7 +64,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _questions(repo: Path, text: str) -> Path:
     path = repo / "tools" / "retrieval-eval" / "questions.yaml"
-    path.write_text(text)
+    path.write_text(text, newline="\n")
     return path
 
 
@@ -118,11 +126,16 @@ def test_eval_index_navigation_ranks_index_matches_first(repo: Path) -> None:
 def test_eval_common_words_do_not_bury_text_hits(repo: Path, capsys) -> None:
     """Regression: substring matches and stop words let every index entry outrank the text search."""
     for n in range(12):
-        (repo / "kb" / "data" / f"thing-{n:02}.md").write_text(_page(f"Thing {n}", f"Overview of the thing number {n}.", "Nothing."))
+        (repo / "kb" / "data" / f"thing-{n:02}.md").write_text(
+            _page(f"Thing {n}", f"Overview of the thing number {n}.", "Nothing."), newline="\n"
+        )
     (repo / "kb" / "data" / "zbackups.md").write_text(
-        _page("Snapshot schedule", "When snapshots run.", "The retention policy for backups keeps 30 days.")
+        _page("Snapshot schedule", "When snapshots run.", "The retention policy for backups keeps 30 days."),
+        newline="\n",
     )
-    _questions(repo, "questions:\n  - question: What is the retention policy for backups?\n    expected: [/data/zbackups.md]\n")
+    _questions(
+        repo, "questions:\n  - question: What is the retention policy for backups?\n    expected: [/data/zbackups.md]\n"
+    )
     assert main(["eval", "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["questions"][0]["tiers"]["index+text"]["rank"] == 1
 
@@ -140,8 +153,10 @@ def test_eval_index_needs_two_words_of_a_long_question(repo: Path) -> None:
     [
         (["--tag", "networking"], ["/systems/dhcp.md\tConcept\tDHCP", "/systems/dns.md\tConcept\tDNS"]),
         (["--folder", "data"], ["/data/parquet.md\tConcept\tParquet"]),
-        (["--folder", "systems", "--tag", "networking", "--status", "stable"],
-         ["/systems/dhcp.md\tConcept\tDHCP", "/systems/dns.md\tConcept\tDNS"]),
+        (
+            ["--folder", "systems", "--tag", "networking", "--status", "stable"],
+            ["/systems/dhcp.md\tConcept\tDHCP", "/systems/dns.md\tConcept\tDNS"],
+        ),
         (["--status", "draft"], []),
         (["--type", "Source"], []),
     ],
@@ -191,7 +206,8 @@ def test_eval_qmd_failure_is_reported(repo: Path, monkeypatch: pytest.MonkeyPatc
     _questions(repo, "questions:\n  - question: host names\n    expected: [/systems/dns.md]\n")
     monkeypatch.setattr(search, "qmd_ready", lambda collection: True)
     monkeypatch.setattr(
-        retrieval_eval.subprocess, "run",
+        retrieval_eval.subprocess,
+        "run",
         _fake_qmd(lambda cmd, **kw: subprocess.CompletedProcess(cmd, 2, stdout="", stderr="no models")),
     )
     assert main(["eval"]) == 0
@@ -207,22 +223,52 @@ def test_eval_qmd_failure_is_reported(repo: Path, monkeypatch: pytest.MonkeyPatc
         ("questions: [x]\n", "question 1: expected a mapping"),
         ("questions:\n  - expected: [/systems/dns.md]\n", "question 1: `question` must be a non-empty string"),
         ("questions:\n  - question: q\n", "question 1: `expected` must be a non-empty list"),
-        ("questions:\n  - {question: q, expected: [systems/dns.md]}\n", "'systems/dns.md' is not a bundle-absolute path"),
-        ("questions:\n  - {question: q, expected: [/systems/nope.md]}\n", "/systems/nope.md does not exist in the bundle"),
-        ("questions:\n  - {question: q, expected: [/Systems/DNS.md]}\n", "/Systems/DNS.md does not exist in the bundle"),
+        (
+            "questions:\n  - {question: q, expected: [systems/dns.md]}\n",
+            "'systems/dns.md' is not a bundle-absolute path",
+        ),
+        (
+            "questions:\n  - {question: q, expected: [/systems/nope.md]}\n",
+            "/systems/nope.md does not exist in the bundle",
+        ),
+        (
+            "questions:\n  - {question: q, expected: [/Systems/DNS.md]}\n",
+            "/Systems/DNS.md does not exist in the bundle",
+        ),
         ("questions:\n  - {question: q, expected: [/systems/index.md]}\n", "/systems/index.md is a generated index"),
         ("questions:\n  - {question: q, expected: [/systems/dns.md], note: x}\n", "unknown key `note`"),
         ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: [x]}\n", "`filters` must be a mapping"),
         ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {kind: x}}\n", "unknown filter `kind`"),
-        ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {tag: [1]}}\n", "filter `tag` must be a string or a list"),
-        ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {status: old}}\n", "filter `status` must be one of"),
+        (
+            "questions:\n  - {question: q, expected: [/systems/dns.md], filters: {tag: [1]}}\n",
+            "filter `tag` must be a string or a list",
+        ),
+        (
+            "questions:\n  - {question: q, expected: [/systems/dns.md], filters: {status: old}}\n",
+            "filter `status` must be one of",
+        ),
         ("questions: [\n", "unparseable YAML"),
-        ("questions:\n  - {question: q, expected: [/systems/dns.md, /systems/dns.md]}\n", "/systems/dns.md is listed more than once"),
+        (
+            "questions:\n  - {question: q, expected: [/systems/dns.md, /systems/dns.md]}\n",
+            "/systems/dns.md is listed more than once",
+        ),
         ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {type: Idea}}\n", "'Idea' is not a type"),
-        ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {folder: nope}}\n", "'nope' is not a folder"),
-        ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {folder: ../schema}}\n", "'../schema' is not a folder"),
-        ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {folder: systems/..}}\n", "'systems/..' is not a folder"),
-        ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {tag: []}}\n", "must name at least one tag"),
+        (
+            "questions:\n  - {question: q, expected: [/systems/dns.md], filters: {folder: nope}}\n",
+            "'nope' is not a folder",
+        ),
+        (
+            "questions:\n  - {question: q, expected: [/systems/dns.md], filters: {folder: ../schema}}\n",
+            "'../schema' is not a folder",
+        ),
+        (
+            "questions:\n  - {question: q, expected: [/systems/dns.md], filters: {folder: systems/..}}\n",
+            "'systems/..' is not a folder",
+        ),
+        (
+            "questions:\n  - {question: q, expected: [/systems/dns.md], filters: {tag: []}}\n",
+            "must name at least one tag",
+        ),
     ],
 )
 def test_eval_rejects_invalid_questions(repo: Path, text: str, message: str) -> None:

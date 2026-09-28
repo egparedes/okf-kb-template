@@ -39,6 +39,7 @@ pull later template changes into a knowledge base, run
 ```sh
 uv sync
 uv run poe test                # renders several configurations and runs each result's checks
+uv run poe lint                # ruff (lint, format check) and mypy; `uv run ruff format` fixes the formatting
 uv run poe render [DEST]       # renders the working tree with defaults into DEST (default /tmp/okf-kb-preview)
 uv run poe docs-serve          # preview the documentation site on http://localhost:8000
 uv run poe docs                # build it into site/ (strict)
@@ -51,7 +52,10 @@ CI (`.github/workflows/template.yml`) runs `uv run poe test` from the
 locked environment (`uv sync --locked`) on Linux, macOS and Windows, with
 Python 3.11 and 3.14; the Linux job with Python 3.11 runs in the C locale
 without UTF-8 mode, which catches file access that relies on the platform's
-default encoding. `docs.yml` builds the documentation site; `links.yml`
+default encoding. The Linux job with Python 3.14 also runs `uv run poe lint`:
+ruff over `tests/`, `launcher/` and the template's tooling, mypy over
+`tests/` and `launcher/`. The tooling is type-checked in a rendered knowledge
+base (its own `poe lint`, which `tests/test_template.py` runs). `docs.yml` builds the documentation site; `links.yml`
 checks its external links on demand. The actions are pinned by commit SHA
 and `.github/dependabot.yml` proposes updates weekly. Dependabot reads only
 `.github/workflows/`, not the knowledge base's `kb.yml` inside `template/`:

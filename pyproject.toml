@@ -8,7 +8,7 @@ license-files = ["LICENSE"]
 dependencies = []
 
 [dependency-groups]
-dev = ["copier>=9.6", "pytest>=8", "poethepoet>=0.48"]
+dev = ["copier>=9.6", "pytest>=8", "poethepoet>=0.48", "ruff>=0.16", "mypy>=2.0"]
 docs = ["zensical>=0.0.65"]
 
 [tool.pytest.ini_options]
@@ -18,6 +18,10 @@ testpaths = ["tests"]
 [tool.poe.tasks.test]
 help = "Render the template in several configurations and run each result's checks"
 cmd = "pytest -q"
+
+[tool.poe.tasks.lint]
+help = "Lint and format check (ruff) of tests/, launcher/ and the template's tooling; type check (mypy) of tests/ and launcher/"
+sequence = [{ cmd = "ruff check" }, { cmd = "ruff format --check" }, { cmd = "mypy" }]
 
 [tool.poe.tasks.render]
 help = "Render the template with defaults into a scratch directory (default /tmp/okf-kb-preview)"
@@ -32,3 +36,41 @@ cmd = "uv run --only-group docs zensical build --clean --strict"
 help = "Serve the documentation with live reload on http://localhost:8000"
 cmd = "uv run --only-group docs zensical serve"
 
+
+# Lint and type checks (`uv run poe lint`). The rules match the knowledge base's own
+# (template/pyproject.toml.jinja); mypy checks the template's tooling in a rendered
+# knowledge base (its `poe lint`, run by tests/test_template.py), where its dependencies are installed.
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+include = ["tests/**/*.py", "launcher/**/*.py", "template/tools/**/*.py"]
+
+[tool.ruff.lint]
+# An explicit list (the classic ruff defaults E4, E7, E9, F, plus bugbear, pyupgrade, simplify,
+# import sorting and ruff's own rules), so a newer ruff with other defaults checks the same.
+select = ["E4", "E7", "E9", "F", "B", "UP", "SIM", "I", "RUF"]
+# Codes of security and naming linters the code documents its exceptions with.
+external = ["S", "BLE", "N802"]
+ignore = [
+    "SIM108", # a ternary is not always clearer than if/else
+    "SIM905", # "a b c".split() reads better than a long list of short strings
+    "RUF001", "RUF002", "RUF003", # typographic characters (›, –, ’) are deliberate in a Markdown tool
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The tooling tests import pytest fixtures from sibling test modules; using one as a parameter "redefines" it.
+"template/tools/tests/*" = ["F811"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["kbtools", "okf_kb"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["tests", "launcher/src"]
+mypy_path = "launcher/src"
+check_untyped_defs = true
+disallow_untyped_defs = true
+no_implicit_reexport = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unused_ignores = true

@@ -31,11 +31,16 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import IO, TypeVar
 
 from .bundle import Bundle, load_yaml
+from .fsutil import which_on_path
 from .names import fold, slug
+
+T = TypeVar("T")
 
 ZOTERO_KEY = re.compile(r"^[A-Z0-9]{8}$")
 LOCAL_ZOTERO = "http://localhost:23119/api"  # + /users/0 (the local user) or /groups/<id>
@@ -76,7 +81,7 @@ def load_env(repo_root: Path) -> None:
     for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
         line = line.strip()
         if line.startswith("export "):
-            line = line[len("export "):].lstrip()
+            line = line[len("export ") :].lstrip()
         if not line or line.startswith("#"):
             continue
         key, sep, value = line.partition("=")
@@ -102,8 +107,11 @@ def child_env() -> dict[str, str]:
     settings (`UV_*`), which uvx needs for private package indexes.
     """
     drop = LOADED_FROM_DOTENV | SECRET_NAMES | {"KB_REPO_ROOT", "OKF_KB_LAUNCHER"}
-    return {k: v for k, v in os.environ.items()
-            if k not in drop and (k.upper().startswith("UV_") or not _SECRET_NAME.search(k))}
+    return {
+        k: v
+        for k, v in os.environ.items()
+        if k not in drop and (k.upper().startswith("UV_") or not _SECRET_NAME.search(k))
+    }
 
 
 _PLATFORM = sys.platform  # a seam for tests
@@ -121,7 +129,8 @@ def open_with_default_app(target: str) -> None:
         keep = child_env()
         for name in [n for n in os.environ if n not in keep]:
             del os.environ[name]
-        os.startfile(target)  # noqa: S606 - opening a URI with the default handler
+        # os.startfile exists only on Windows; _PLATFORM (patched in tests) does not narrow it for mypy.
+        os.startfile(target)  # type: ignore[attr-defined,unused-ignore]  # noqa: S606 - opening a URI with the default handler
         return
     opener = "open" if _PLATFORM == "darwin" else "xdg-open"
     subprocess.Popen([opener, target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=child_env())
@@ -185,7 +194,9 @@ class Settings:
         return cls(
             roots={str(k): str(v) for k, v in (data.get("roots") or {}).items()},
             deny=deny_patterns(data),
-            zotero_user_id=str(zotero["user_id"]) if zotero.get("user_id") else (os.environ.get("ZOTERO_USER_ID") or "").strip() or None,
+            zotero_user_id=str(zotero["user_id"])
+            if zotero.get("user_id")
+            else (os.environ.get("ZOTERO_USER_ID") or "").strip() or None,
             zotero_group_id=str(zotero["group_id"]) if zotero.get("group_id") else None,
         )
 
@@ -221,7 +232,15 @@ class Settings:
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     """Never follow redirects: they would drop POST bodies and leak API keys to other hosts."""
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: http.client.HTTPMessage,
+        newurl: str,
+    ) -> None:
         return None
 
 
@@ -236,10 +255,14 @@ def http_base(url: str, variable: str, warn_cleartext: bool = True) -> str:
     """
     parts = urllib.parse.urlsplit(url.strip())
     if parts.scheme not in ("http", "https") or not parts.netloc:
-        raise ResourceError(f"kb: {variable} must be an http:// or https:// address, e.g. https://example.org (got `{url}`)")
+        raise ResourceError(
+            f"kb: {variable} must be an http:// or https:// address, e.g. https://example.org (got `{url}`)"
+        )
     if warn_cleartext and parts.scheme == "http" and parts.hostname not in ("localhost", "127.0.0.1", "::1"):
-        print(f"kb: warning: {variable} uses http://, so the API key crosses the network unencrypted; use https://",
-              file=sys.stderr)
+        print(
+            f"kb: warning: {variable} uses http://, so the API key crosses the network unencrypted; use https://",
+            file=sys.stderr,
+        )
     return url.strip().rstrip("/")
 
 
@@ -317,7 +340,9 @@ class ZoteroDB:
             self.library = self._library(group_id)
         except (OSError, sqlite3.DatabaseError) as exc:
             self.close()
-            raise ResourceError(f"kb: cannot read the Zotero database snapshot ({exc}); retry, or close Zotero") from None
+            raise ResourceError(
+                f"kb: cannot read the Zotero database snapshot ({exc}); retry, or close Zotero"
+            ) from None
 
     def close(self) -> None:
         """Close the connection, then delete the snapshot (in this order, for Windows)."""
@@ -325,6 +350,12 @@ class ZoteroDB:
             self.db.close()
             self.db = None
         self._tmp.cleanup()
+
+    @property
+    def _connection(self) -> sqlite3.Connection:
+        if self.db is None:
+            raise ResourceError("kb: the Zotero database snapshot is already closed")
+        return self.db
 
     def __enter__(self) -> ZoteroDB:
         return self
@@ -334,41 +365,56 @@ class ZoteroDB:
 
     def _library(self, group_id: str | None) -> int | None:
         """libraryID of the configured group, else of the user library (None: a schema without libraries)."""
-        columns = {r["name"] for r in self.db.execute("PRAGMA table_info(items)")}
-        tables = {r["name"] for r in self.db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        columns = {r["name"] for r in self._connection.execute("PRAGMA table_info(items)")}
+        tables = {r["name"] for r in self._connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
         if "libraryID" not in columns or not {"libraries", "groups"} <= tables:
             return None
         if group_id:
-            row = self.db.execute("SELECT libraryID FROM groups WHERE groupID = ?", (int(group_id),)).fetchone()
+            row = self._connection.execute(
+                "SELECT libraryID FROM groups WHERE groupID = ?", (int(group_id),)
+            ).fetchone()
             if row is None:
-                raise ResourceError(f"kb: Zotero group {group_id} is not in the local database (sync it in Zotero first)")
+                raise ResourceError(
+                    f"kb: Zotero group {group_id} is not in the local database (sync it in Zotero first)"
+                )
         else:
-            row = self.db.execute("SELECT libraryID FROM libraries WHERE type = 'user'").fetchone()
+            row = self._connection.execute("SELECT libraryID FROM libraries WHERE type = 'user'").fetchone()
         return row["libraryID"] if row else None
 
     def _query(self, sql: str, params: tuple) -> list:
         try:
-            return self.db.execute(sql, params).fetchall()
+            return self._connection.execute(sql, params).fetchall()
         except sqlite3.DatabaseError as exc:
-            raise ResourceError(f"kb: cannot read the Zotero database snapshot ({exc}); retry, or close Zotero") from None
+            raise ResourceError(
+                f"kb: cannot read the Zotero database snapshot ({exc}); retry, or close Zotero"
+            ) from None
 
     def _in_library(self, alias: str = "i") -> tuple[str, tuple]:
         return (f"AND {alias}.libraryID = ? ", (self.library,)) if self.library is not None else ("", ())
 
-    def _item(self, row) -> dict:
-        fields = {r["fieldName"]: r["value"] for r in self._query(
-            "SELECT f.fieldName, v.value FROM itemData d JOIN fields f USING (fieldID) "
-            "JOIN itemDataValues v USING (valueID) WHERE d.itemID = ?", (row["itemID"],))}
+    def _item(self, row: sqlite3.Row) -> dict:
+        fields = {
+            r["fieldName"]: r["value"]
+            for r in self._query(
+                "SELECT f.fieldName, v.value FROM itemData d JOIN fields f USING (fieldID) "
+                "JOIN itemDataValues v USING (valueID) WHERE d.itemID = ?",
+                (row["itemID"],),
+            )
+        }
         creators = [
             {"creatorType": r["creatorType"], "lastName": r["lastName"], "firstName": r["firstName"]}
             for r in self._query(
                 "SELECT t.creatorType, c.lastName, c.firstName FROM itemCreators ic JOIN creators c USING (creatorID) "
-                "JOIN creatorTypes t USING (creatorTypeID) WHERE ic.itemID = ? ORDER BY ic.orderIndex", (row["itemID"],))
+                "JOIN creatorTypes t USING (creatorTypeID) WHERE ic.itemID = ? ORDER BY ic.orderIndex",
+                (row["itemID"],),
+            )
         ]
         return {"key": row["key"], "itemType": row["typeName"], "creators": creators, **fields}
 
-    _ITEMS = ("SELECT i.itemID, i.key, t.typeName FROM items i JOIN itemTypes t USING (itemTypeID) "
-              "WHERE i.itemID NOT IN (SELECT itemID FROM deletedItems) ")
+    _ITEMS = (
+        "SELECT i.itemID, i.key, t.typeName FROM items i JOIN itemTypes t USING (itemTypeID) "
+        "WHERE i.itemID NOT IN (SELECT itemID FROM deletedItems) "
+    )
 
     def item(self, key: str) -> dict | None:
         where, params = self._in_library()
@@ -383,14 +429,18 @@ class ZoteroDB:
             "SELECT d.itemID FROM itemData d JOIN fields f USING (fieldID) JOIN itemDataValues v USING (valueID) "
             "WHERE f.fieldName IN ('title', 'citationKey', 'DOI', 'extra') AND v.value LIKE ? "
             "UNION SELECT ic.itemID FROM itemCreators ic JOIN creators c USING (creatorID) WHERE c.lastName LIKE ?) "
-            "LIMIT ?", (*params, like, like, limit))
+            "LIMIT ?",
+            (*params, like, like, limit),
+        )
         return [self._item(r) for r in rows]
 
     def attachments(self, key: str) -> list[dict]:
         where, params = self._in_library("p")
         rows = self._query(
             "SELECT i.key FROM itemAttachments a JOIN items i ON i.itemID = a.itemID "
-            "JOIN items p ON p.itemID = a.parentItemID WHERE p.key = ? " + where, (key, *params))
+            "JOIN items p ON p.itemID = a.parentItemID WHERE p.key = ? " + where,
+            (key, *params),
+        )
         return [{"key": r["key"], "itemType": "attachment"} for r in rows]
 
 
@@ -406,16 +456,19 @@ class Zotero:
         if not (settings.zotero_user_id or "0").isdigit():
             raise ResourceError("kb: ZOTERO_USER_ID must be the numeric Zotero user id")
         group = settings.zotero_group_id
-        local = _LIBRARY.sub("", http_base(os.environ.get("ZOTERO_LOCAL_API") or LOCAL_ZOTERO, "ZOTERO_LOCAL_API",
-                                         warn_cleartext=False))  # never sent a key
+        local = _LIBRARY.sub(
+            "", http_base(os.environ.get("ZOTERO_LOCAL_API") or LOCAL_ZOTERO, "ZOTERO_LOCAL_API", warn_cleartext=False)
+        )  # never sent a key
         self.local_base = f"{local}/groups/{group}" if group else f"{local}/users/0"  # the local API's own user is 0
         self.web_key = os.environ.get("ZOTERO_API_KEY")
-        library = (f"groups/{group}" if group
-                   else f"users/{settings.zotero_user_id}" if settings.zotero_user_id else None)
+        library = (
+            f"groups/{group}" if group else f"users/{settings.zotero_user_id}" if settings.zotero_user_id else None
+        )
         web = os.environ.get("ZOTERO_WEB_API") or WEB_ZOTERO
         self.web_base = f"{http_base(web, 'ZOTERO_WEB_API')}/{library}" if library and self.web_key else None
         self.data_dir = Path(os.environ["ZOTERO_DATA_DIR"]).expanduser() if os.environ.get("ZOTERO_DATA_DIR") else None
         self.used: str | None = None
+        self._db: ZoteroDB | None = None
 
     def _call(self, path: str, params: dict | None = None) -> object | None:
         """JSON from the local API, else the web API; None when the item does not exist."""
@@ -431,7 +484,9 @@ class Zotero:
         except ResourceError:
             status = None  # Zotero is not running
         if self.web_base and self.web_key:  # also when the local API does not know the item (not synced yet)
-            status, data = _get(f"{self.web_base}{path}{query}", {"Zotero-API-Key": self.web_key, "Zotero-API-Version": "3"})
+            status, data = _get(
+                f"{self.web_base}{path}{query}", {"Zotero-API-Key": self.web_key, "Zotero-API-Version": "3"}
+            )
             if status == 200:
                 self.used = "web API"
                 return _unwrap(data)
@@ -441,19 +496,21 @@ class Zotero:
         hint = "start Zotero, and enable Settings > Advanced > 'Allow other applications on this computer to communicate with Zotero'"
         if status == 403:
             hint = "enable Settings > Advanced > 'Allow other applications on this computer to communicate with Zotero'"
-        raise ResourceError(f"kb: Zotero is not reachable ({hint}); no web API fallback configured (ZOTERO_API_KEY + zotero.user_id)")
+        raise ResourceError(
+            f"kb: Zotero is not reachable ({hint}); no web API fallback configured (ZOTERO_API_KEY + zotero.user_id)"
+        )
 
     def _offline(self) -> ZoteroDB | None:
         if self.data_dir is None:
             return None
-        if getattr(self, "_db", None) is None:
+        if self._db is None:
             self._db = ZoteroDB(self.data_dir, self.settings.zotero_group_id)
             self.used = "database snapshot"
         return self._db
 
     def close(self) -> None:
         """Release the database snapshot, if one was opened."""
-        db, self._db = getattr(self, "_db", None), None
+        db, self._db = self._db, None
         if db is not None:
             db.close()
 
@@ -463,7 +520,7 @@ class Zotero:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
-    def _api_or_offline(self, call, offline):
+    def _api_or_offline(self, call: Callable[[], T], offline: Callable[[ZoteroDB], T]) -> T:
         try:
             return call()
         except ResourceError:
@@ -474,7 +531,9 @@ class Zotero:
 
     def search(self, query: str, limit: int = 20) -> list[dict]:
         def api() -> list[dict]:
-            items = self._call("/items/top", {"q": query, "qmode": "everything", "limit": min(limit, 100), "format": "json"})
+            items = self._call(
+                "/items/top", {"q": query, "qmode": "everything", "limit": min(limit, 100), "format": "json"}
+            )
             if items is not None and not isinstance(items, list):
                 raise ResourceError("kb: unexpected Zotero search response")
             return [i for i in items or [] if isinstance(i, dict)]
@@ -484,7 +543,9 @@ class Zotero:
     def item(self, ref: str) -> dict:
         """Item data by item key or citation key."""
         if ZOTERO_KEY.match(ref):
-            data = self._api_or_offline(lambda: self._call(f"/items/{ref}", {"format": "json"}), lambda db: db.item(ref))
+            data = self._api_or_offline(
+                lambda: self._call(f"/items/{ref}", {"format": "json"}), lambda db: db.item(ref)
+            )
             if isinstance(data, dict):
                 return data
             raise ResourceError(f"kb: no Zotero item with key `{ref}`")
@@ -499,7 +560,10 @@ class Zotero:
 
     def attachments(self, key: str) -> list[dict]:
         children = self._api_or_offline(
-            lambda: self._call(f"/items/{key}/children", {"format": "json"}), lambda db: db.attachments(key)) or []
+            lambda: self._call(f"/items/{key}/children", {"format": "json"}), lambda db: db.attachments(key)
+        )
+        if not isinstance(children, list):  # None, or an unexpected response
+            return []
         return [c for c in children if isinstance(c, dict) and c.get("itemType") == "attachment"]
 
     def fulltext(self, key: str) -> str:
@@ -533,7 +597,9 @@ def _unwrap(data: object) -> object:
     if not isinstance(data, dict) or not isinstance(data.get("data"), dict):
         return data
     item = dict(data["data"])
-    meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+    meta = data.get("meta")
+    if not isinstance(meta, dict):
+        meta = {}
     if meta.get("parsedDate") and "parsedDate" not in item:
         item["parsedDate"] = meta["parsedDate"]
     return item
@@ -543,7 +609,11 @@ def citekey_slug(citekey: str) -> str:
     """Kebab-case slug of a citation key: 'hoppeProgressiveMeshes1996' -> 'hoppe-progressive-meshes-1996'."""
     out = []
     for prev, char in zip(" " + citekey, citekey, strict=False):
-        if (prev.islower() and char.isupper()) or (prev.isalpha() and char.isdigit()) or (prev.isdigit() and char.isalpha()):
+        if (
+            (prev.islower() and char.isupper())
+            or (prev.isalpha() and char.isdigit())
+            or (prev.isdigit() and char.isalpha())
+        ):
             out.append("-")
         out.append(char)
     return slug("".join(out))
@@ -582,16 +652,22 @@ def _published(date: str) -> str | None:
 
 def zotero_source_frontmatter(item: dict, settings: Settings) -> dict:
     """Frontmatter for a Source page describing a Zotero item."""
-    creators = [c.get("lastName") or c.get("name") for c in item.get("creators") or [] if c.get("creatorType") in (None, "author", "editor")]
+    creators = [
+        c.get("lastName") or c.get("name")
+        for c in item.get("creators") or []
+        if c.get("creatorType") in (None, "author", "editor")
+    ]
     authors = ", ".join(a for a in creators if a)
     doi = re.sub(r"^(https?://(dx\.)?doi\.org/|doi:)", "", (item.get("DOI") or "").strip(), flags=re.I)
     library = f"groups/{settings.zotero_group_id}" if settings.zotero_group_id else "library"
-    resource = (f"https://doi.org/{doi}" if doi else item.get("url")
-                or f"zotero://select/{library}/items/{item['key']}")
+    resource = f"https://doi.org/{doi}" if doi else item.get("url") or f"zotero://select/{library}/items/{item['key']}"
     kind = re.sub(r"(?<!^)(?=[A-Z])", " ", item.get("itemType", "item")).lower()
-    fm: dict = {"type": "Source", "title": item.get("title") or item["key"],
-                "description": f"A {kind} by {authors or 'unknown authors'} (summary pending).",
-                "resource": resource}
+    fm: dict = {
+        "type": "Source",
+        "title": item.get("title") or item["key"],
+        "description": f"A {kind} by {authors or 'unknown authors'} (summary pending).",
+        "resource": resource,
+    }
     if authors:
         fm["author"] = authors
     published = _published(item.get("parsedDate") or item.get("date") or "")
@@ -610,7 +686,7 @@ def zotero_source_frontmatter(item: dict, settings: Settings) -> dict:
 class KaraKeep:
     """KaraKeep by URL; works against the cloud service or a self-hosted instance."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         base = os.environ.get("KARAKEEP_URL")
         key = os.environ.get("KARAKEEP_API_KEY")
         if not base or not key:
@@ -639,7 +715,9 @@ class KaraKeep:
         bookmark = urllib.parse.quote(str(bookmark_id), safe="")
         for _ in range(MAX_PAGES):
             params = {"format": "markdown", **({"cursor": cursor} if cursor else {})}
-            status, data = _get(f"{self.api}/bookmarks/{bookmark}/content?{urllib.parse.urlencode(params)}", self.headers)
+            status, data = _get(
+                f"{self.api}/bookmarks/{bookmark}/content?{urllib.parse.urlencode(params)}", self.headers
+            )
             if status != 200 or not isinstance(data, dict):
                 break
             content = data.get("content")
@@ -654,8 +732,12 @@ class KaraKeep:
         status, data = _get(f"{self.api}/bookmarks/{bookmark}?includeContent=true", self.headers)
         if status != 200 or not isinstance(data, dict):
             raise ResourceError(f"kb: KaraKeep returned {status} for bookmark {bookmark_id}")
-        content = data.get("content") if isinstance(data.get("content"), dict) else {}
-        if content.get("crawlStatus") == "pending" or (not content.get("htmlContent") and not content.get("crawlStatus")):
+        content = data.get("content")
+        if not isinstance(content, dict):
+            content = {}
+        if content.get("crawlStatus") == "pending" or (
+            not content.get("htmlContent") and not content.get("crawlStatus")
+        ):
             raise ResourceError(f"kb: KaraKeep is still archiving bookmark {bookmark_id}; retry in a minute")
         html = content.get("htmlContent")
         if not html:
@@ -672,17 +754,17 @@ def _html_to_text(html: str) -> str:
             self.parts: list[str] = []
             self.skip = 0
 
-        def handle_starttag(self, tag, attrs):
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
             if tag in ("script", "style"):
                 self.skip += 1
             elif tag in ("p", "br", "li", "h1", "h2", "h3", "h4", "tr", "div"):
                 self.parts.append("\n")
 
-        def handle_endtag(self, tag):
+        def handle_endtag(self, tag: str) -> None:
             if tag in ("script", "style") and self.skip:
                 self.skip -= 1
 
-        def handle_data(self, data):
+        def handle_data(self, data: str) -> None:
             if not self.skip:
                 self.parts.append(data)
 
@@ -697,7 +779,12 @@ def _html_to_text(html: str) -> str:
 def web_url(url: str) -> str:
     """`url` if it is an http(s) URL with a host; anything else could make an opener run a program."""
     parts = urllib.parse.urlsplit(url)
-    if parts.scheme.lower() not in ("http", "https") or not parts.netloc or url != url.strip() or any(c < " " for c in url):
+    if (
+        parts.scheme.lower() not in ("http", "https")
+        or not parts.netloc
+        or url != url.strip()
+        or any(c < " " for c in url)
+    ):
         raise ResourceError(f"kb: `{url}` is not an http:// or https:// URL")
     return url
 
@@ -736,15 +823,23 @@ def _convert(path: Path) -> str:
     It runs without the .env secrets, with a time limit, and through uvx at a
     pinned version (`KB_MARKITDOWN`) unless markitdown is installed.
     """
-    if shutil.which("markitdown"):
-        command = ["markitdown", str(path)]
-    elif shutil.which("uvx"):
-        command = ["uvx", "--from", os.environ.get("KB_MARKITDOWN") or MARKITDOWN, "markitdown", str(path)]
+    if markitdown := which_on_path("markitdown"):
+        command = [markitdown, str(path)]
+    elif uvx := which_on_path("uvx"):
+        command = [uvx, "--from", os.environ.get("KB_MARKITDOWN") or MARKITDOWN, "markitdown", str(path)]
     else:
         raise ResourceError("kb: install markitdown (or uv) to convert non-text files")
     try:
-        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                                env=child_env(), timeout=CONVERT_TIMEOUT, check=False)
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=child_env(),
+            timeout=CONVERT_TIMEOUT,
+            check=False,
+        )
     except subprocess.TimeoutExpired:
         raise ResourceError(f"kb: markitdown took more than {CONVERT_TIMEOUT} s for {path.name}") from None
     except OSError as exc:
@@ -762,7 +857,9 @@ def fetch(bundle: Bundle, ref: str, out_dir: Path) -> Path:
         with Zotero(settings) as zotero:
             item = zotero.item(rest)
             text, name = zotero.fulltext(item["key"]), zotero_citekey_slug(item)
-            header = f"<!-- zotero:{item['key']} via {zotero.used or 'storage cache'} -->\n# {item.get('title', '')}\n\n"
+            header = (
+                f"<!-- zotero:{item['key']} via {zotero.used or 'storage cache'} -->\n# {item.get('title', '')}\n\n"
+            )
     elif scheme == "karakeep":
         keep = KaraKeep()
         bookmark = keep.find(rest) or keep.save(rest)
@@ -776,25 +873,92 @@ def fetch(bundle: Bundle, ref: str, out_dir: Path) -> Path:
             raise ResourceError(f"kb: {rest} is not a file")
         name = slug(path.stem)[:70]
         header = f"<!-- file:{rest} -->\n\n"
-        text = path.read_text(encoding="utf-8", errors="replace") if path.suffix.lower() in (".md", ".txt") else _convert(path)
+        text = (
+            path.read_text(encoding="utf-8", errors="replace")
+            if path.suffix.lower() in (".md", ".txt")
+            else _convert(path)
+        )
     name = f"{name or 'resource'}-{hashlib.sha1(ref.encode()).hexdigest()[:6]}" if scheme != "zotero" else name
     out_dir.mkdir(parents=True, exist_ok=True)
     target = out_dir / f"{name}.md"
-    target.write_text(header + text, encoding="utf-8")
+    target.write_text(header + text, encoding="utf-8", newline="\n")
     return target
 
 
 # File types the desktop runs instead of showing (Windows PATHEXT and shell types, macOS, Linux desktops).
-RUN_ON_OPEN = frozenset({
-    ".exe", ".com", ".bat", ".cmd", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh", ".msc", ".msi", ".msp",
-    ".scr", ".cpl", ".pif", ".lnk", ".url", ".ps1", ".psm1", ".reg", ".hta", ".jar", ".appref-ms",
-    ".app", ".command", ".tool", ".scpt", ".workflow", ".pkg", ".desktop", ".appimage",
-})
+RUN_ON_OPEN = frozenset(
+    {
+        ".exe",
+        ".com",
+        ".bat",
+        ".cmd",
+        ".vbs",
+        ".vbe",
+        ".js",
+        ".jse",
+        ".wsf",
+        ".wsh",
+        ".msc",
+        ".msi",
+        ".msp",
+        ".scr",
+        ".cpl",
+        ".pif",
+        ".lnk",
+        ".url",
+        ".ps1",
+        ".psm1",
+        ".reg",
+        ".hta",
+        ".jar",
+        ".appref-ms",
+        ".app",
+        ".command",
+        ".tool",
+        ".scpt",
+        ".workflow",
+        ".pkg",
+        ".desktop",
+        ".appimage",
+    }
+)
+
+
+# First bytes of files the system can run: a script's `#!`, ELF, Mach-O (both word sizes and byte orders,
+# universal binaries) and PE (`MZ`).
+_PROGRAM_MAGIC = (
+    b"#!",
+    b"\x7fELF",
+    b"\xfe\xed\xfa\xce",
+    b"\xfe\xed\xfa\xcf",
+    b"\xce\xfa\xed\xfe",
+    b"\xcf\xfa\xed\xfe",
+    b"\xca\xfe\xba\xbe",
+    b"MZ",
+)
 
 
 def _runs_when_opened(path: Path) -> bool:
+    """A program or shortcut by its extension; on macOS and Linux also an executable-bit file that could run.
+
+    macOS `open` runs an extension-less executable in Terminal. The executable
+    bit alone is not enough: WSL's /mnt/c, SMB/CIFS and FAT/exFAT/NTFS mounts
+    set it on every file. So an executable-bit file is refused only when it has
+    no extension or starts like a program (`#!`, ELF, Mach-O, `MZ`).
+    """
     pathext = {e.lower() for e in os.environ.get("PATHEXT", "").split(os.pathsep) if e}
-    return path.suffix.lower() in RUN_ON_OPEN | pathext
+    if path.suffix.lower() in RUN_ON_OPEN | pathext:
+        return True
+    if _PLATFORM == "win32" or not path.is_file() or not os.access(path, os.X_OK):
+        return False
+    if not path.suffix:
+        return True
+    try:
+        with path.open("rb") as fh:
+            head = fh.read(4)
+    except OSError:
+        return True  # unreadable here: do not hand it to the opener either
+    return head.startswith(_PROGRAM_MAGIC)
 
 
 def open_target(bundle: Bundle, ref: str) -> str:
@@ -815,7 +979,9 @@ def open_target(bundle: Bundle, ref: str) -> str:
         path = resolve_file(settings, rest)
         if _runs_when_opened(path):
             folder = rest.rsplit("/", 1)[0] if "/" in rest else rest
-            raise ResourceError(f"kb: {path.name} is a program or a shortcut, which the desktop would run rather "
-                                f"than show; `kb open file:{folder}` opens its folder")
+            raise ResourceError(
+                f"kb: {path.name} is a program or a shortcut, which the desktop would run rather "
+                f"than show; `kb open file:{folder}` opens its folder"
+            )
         return str(path)  # absolute, so never read as an option
     return web_url(rest)

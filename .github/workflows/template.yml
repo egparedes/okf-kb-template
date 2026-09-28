@@ -43,4 +43,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }} # also used by the rendered knowledge bases
       - run: uv sync --locked
+      - name: Lint and type check (once; the result does not depend on the runner)
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.14'
+        run: uv run --locked poe lint
       - run: uv run --locked poe test

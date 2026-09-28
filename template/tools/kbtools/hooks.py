@@ -22,16 +22,21 @@ importing the rest of the command line (the shell hooks run on every command).
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .bundle import bundle_dir, find_repo_root
-from .fsutil import remove_tree
+from .fsutil import program, remove_tree
 from .session import Session
+
+if TYPE_CHECKING:
+    from .bundle import Bundle
 
 EVENTS = ("pre-tool", "post-tool", "post-edit", "stop")
 AGENTS = ("claude", "codex", "gemini")
@@ -53,7 +58,7 @@ def _payload() -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def _session(bundle, payload: dict) -> Session:
+def _session(bundle: Bundle | _Paths, payload: dict) -> Session:
     return Session(bundle.root, bundle.repo_root, payload.get("session_id"))
 
 
@@ -72,14 +77,14 @@ def _report(problems: list[str], payload: dict, agent: str, header: str, blockin
     return 0
 
 
-def _full(bundle):
+def _full(bundle: Bundle | _Paths) -> Bundle:
     """The bundle with its configuration and file listing (the shell hooks start with bare paths)."""
     from .bundle import Bundle
 
     return bundle if isinstance(bundle, Bundle) else Bundle(bundle.root, bundle.repo_root)
 
 
-def _part_of_bundle(bundle, rels: list[str]) -> tuple[object, list[str]]:
+def _part_of_bundle(bundle: Bundle | _Paths, rels: list[str]) -> tuple[Bundle | _Paths, list[str]]:
     """(full bundle, `rels` without files the bundle leaves out): dot-folders, gitignored files.
 
     Deleted pages stay: they still count as changes. The dot-folder test is
@@ -88,11 +93,11 @@ def _part_of_bundle(bundle, rels: list[str]) -> tuple[object, list[str]]:
     rels = [r for r in rels if not any(part.startswith(".") for part in r.split("/")[:-1])]
     if not rels:
         return bundle, rels
-    bundle = _full(bundle)
-    return bundle, [r for r in rels if r in bundle.files or not (bundle.root / r).exists()]
+    full = _full(bundle)
+    return full, [r for r in rels if r in full.files or not (full.root / r).exists()]
 
 
-def _check(bundle, rels: list[str]) -> list[str]:
+def _check(bundle: Bundle | _Paths, rels: list[str]) -> list[str]:
     """Errors in the given bundle pages (only the files: no bundle-wide checks)."""
     from .check import Checker
 
@@ -100,14 +105,15 @@ def _check(bundle, rels: list[str]) -> list[str]:
     paths = [bundle.root / r for r in rels if r.endswith(".md") and (bundle.root / r).is_file()]
     if not paths:
         return []
-    errors = [d for d in Checker(bundle).check_files([bundle.document(p) for p in paths]) if d.is_error]
+    full = _full(bundle)  # already loaded when pages remain
+    errors = [d for d in Checker(full).check_files([full.document(p) for p in paths]) if d.is_error]
     shown = [str(d) for d in errors[:MAX_SHOWN]]
     if len(errors) > MAX_SHOWN:
         shown.append(f"... and {len(errors) - MAX_SHOWN} more (run `uv run poe check`)")
     return shown
 
 
-def pre_tool(bundle, agent: str = "claude") -> int:
+def pre_tool(bundle: Bundle | _Paths, agent: str = "claude") -> int:
     """Before a shell command: remember log.md (first event of the session) and the bundle's files."""
     payload = _payload()
     try:
@@ -119,7 +125,7 @@ def pre_tool(bundle, agent: str = "claude") -> int:
     return _report([], payload, agent, "")
 
 
-def post_tool(bundle, agent: str = "claude") -> int:
+def post_tool(bundle: Bundle | _Paths, agent: str = "claude") -> int:
     """After a shell command: record the pages it created, changed or deleted, and check them."""
     payload = _payload()
     session = _session(bundle, payload)
@@ -129,7 +135,7 @@ def post_tool(bundle, agent: str = "claude") -> int:
     return _report(problems, payload, agent, "kb check found problems in pages this command changed:")
 
 
-def post_edit(bundle, agent: str = "claude") -> int:
+def post_edit(bundle: Bundle | _Paths, agent: str = "claude") -> int:
     """After Write/Edit (or write_file/replace): remember the file and validate it if it is in the bundle."""
     payload = _payload()
     tool_input, tool_response = payload.get("tool_input"), payload.get("tool_response")
@@ -155,7 +161,7 @@ def post_edit(bundle, agent: str = "claude") -> int:
     return _report(problems, payload, agent, "kb check found problems in the file you just edited:")
 
 
-def stop(bundle, agent: str = "claude") -> int:
+def stop(bundle: Bundle | _Paths, agent: str = "claude") -> int:
     """Before the agent finishes: the pages it changed must validate, and knowledge edits must be logged.
 
     Only pages this session changed are checked (through file tools, shell
@@ -179,19 +185,19 @@ def stop(bundle, agent: str = "claude") -> int:
     checker.check_indexes()
     folders = {(root / r).parent for r in touched}  # their indexes and every ancestor index up to the root
     index_errors = [
-        d for d in checker.diagnostics
-        if d.is_error and any((root / d.path).parent in (f, *f.parents) for f in folders)
+        d for d in checker.diagnostics if d.is_error and any((root / d.path).parent in (f, *f.parents) for f in folders)
     ]
     problems += [str(d) for d in index_errors[:MAX_SHOWN]]
     personal = tuple(root / folder for folder in bundle.config.personal_folders)
     knowledge_edits = [
-        r for r in touched
+        r
+        for r in touched
         if Path(r).name not in ("index.md", "log.md") and not any(f in (root / r).parents for f in personal)
     ]
     if knowledge_edits and session.log_changed() is False:
         problems.append(
             f"knowledge pages changed but {bundle.show('log.md')} has no new entry: "
-            "run `uv run kb log <Op> \"<message with /links>\"`"
+            'run `uv run kb log <Op> "<message with /links>"`'
         )
     if not problems:
         session.clear()
@@ -265,14 +271,28 @@ def _link_skills(link: Path, target: Path) -> str:
 
 def _copy_skills(target: Path, link: Path) -> None:
     shutil.copytree(target, link)
-    (link / _COPY_MARKER).write_text("Copied by `kb setup` from .agents/skills; edit the originals.\n", encoding="utf-8")
+    (link / _COPY_MARKER).write_text(
+        "Copied by `kb setup` from .agents/skills; edit the originals.\n", encoding="utf-8", newline="\n"
+    )
 
 
 def _hide_from_git(repo_root: Path) -> None:
     """Keep the replaced `.claude/skills` out of `git status` (it is tracked as a symlink)."""
+
     def git(*args: str) -> subprocess.CompletedProcess:
-        return subprocess.run(["git", *args], cwd=repo_root, capture_output=True, text=True, encoding="utf-8",
-                              errors="replace", check=False)
+        try:
+            command = [program("git"), *args]
+        except FileNotFoundError as exc:  # no git: nothing to hide from
+            return subprocess.CompletedProcess(args, 127, "", str(exc))
+        return subprocess.run(
+            command,
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
 
     if git("ls-files", "--error-unmatch", "--", SKILLS_LINK.as_posix()).returncode != 0:
         return
@@ -283,7 +303,11 @@ def _hide_from_git(repo_root: Path) -> None:
         text = path.read_text(encoding="utf-8") if path.is_file() else ""
         if "/.claude/skills/" not in text.splitlines():
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text + ("" if not text or text.endswith("\n") else "\n") + "/.claude/skills/\n", encoding="utf-8")
+            path.write_text(
+                text + ("" if not text or text.endswith("\n") else "\n") + "/.claude/skills/\n",
+                encoding="utf-8",
+                newline="\n",
+            )
 
 
 # -- entry point -----------------------------------------------------------------------
@@ -291,7 +315,7 @@ def _hide_from_git(repo_root: Path) -> None:
 HANDLERS = {"pre-tool": pre_tool, "post-tool": post_tool, "post-edit": post_edit, "stop": stop}
 
 
-def run(event: str, agent: str = "claude", bundle=None) -> int:
+def run(event: str, agent: str = "claude", bundle: Bundle | _Paths | None = None) -> int:
     if bundle is None:
         repo_root = find_repo_root()
         bundle = _Paths(repo_root / bundle_dir(repo_root), repo_root)
@@ -310,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
     # wrong in those (arguments, a missing repository), they exit 0, so their commands need
     # no shell-specific `|| true` for errors raised here (Codex's commandWindows has none).
     agents = {a.split("=", 1)[1] for a in argv if a.startswith("--agent=")}
-    agents |= {value for flag, value in zip(argv, argv[1:]) if flag == "--agent"}
+    agents |= {value for flag, value in itertools.pairwise(argv) if flag == "--agent"}
     never_fail = "pre-tool" in argv or ("stop" not in argv and bool(agents & {"codex", "gemini"}))
     if not never_fail:
         args = parser.parse_args(argv)

@@ -30,6 +30,7 @@ def toml_path(path: Path) -> str:
 
 
 def launch(args: list[str], cwd: Path, tmp_path: Path, **env: str) -> subprocess.CompletedProcess:
+    """Run the launcher with a stand-in uv first on PATH (`env` may replace PATH; the stand-in is in tmp_path/bin)."""
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir(exist_ok=True)
     script = tmp_path / "fake_uv.py"
@@ -40,10 +41,22 @@ def launch(args: list[str], cwd: Path, tmp_path: Path, **env: str) -> subprocess
         write(fake_bin / "uv", f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n')
         (fake_bin / "uv").chmod(0o755)
     base = {k: v for k, v in os.environ.items() if k not in ("KB_DIR", "KB_REPO_ROOT")}
-    full_env = dict(base, PATH=f"{fake_bin}{os.pathsep}{base.get('PATH', '')}", PYTHONPATH=str(SRC),
-                    XDG_CONFIG_HOME=str(tmp_path / "config"), **env)
-    return subprocess.run([sys.executable, "-m", "okf_kb", *args], cwd=cwd, env=full_env, capture_output=True, text=True,
-                          encoding="utf-8", errors="replace")
+    full_env = {
+        **base,
+        "PATH": f"{fake_bin}{os.pathsep}{base.get('PATH', '')}",
+        "PYTHONPATH": str(SRC),
+        "XDG_CONFIG_HOME": str(tmp_path / "config"),
+        **env,
+    }
+    return subprocess.run(
+        [sys.executable, "-m", "okf_kb", *args],
+        cwd=cwd,
+        env=full_env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
 
 
 @pytest.fixture
@@ -52,7 +65,9 @@ def kbs(tmp_path: Path) -> dict[str, Path]:
     (one / "kb" / "deep").mkdir(parents=True)
     config = tmp_path / "config" / "okf-kb"
     config.mkdir(parents=True)
-    write(config / "config.toml", f'default = "two"\n[knowledge-bases]\none = {toml_path(one)}\ntwo = {toml_path(two)}\n')
+    write(
+        config / "config.toml", f'default = "two"\n[knowledge-bases]\none = {toml_path(one)}\ntwo = {toml_path(two)}\n'
+    )
     return {"one": one, "two": two}
 
 
@@ -89,7 +104,7 @@ def test_config_errors_and_guard(kbs: dict[str, Path], tmp_path: Path) -> None:
     assert "cannot read" in launch(["find"], tmp_path, tmp_path, KB_DIR="work").stderr  # a name needs the config
 
 
-@pytest.mark.parametrize("broken", ["this is [ not toml\n", 'knowledge-bases = "x"\n', 'default = 3\n'])
+@pytest.mark.parametrize("broken", ["this is [ not toml\n", 'knowledge-bases = "x"\n', "default = 3\n"])
 def test_broken_config_is_not_needed_for_a_path(kbs: dict[str, Path], tmp_path: Path, broken: str) -> None:
     write(tmp_path / "config" / "okf-kb" / "config.toml", broken)
     for args, cwd, env in (
@@ -112,3 +127,30 @@ def test_config_relative_paths(kbs: dict[str, Path], tmp_path: Path) -> None:
     assert "neither a knowledge base" in launch(["find"], tmp_path, tmp_path, KB_DIR="/nonexistent").stderr
     guarded = launch(["find"], kbs["one"], tmp_path, OKF_KB_LAUNCHER="1")
     assert guarded.returncode != 0 and "uv run poe setup" in guarded.stderr
+
+
+def test_uv_is_never_taken_from_the_current_directory(kbs: dict[str, Path], tmp_path: Path) -> None:
+    """Windows looks in the current directory before PATH (POSIX too with "." on PATH): a uv committed
+    to the knowledge base must not run."""
+    if os.name == "nt":
+        (kbs["one"] / "uv.bat").write_text("@echo planted\r\n", encoding="utf-8", newline="")
+    else:
+        write(kbs["one"] / "uv", "#!/bin/sh\necho planted\n")
+        (kbs["one"] / "uv").chmod(0o755)
+    path = os.pathsep.join(["", ".", str(tmp_path / "bin"), os.environ.get("PATH", "")])
+    result = launch(["check"], kbs["one"], tmp_path, PATH=path)
+    assert result.returncode == 0, result.stderr
+    assert "planted" not in result.stdout and f"root={kbs['one']}" in result.stdout
+
+
+def test_which_on_path_matches_the_tooling_copy() -> None:
+    """The launcher's which_on_path is a copy of kbtools.fsutil's: the code must stay the same."""
+    import ast
+
+    def body(path: Path) -> str:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        func = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "which_on_path")
+        return ast.dump(ast.Module(body=func.body[1:], type_ignores=[]))  # without the docstring
+
+    tooling = Path(__file__).resolve().parents[1] / "template" / "tools" / "kbtools" / "fsutil.py"
+    assert body(SRC / "okf_kb" / "__init__.py") == body(tooling)

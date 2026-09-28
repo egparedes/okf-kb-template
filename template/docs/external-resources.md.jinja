@@ -107,4 +107,6 @@ uv run kb open  "file:talks/2024-05-conference-talk/slides.pdf"
 ```
 
 `kb open` hands only `http(s)://` URLs, `zotero://select/…` URLs and files
-under a declared root to the desktop; other schemes are refused.
+under a declared root to the desktop; other schemes are refused, and so are
+programs and shortcuts, including (on macOS and Linux) executable files
+without an extension or that start like a program.

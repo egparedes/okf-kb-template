@@ -62,8 +62,12 @@ def mask_code(text: str) -> str:
         if fence is not None:
             if not (fence_in_list and content.strip() and indent < fence_indent):
                 match = _FENCE.match(content) if fence[0] in content else None
-                if (match and match.group(2).startswith(fence) and not match.group(3).strip()
-                        and indent < fence_indent + 4):
+                if (
+                    match
+                    and match.group(2).startswith(fence)
+                    and not match.group(3).strip()
+                    and indent < fence_indent + 4
+                ):
                     fence = None
                 out.append(_blank(line))
                 continue
@@ -227,7 +231,9 @@ def ref_defs(text: str, masked: str | None = None) -> list[RefDef]:
     """Reference-style link definitions (`[label]: target`), outside code."""
     masked = mask(text) if masked is None else masked
     return [
-        RefDef(m.group("label"), text[m.start("target") : m.end("target")], line_at(masked, m.start()), m.start(), m.end())
+        RefDef(
+            m.group("label"), text[m.start("target") : m.end("target")], line_at(masked, m.start()), m.start(), m.end()
+        )
         for m in _REF_DEF.finditer(masked)
     ]
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import posixpath
@@ -17,6 +18,7 @@ from typing import Any
 import yaml
 
 from . import mdlinks
+from .fsutil import program
 from .mdlinks import Link, RefDef, Relation
 
 RESERVED = {"index.md", "log.md"}
@@ -25,7 +27,7 @@ TOUCHED = ".cache/kb-touched.txt"
 SCOPES = ("knowledge", "all")
 
 
-def record_touched(repo_root: Path, paths) -> None:
+def record_touched(repo_root: Path, paths: Iterable[str | Path]) -> None:
     """Remember pages changed in an agent session, for the Stop hook.
 
     Claude Code sets CLAUDECODE=1 for the commands its agent runs; a human's
@@ -35,7 +37,7 @@ def record_touched(repo_root: Path, paths) -> None:
         return
     target = repo_root / TOUCHED
     target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("a", encoding="utf-8") as fh:
+    with target.open("a", encoding="utf-8", newline="\n") as fh:
         for path in paths:
             fh.write(f"{Path(path).resolve()}\n")
 
@@ -276,9 +278,7 @@ class Config:
     @property
     def domain_folders(self) -> set[str]:
         return {
-            name
-            for name, spec in self.folders.items()
-            if "/" not in name and spec.get("group") == "Knowledge domains"
+            name for name, spec in self.folders.items() if "/" not in name and spec.get("group") == "Knowledge domains"
         }
 
     @property
@@ -368,12 +368,16 @@ class Bundle:
         inside = self.repo_root in self.root.parents
         cwd = self.repo_root if inside else self.root  # hooks may set a GIT_DIR relative to the top level
         prefix = f"{self.prefix}/" if inside else ""
-        args = ["git", "ls-files", "-z", "--cached"]
+        args = ["ls-files", "-z", "--cached"]
         if not self.tracked_only:
             args += ["--others", "--exclude-standard"]
         try:
             result = subprocess.run(
-                [*args, "--", f":(literal){prefix or '.'}"], cwd=cwd, capture_output=True, check=False, timeout=60
+                [program("git"), *args, "--", f":(literal){prefix or '.'}"],
+                cwd=cwd,
+                capture_output=True,
+                check=False,
+                timeout=60,
             )
         except (OSError, subprocess.SubprocessError):
             return None
@@ -484,10 +488,8 @@ class Bundle:
         None unless it is a file of the bundle (ignored files and dot-folders are not).
         """
         candidates = [Path(arg), self.repo_root / arg, self.root / arg.lstrip("/")]
-        try:
+        with contextlib.suppress(SystemExit):
             candidates.append(self.root / self.rel(arg))
-        except SystemExit:
-            pass
         for candidate in candidates:
             candidate = candidate.resolve()
             if candidate.is_file():

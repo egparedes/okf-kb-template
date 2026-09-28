@@ -16,7 +16,6 @@ The command runs `uv run --project <root> --quiet kb <args>` with
 from __future__ import annotations
 
 import os
-import shutil
 import sys
 import tomllib
 from pathlib import Path
@@ -29,6 +28,29 @@ Runs the `kb` tool of a knowledge base generated from okf-kb-template.
 Without -C: $KB_DIR, then the knowledge base around the current directory,
 then `default` in {config}.
 `kb -h` and `kb <command> -h` show the knowledge base's own help."""
+
+
+def which_on_path(name: str) -> str | None:
+    """shutil.which without the current directory (Windows searches it first): absolute PATH entries only.
+
+    A copy of kbtools.fsutil.which_on_path (the launcher is a separate package).
+    """
+    if not name or os.path.basename(name) != name or name in (os.curdir, os.pardir):
+        return None
+    if sys.platform == "win32":
+        exts = [e for e in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").lower().split(os.pathsep) if e]
+        candidates = [name] if os.path.splitext(name)[1].lower() in exts else [name + e for e in exts]
+    else:
+        candidates = [name]
+    for entry in os.environ.get("PATH", os.defpath).split(os.pathsep):
+        entry = entry.strip('"')  # Windows allows quoted entries
+        if not entry or not os.path.isabs(entry):
+            continue
+        for candidate in candidates:
+            path = os.path.join(entry, candidate)
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                return path
+    return None
 
 
 def config_path() -> Path:
@@ -105,7 +127,9 @@ def resolve(selector: str | None, config: dict) -> Path:
     if default:
         target = names.get(default)
         if target is None or not is_kb_root(target):
-            raise SystemExit(f"kb: default {default!r} -> {target or 'not registered'} is not a knowledge base ({config_path()})")
+            raise SystemExit(
+                f"kb: default {default!r} -> {target or 'not registered'} is not a knowledge base ({config_path()})"
+            )
         return target
     raise SystemExit(
         "kb: not inside a knowledge base. Use -C PATH|NAME, set $KB_DIR, "
@@ -143,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     if args[:1] == ["--which"]:
         print(root)
         return 0
-    uv = shutil.which("uv")
+    uv = which_on_path("uv")
     if uv is None:
         raise SystemExit("kb: `uv` is not on PATH (https://docs.astral.sh/uv/)")
     env = dict(os.environ, KB_REPO_ROOT=str(root), **{GUARD: "1"})

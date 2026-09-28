@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass
 from urllib.parse import unquote
 
@@ -111,7 +112,7 @@ class _Matcher:
         for spellings in self.acronyms.values():
             spellings.sort(key=lambda s: (-len(s[0]), s[0]))
 
-    def acronym_matches(self, text: str):
+    def acronym_matches(self, text: str) -> Iterator[tuple[int, int]]:
         if not self.acronyms:
             return
         pos = 0
@@ -135,7 +136,7 @@ class _Matcher:
             self._entries[matched] = entry
         return self._entries[matched]
 
-    def phrase_matches(self, folded: str):
+    def phrase_matches(self, folded: str) -> Iterator[tuple[int, int]]:
         """Spans of names in the folded text; a plural `s`/`es` on the last word is allowed."""
         if not self.forms:
             return
@@ -149,8 +150,11 @@ class _Matcher:
                 i += 1
                 continue
             longest = 1  # how many words follow each other with only spaces, `-` or `_` between
-            while (longest < self.longest and i + longest < count
-                   and _SEPARATOR.fullmatch(folded, matches[i + longest - 1].end(), matches[i + longest].start())):
+            while (
+                longest < self.longest
+                and i + longest < count
+                and _SEPARATOR.fullmatch(folded, matches[i + longest - 1].end(), matches[i + longest].start())
+            ):
                 longest += 1
             found = 0
             for n in range(longest, 0, -1):
@@ -169,7 +173,9 @@ def _is_word(char: str) -> bool:
     return char.isalnum() or char == "_"
 
 
-def find(bundle: Bundle, only: list[str] | None = None, min_len: int = 4, include_personal: bool = False) -> list[Mention]:
+def find(
+    bundle: Bundle, only: list[str] | None = None, min_len: int = 4, include_personal: bool = False
+) -> list[Mention]:
     names, _ = vocabulary(bundle, min_len)
     pages = bundle.pages("all" if include_personal else "knowledge")
     wanted = None
@@ -214,5 +220,9 @@ def _page_mentions(bundle: Bundle, rel: str, doc: Document, names: dict, matcher
             line_start = body.rfind("\n", 0, start) + 1
             line_end = body.find("\n", start)
             snippet = body[line_start : len(body) if line_end < 0 else line_end].strip()
-            out.append(Mention(f"/{rel}", line_at(body, start) + doc.body_line_offset, body[start:end], f"/{target}", snippet[:160]))
+            out.append(
+                Mention(
+                    f"/{rel}", line_at(body, start) + doc.body_line_offset, body[start:end], f"/{target}", snippet[:160]
+                )
+            )
     return out

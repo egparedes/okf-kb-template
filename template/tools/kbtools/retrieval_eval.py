@@ -29,7 +29,13 @@ from .bundle import Bundle, load_yaml
 
 QUESTIONS = "tools/retrieval-eval/questions.yaml"
 TIERS = ("index+text", "filters", "qmd")
-FILTER_KEYS = {"type": str, "tag": (str, list), "status": str, "folder": str, "trust": str}
+FILTER_KEYS: dict[str, type | tuple[type, ...]] = {
+    "type": str,
+    "tag": (str, list),
+    "status": str,
+    "folder": str,
+    "trust": str,
+}
 # Question words that say nothing about the topic; they are left out of index matching.
 STOPWORDS = frozenset(
     "about all and any are can could did does for from had has have how into its not our should than that the "
@@ -99,8 +105,12 @@ def load_questions(bundle: Bundle, path: Path) -> list[Question]:
             kinds = FILTER_KEYS.get(key)
             if kinds is None:
                 errors.append(f"{where}: unknown filter `{key}` (allowed: {', '.join(FILTER_KEYS)})")
-            elif not isinstance(value, kinds) or (isinstance(value, list) and not all(isinstance(v, str) for v in value)):
-                errors.append(f"{where}: filter `{key}` must be a string" + (" or a list of strings" if key == "tag" else ""))
+            elif not isinstance(value, kinds) or (
+                isinstance(value, list) and not all(isinstance(v, str) for v in value)
+            ):
+                errors.append(
+                    f"{where}: filter `{key}` must be a string" + (" or a list of strings" if key == "tag" else "")
+                )
             elif key in FILTER_CHOICES and value not in FILTER_CHOICES[key]:
                 errors.append(f"{where}: filter `{key}` must be one of {', '.join(FILTER_CHOICES[key])}")
             elif key == "type" and value not in bundle.config.types:
@@ -162,8 +172,14 @@ def tier1_ranking(bundle: Bundle, query: str) -> list[str]:
 
 def filters_ranking(bundle: Bundle, filters: dict[str, Any]) -> list[str]:
     tags = filters.get("tag")
-    docs = finder.find_pages(bundle, filters.get("type"), [tags] if isinstance(tags, str) else tags,
-                      filters.get("status"), filters.get("folder"), filters.get("trust"))
+    docs = finder.find_pages(
+        bundle,
+        filters.get("type"),
+        [tags] if isinstance(tags, str) else tags,
+        filters.get("status"),
+        filters.get("folder"),
+        filters.get("trust"),
+    )
     return [f"/{doc.rel}" for doc in docs]
 
 
@@ -171,15 +187,22 @@ def qmd_ranking(collection: str, query: str, limit: int) -> list[str]:
     """`qmd query --json` results as bundle-absolute paths."""
     try:
         argv = search.qmd_argv("query", "-c", collection, "--json", "-n", str(limit), "--", query)
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
         raise RuntimeError(str(exc)) from None
     try:
         result = subprocess.run(
             argv,
-            capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, timeout=QMD_TIMEOUT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=QMD_TIMEOUT,
         )
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"`qmd query` timed out after {QMD_TIMEOUT} s") from None
+    except OSError as exc:
+        raise RuntimeError(f"cannot run qmd: {exc}") from None
     if result.returncode != 0:
         raise RuntimeError(f"`qmd query` failed (exit {result.returncode}): {result.stderr.strip()[:200]}")
     try:
@@ -192,7 +215,7 @@ def qmd_ranking(collection: str, query: str, limit: int) -> list[str]:
         file = row.get("file", "") if isinstance(row, dict) else ""
         file = file.split("?", 1)[0] if isinstance(file, str) else ""  # qmd may append ?index=<name>
         if file.startswith(uri):
-            path = "/" + file[len(uri):]
+            path = "/" + file[len(uri) :]
             if path not in out:
                 out.append(path)
     return out
@@ -224,13 +247,17 @@ def evaluate(bundle: Bundle, questions: list[Question], k: int, use_qmd: bool = 
     if qmd_skip is None and not search.qmd_ready(collection):
         qmd_skip = f"qmd is not set up: no collection `{collection}`"
     if qmd_skip is None and questions:
-        print(f"kb eval: running `qmd query` for {len(questions)} question(s); the first run may download qmd's models",
-              file=sys.stderr, flush=True)
-    results = []
+        print(
+            f"kb eval: running `qmd query` for {len(questions)} question(s); the first run may download qmd's models",
+            file=sys.stderr,
+            flush=True,
+        )
+    results: list[dict[str, Any]] = []
     for q in questions:
         tiers: dict[str, Any] = {"index+text": score(tier1_ranking(bundle, q.question), q.expected, k)}
         tiers["filters"] = (
-            score(filters_ranking(bundle, q.filters), q.expected, k) if q.filters
+            score(filters_ranking(bundle, q.filters), q.expected, k)
+            if q.filters
             else {"status": "skipped", "reason": "no filters"}
         )
         if qmd_skip:
@@ -241,7 +268,7 @@ def evaluate(bundle: Bundle, questions: list[Question], k: int, use_qmd: bool = 
             except RuntimeError as exc:
                 tiers["qmd"] = {"status": "error", "reason": str(exc)}
         results.append({"question": q.question, "expected": q.expected, "filters": q.filters, "tiers": tiers})
-    summary = {}
+    summary: dict[str, dict[str, Any]] = {}
     for tier in TIERS:
         ran = [r["tiers"][tier] for r in results if r["tiers"][tier]["status"] == "ok"]
         summary[tier] = {
@@ -286,8 +313,14 @@ def to_text(result: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def run(bundle: Bundle, questions_path: str | None, k: int = 10, as_json: bool = False,
-        min_recall: float | None = None, use_qmd: bool = True) -> int:
+def run(
+    bundle: Bundle,
+    questions_path: str | None,
+    k: int = 10,
+    as_json: bool = False,
+    min_recall: float | None = None,
+    use_qmd: bool = True,
+) -> int:
     if k < 1:
         raise SystemExit("kb eval: --k must be at least 1")
     if min_recall is not None and not 0 <= min_recall <= 1:

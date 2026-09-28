@@ -115,14 +115,16 @@ def colink_gaps(graph: Graph, min_count: int = 3, max_out: int = 60) -> list[tup
     for targets in graph.out.values():
         if len(targets) <= max_out:
             counts.update(combinations(sorted(targets), 2))
-    covered = set()
+    covered: set[tuple[str, str]] = set()
     for rel, doc in graph.pages.items():
         if doc.type in SYNTHESIS_TYPES:
             covered.update(combinations(sorted(graph.out.get(rel, ())), 2))
     gaps = [
         (a, b, n)
         for (a, b), n in counts.items()
-        if n >= min_count and (a, b) not in covered and graph.pages[a].type not in SYNTHESIS_TYPES
+        if n >= min_count
+        and (a, b) not in covered
+        and graph.pages[a].type not in SYNTHESIS_TYPES
         and graph.pages[b].type not in SYNTHESIS_TYPES
     ]
     return sorted(gaps, key=lambda g: (-g[2], g[0], g[1]))
@@ -141,17 +143,26 @@ def analyze(bundle: Bundle, scope: str = "knowledge", top: int = 15) -> dict:
         "pages": len(pages),
         "links": sum(outdeg.values()),
         "relation_edges": dict(graph.relations),
-        "components": {"count": len(comps), "largest": len(comps[0]) if comps else 0,
-                       "small": [c for c in comps if 1 < len(c) <= 3]},
-        "top_pagerank": [{"page": f"/{v}", "score": round(rank[v], 4), "in": indeg[v], "out": outdeg[v]} for v in ordered[:top]],
+        "components": {
+            "count": len(comps),
+            "largest": len(comps[0]) if comps else 0,
+            "small": [c for c in comps if 1 < len(c) <= 3],
+        },
+        "top_pagerank": [
+            {"page": f"/{v}", "score": round(rank[v], 4), "in": indeg[v], "out": outdeg[v]} for v in ordered[:top]
+        ],
         "orphans": [f"/{v}" for v in sorted(pages) if indeg[v] == 0 and pages[v].type not in SYNTHESIS_TYPES],
         "dead_ends": [f"/{v}" for v in sorted(pages) if outdeg[v] == 0],
         "sink_hubs": [f"/{v}" for v in sorted(pages) if indeg[v] >= 3 and outdeg[v] == 0],
         "weak_tags": [{"tag": t, "pages": n, "density": d} for t, n, d in tag_cohesion(graph)],
         "colink_gaps": [{"a": f"/{a}", "b": f"/{b}", "co_linked_by": n} for a, b, n in colink_gaps(graph)[:top]],
         "review_first": [
-            {"page": f"/{v}", "score": round(rank[v], 4), "trust": trust_tier(pages[v]),
-             "cited": bool(pages[v].frontmatter.get("sources"))}
+            {
+                "page": f"/{v}",
+                "score": round(rank[v], 4),
+                "trust": trust_tier(pages[v]),
+                "cited": bool(pages[v].frontmatter.get("sources")),
+            }
             for v in ordered
             if trust_tier(pages[v]) == "unverified" or not pages[v].frontmatter.get("sources")
         ][:top],
@@ -159,9 +170,13 @@ def analyze(bundle: Bundle, scope: str = "knowledge", top: int = 15) -> dict:
 
 
 def to_markdown(result: dict) -> str:
-    lines = [f"# Link graph ({result['scope']} scope)", "",
-             f"{result['pages']} pages, {result['links']} links, "
-             f"{result['components']['count']} components (largest {result['components']['largest']}).", ""]
+    lines = [
+        f"# Link graph ({result['scope']} scope)",
+        "",
+        f"{result['pages']} pages, {result['links']} links, "
+        f"{result['components']['count']} components (largest {result['components']['largest']}).",
+        "",
+    ]
 
     def section(title: str, items: list[str]) -> None:
         if not items:
@@ -170,15 +185,27 @@ def to_markdown(result: dict) -> str:
         lines.extend(f"* {item}" for item in items)
         lines.append("")
 
-    section("Most central (PageRank)", [f"{e['page']} - {e['score']} (in {e['in']}, out {e['out']})" for e in result["top_pagerank"]])
-    section("Review first: central but unverified or uncited",
-            [f"{e['page']} - {e['trust']}{'' if e['cited'] else ', no sources'}" for e in result["review_first"]])
+    section(
+        "Most central (PageRank)",
+        [f"{e['page']} - {e['score']} (in {e['in']}, out {e['out']})" for e in result["top_pagerank"]],
+    )
+    section(
+        "Review first: central but unverified or uncited",
+        [f"{e['page']} - {e['trust']}{'' if e['cited'] else ', no sources'}" for e in result["review_first"]],
+    )
     section("Orphans (nothing links here)", result["orphans"])
     section("Dead ends (link nowhere)", result["dead_ends"])
     section("Sink hubs (3+ inbound, no outbound)", result["sink_hubs"])
-    section("Small islands (components of 2-3 pages)", [", ".join(f"/{p}" for p in c) for c in result["components"]["small"]])
-    section("Weakly linked tags (5+ pages, density < 0.15)",
-            [f"{t['tag']} - {t['pages']} pages, density {t['density']}" for t in result["weak_tags"]])
-    section("Co-link gaps (linked together often, no synthesis or comparison)",
-            [f"{g['a']} + {g['b']} - co-linked by {g['co_linked_by']} pages" for g in result["colink_gaps"]])
+    section(
+        "Small islands (components of 2-3 pages)",
+        [", ".join(f"/{p}" for p in c) for c in result["components"]["small"]],
+    )
+    section(
+        "Weakly linked tags (5+ pages, density < 0.15)",
+        [f"{t['tag']} - {t['pages']} pages, density {t['density']}" for t in result["weak_tags"]],
+    )
+    section(
+        "Co-link gaps (linked together often, no synthesis or comparison)",
+        [f"{g['a']} + {g['b']} - co-linked by {g['co_linked_by']} pages" for g in result["colink_gaps"]],
+    )
     return "\n".join(lines).rstrip() + "\n"

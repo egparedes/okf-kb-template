@@ -10,7 +10,7 @@ from __future__ import annotations
 import posixpath
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from urllib.parse import unquote
 
@@ -126,17 +126,25 @@ class Checker:
             self.report(doc, 1, "H010", f"{where}: {error.message}")
         for key in doc.frontmatter:
             if key not in self.known_keys:
-                self.report(doc, 1, "W010", f"unknown frontmatter key `{key}` (typo? otherwise declare it under `fields` in schema/vocabulary.yaml)")
+                self.report(
+                    doc,
+                    1,
+                    "W010",
+                    f"unknown frontmatter key `{key}` (typo? otherwise declare it under `fields` in schema/vocabulary.yaml)",
+                )
 
     def check_type(self, doc: Document) -> None:
-        spec = self.config.types.get(doc.type)
+        spec = self.config.types.get(doc.type) if doc.type else None
         if spec is None:
             self.report(doc, 1, "H011", f"type `{doc.type}` is not in schema/vocabulary.yaml")
             return
         allowed = spec.get("folders", ["*"])
         top = doc.rel.parts[0] if len(doc.rel.parts) > 1 else ""
         ok = any(
-            (a == "*" and top in self.config.domain_folders) or top == a or doc.folder.startswith(f"{a}/") or doc.folder == a
+            (a == "*" and top in self.config.domain_folders)
+            or top == a
+            or doc.folder.startswith(f"{a}/")
+            or doc.folder == a
             for a in allowed
         )
         if not ok:
@@ -148,7 +156,7 @@ class Checker:
 
     def check_citations(self, doc: Document) -> None:
         sources = doc.frontmatter.get("sources") or []
-        ids = {s.get("id") for s in sources if isinstance(s, dict) and s.get("id")}
+        ids = {s["id"] for s in sources if isinstance(s, dict) and s.get("id")}
         defs = doc.footnote_defs
         cited = set()
         for label, line in doc.footnote_refs:
@@ -158,7 +166,7 @@ class Checker:
                 self.report(doc, line, "H020", f"footnote [^{label}] does not match any `sources[].id`")
             if label not in defs:
                 self.report(doc, line, "H021", f"footnote [^{label}] has no definition")
-        for source_id in sorted(ids - cited):
+        for source_id in sorted(ids - cited, key=str):  # an id may be a number (the schema reports it)
             self.report(doc, 1, "W020", f"source `{source_id}` is never cited with [^{source_id}]")
         for source in sources:
             if isinstance(source, dict) and isinstance(source.get("resource"), str):
@@ -179,17 +187,31 @@ class Checker:
             if not self.bundle.exists(target):
                 self.report(doc, line, "W030", f"broken link `{link.target}` (not-yet-written page?)")
             if not link.target.startswith("/"):
-                self.report(doc, line, "W031", f"link `{link.target}` should be bundle-absolute (`/{target}`); run `uv run poe fix`")
+                self.report(
+                    doc,
+                    line,
+                    "W031",
+                    f"link `{link.target}` should be bundle-absolute (`/{target}`); run `uv run poe fix`",
+                )
 
     def check_wikilinks(self, doc: Document) -> None:
         masked = doc.masked_body
         for m in WIKILINK.finditer(masked):
             line = line_at(masked, m.start()) + doc.body_line_offset
-            self.report(doc, line, "H032", f"`{m.group(0)[:60]}` is a wikilink or embed, not an OKF link; use [text](/path.md)")
+            self.report(
+                doc, line, "H032", f"`{m.group(0)[:60]}` is a wikilink or embed, not an OKF link; use [text](/path.md)"
+            )
 
     def check_timestamps(self, doc: Document) -> None:
-        now = datetime.now(timezone.utc)
-        events = [("generated.at", (doc.frontmatter.get("generated") or {}).get("at") if isinstance(doc.frontmatter.get("generated"), dict) else None)]
+        now = datetime.now(UTC)
+        events = [
+            (
+                "generated.at",
+                (doc.frontmatter.get("generated") or {}).get("at")
+                if isinstance(doc.frontmatter.get("generated"), dict)
+                else None,
+            )
+        ]
         verified = doc.frontmatter.get("verified")
         for event in verified if isinstance(verified, list) else [verified] if isinstance(verified, dict) else []:
             if isinstance(event, dict):
@@ -204,8 +226,12 @@ class Checker:
 
     def check_reference_links(self, doc: Document) -> None:
         for definition in doc.ref_defs:
-            self.report(doc, definition.line + doc.body_line_offset, "W033",
-                        "reference-style link definition: kb tooling only follows inline links [text](/path.md)")
+            self.report(
+                doc,
+                definition.line + doc.body_line_offset,
+                "W033",
+                "reference-style link definition: kb tooling only follows inline links [text](/path.md)",
+            )
 
     def check_relations(self, doc: Document) -> None:
         for relation in doc.relations(self.config.relations):
@@ -215,7 +241,12 @@ class Checker:
             if target and not self.bundle.exists(target):
                 self.report(doc, 1, "W032", f"{relation.key}: target `{relation.target}` does not exist")
             if target is None or target not in doc.link_targets:
-                self.report(doc, 1, "H031", f"{relation.key}: `{relation.target}` is not linked from the body (explain the relation in prose)")
+                self.report(
+                    doc,
+                    1,
+                    "H031",
+                    f"{relation.key}: `{relation.target}` is not linked from the body (explain the relation in prose)",
+                )
 
     def check_locators(self, doc: Document) -> None:
         for locator in doc.frontmatter.get("locators") or []:
@@ -236,8 +267,10 @@ class Checker:
             return
         if instant.tzinfo is None:
             return  # the schema reports the missing UTC offset (H010)
-        if datetime.now(timezone.utc) >= instant:
-            self.report(doc, 1, "W040", f"stale since {stale_after}: re-check against sources, then update `stale_after`")
+        if datetime.now(UTC) >= instant:
+            self.report(
+                doc, 1, "W040", f"stale since {stale_after}: re-check against sources, then update `stale_after`"
+            )
 
     # -- reserved files -----------------------------------------------------
 
@@ -281,7 +314,12 @@ class Checker:
     def check_folders(self) -> None:
         for folder in indexgen.folders_to_index(self.bundle):
             if folder and self.config.folder_spec(folder) is None:
-                self.report(f"{folder}/", 1, "W050", "folder has no entry in schema/taxonomy.yaml (title/description for the index)")
+                self.report(
+                    f"{folder}/",
+                    1,
+                    "W050",
+                    "folder has no entry in schema/taxonomy.yaml (title/description for the index)",
+                )
 
     def check_indexes(self) -> None:
         expected = indexgen.generate(self.bundle)
@@ -289,7 +327,12 @@ class Checker:
         for path in indexgen.stale(self.bundle, expected):
             rel = PurePosixPath(path.relative_to(self.bundle.root).as_posix())
             if path in orphans:
-                self.report(str(rel), 1, "H040", "index.md is left in a folder without pages; run `uv run poe index` (deletes it)")
+                self.report(
+                    str(rel),
+                    1,
+                    "H040",
+                    "index.md is left in a folder without pages; run `uv run poe index` (deletes it)",
+                )
             else:
                 self.report(str(rel), 1, "H040", "index.md is missing or out of date; run `uv run poe index`")
 

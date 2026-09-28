@@ -124,6 +124,13 @@ exit 2, which is how they send the agent back. Its payload has no tool-call
 id, so commands that overlap share one "before" listing: the one taken
 before the first of them is kept until a later hook uses it.
 
+On Windows, Gemini CLI runs hooks with `powershell -Command` (PowerShell 7
+when installed). PowerShell alone reports any failed program as exit 1, but
+Gemini CLI appends `; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }` to
+every hook command (`packages/core/src/hooks/hookRunner.ts`). The stop hook's
+exit 2 therefore reaches Gemini CLI unchanged, and the stop command needs no
+suffix of its own.
+
 Both CLIs ask you to review project hooks before they run: in Codex, trust
 the project and approve the hooks with `/hooks`; in Gemini CLI, trust the
 folder and accept the hooks when it warns about them. Until then, the

@@ -43,10 +43,10 @@ def folders_to_index(bundle: Bundle) -> list[str]:
         if in_tooling_folder(PurePosixPath(name, "x")):
             continue
         folders.add(name)
-        parent = PurePosixPath(name).parent
-        while str(parent) != ".":
-            folders.add(str(parent))
-            parent = parent.parent
+        ancestor = PurePosixPath(name).parent
+        while str(ancestor) != ".":
+            folders.add(str(ancestor))
+            ancestor = ancestor.parent
     return sorted(folders)
 
 
@@ -103,15 +103,12 @@ def render_index(
     for type_name in sorted(by_type, key=lambda t: (type_order.index(t) if t in type_order else len(type_order), t)):
         heading = config.types.get(type_name, {}).get("plural", type_name)
         entries = [
-            _entry(d.title, f"./{d.rel.name}", d.description)
-            for d in _sorted_docs(bundle, folder, by_type[type_name])
+            _entry(d.title, f"./{d.rel.name}", d.description) for d in _sorted_docs(bundle, folder, by_type[type_name])
         ]
         sections.append((heading, entries))
 
     sections = [(h, e) for h, e in sections if e] or [(EMPTY_HEADING, [])]
-    body = "\n".join(
-        f"# {h}\n" + ("\n" + "".join(f"{line}\n" for line in e) if e else "") for h, e in sections
-    )
+    body = "\n".join(f"# {h}\n" + ("\n" + "".join(f"{line}\n" for line in e) if e else "") for h, e in sections)
     if folder == "":
         return f'---\nokf_version: "{OKF_VERSION}"\n---\n\n{body}'
     return body
@@ -183,5 +180,7 @@ def write(bundle: Bundle) -> list[Path]:
 def stale(bundle: Bundle, expected: dict[Path, str] | None = None) -> list[Path]:
     """index.md files that `write` would change: missing, out of date, or orphaned."""
     expected = generate(bundle) if expected is None else expected
-    outdated = [path for path, content in expected.items() if not path.exists() or path.read_text(encoding="utf-8") != content]
+    outdated = [
+        path for path, content in expected.items() if not path.exists() or path.read_text(encoding="utf-8") != content
+    ]
     return sorted(outdated + orphans(bundle, expected))

@@ -19,11 +19,13 @@ session that is running.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
 import re
 import time
+from collections.abc import Iterable
 from pathlib import Path
 
 from .bundle import TOUCHED
@@ -84,17 +86,17 @@ def listing(root: Path, cache: Path) -> dict[str, list]:
             continue
         found[rel], fresh = [mtime, size, digest], True
     if fresh or found.keys() != known.keys():
-        try:  # the cache is optional: on Windows, replacing it fails while another hook reads it
+        with contextlib.suppress(
+            OSError
+        ):  # the cache is optional: on Windows, replacing it fails while another hook reads it
             _write_json(cache, found)
-        except OSError:
-            pass
     return found
 
 
 def _write_json(target: Path, data: object) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_name(f"{target.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
+    tmp.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8", newline="\n")
     try:
         os.replace(tmp, target)
     except OSError:
@@ -153,12 +155,12 @@ class Session:
             except (ValueError, OSError):
                 return None
 
-    def record(self, paths) -> None:
+    def record(self, paths: Iterable[str | Path]) -> None:
         rels = [r for r in (self.rel(p) for p in paths) if r]
         if not rels:
             return
         self.dir.mkdir(parents=True, exist_ok=True)
-        with (self.dir / "touched").open("a", encoding="utf-8") as fh:
+        with (self.dir / "touched").open("a", encoding="utf-8", newline="\n") as fh:
             fh.write("".join(f"{r}\n" for r in rels))
 
     def claim_commands(self) -> None:

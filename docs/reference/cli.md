@@ -188,8 +188,9 @@ It refuses:
 first, back up the originals in `.cache/kb-backup/`, and write each file
 through a temporary file. If a step fails, they put the originals back and
 exit with an error; the backup is removed. If putting them back fails too,
-the message names the backup folder, whose `MANIFEST` lists the original
-path of each copy: copy the files back, then delete the folder. Only a
+the message names the backup folder, whose `MANIFEST` lists each copy's
+number and its original path, relative to the repository root and with `/`
+on every system: copy the files back, then delete the folder. Only a
 process killed outright (not Ctrl-C) can leave a hidden `.NAME.….tmp` file
 next to a page; delete it.
 
@@ -546,7 +547,12 @@ uv run kb open REF [--print]
 `https://` URLs with a host, `zotero://select/…` URLs that it builds from a
 checked item key, and absolute paths of files under a declared root. Other
 schemes (`smb:`, `file:` URLs, custom ones) and anything starting with `-`
-are refused.
+are refused. So are files the desktop would run rather than show: programs
+and shortcuts by their extension (`.exe`, `.bat`, `.lnk`, `.app`,
+`.command`, …) and, on macOS and Linux, files with the executable bit that
+have no extension or start like a program (`#!`, ELF, Mach-O, `MZ`). A PDF
+with the executable bit, as on SMB, WSL `/mnt/c` or FAT mounts, still opens.
+`kb open file:<folder>` opens the file's folder instead.
 
 ### `kb import`
 

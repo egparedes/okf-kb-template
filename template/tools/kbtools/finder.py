@@ -6,8 +6,14 @@ from . import report
 from .bundle import Bundle, Document
 
 
-def find_pages(bundle: Bundle, type_: str | None = None, tags: list[str] | None = None, status: str | None = None,
-               folder: str | None = None, trust: str | None = None) -> list[Document]:
+def find_pages(
+    bundle: Bundle,
+    type_: str | None = None,
+    tags: list[str] | None = None,
+    status: str | None = None,
+    folder: str | None = None,
+    trust: str | None = None,
+) -> list[Document]:
     """Concepts whose frontmatter matches every given filter, in path order."""
     out = []
     for doc in bundle.concepts():

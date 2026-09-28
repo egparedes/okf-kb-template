@@ -35,6 +35,7 @@ def write(repo: Path, rel: str, title: str, body: str = "", extra: str = "", typ
         f"---\ntype: {type_}\ntitle: {title}\ndescription: {title} in one sentence.\ntags: [test]\n"
         f"status: stable\ngenerated: {{ by: test/0, at: 2026-09-25T12:00:00Z }}\n{extra}---\n\n{body}",
         encoding="utf-8",
+        newline="\n",
     )
     return path
 
@@ -48,22 +49,26 @@ def codes(repo: Path) -> list[str]:
 
 
 def git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", "-c", "user.email=t@example.org", "-c", "user.name=t", *args], cwd=repo, check=True,
-                   capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=t@example.org", "-c", "user.name=t", *args], cwd=repo, check=True, capture_output=True
+    )
 
 
 # -- markdown scanning ----------------------------------------------------------------
 
 
-@pytest.mark.parametrize(("text", "targets"), [
-    ("See the [alpha\npage](/a.md).", ["/a.md"]),  # a soft line break in the link text
-    ("See the [alpha\n\npage](/a.md).", []),  # a blank line ends the paragraph
-    ("[![logo](/img.png)](/a.md)", ["/img.png", "/a.md"]),  # an image inside a link
-    (r"Not a link: \[x](/a.md).", []),  # escaped bracket
-    (r"A link after an escaped backslash: \\[x](/a.md).", ["/a.md"]),
-    (r"\![x](/a.md) is a link, not an image.", ["/a.md"]),
-    ("`code [x](/a.md)` and [y](/b.md)", ["/b.md"]),
-])
+@pytest.mark.parametrize(
+    ("text", "targets"),
+    [
+        ("See the [alpha\npage](/a.md).", ["/a.md"]),  # a soft line break in the link text
+        ("See the [alpha\n\npage](/a.md).", []),  # a blank line ends the paragraph
+        ("[![logo](/img.png)](/a.md)", ["/img.png", "/a.md"]),  # an image inside a link
+        (r"Not a link: \[x](/a.md).", []),  # escaped bracket
+        (r"A link after an escaped backslash: \\[x](/a.md).", ["/a.md"]),
+        (r"\![x](/a.md) is a link, not an image.", ["/a.md"]),
+        ("`code [x](/a.md)` and [y](/b.md)", ["/b.md"]),
+    ],
+)
 def test_find_links(text: str, targets: list[str]) -> None:
     assert [link.target for link in find_links(text)] == targets
 
@@ -72,24 +77,27 @@ def test_escaped_bang_makes_a_link_not_an_image() -> None:
     assert [link.image for link in find_links(r"\![x](/a.md) ![y](/b.png)")] == [False, True]
 
 
-@pytest.mark.parametrize(("text", "visible"), [
-    # a stray backtick stays literal and does not mask the paragraphs after it
-    ("Use ` here.\n\nSee [a](/a.md) and `x`.\n", ["[a](/a.md)"]),
-    # code spans need a closing run of the same length, in the same paragraph
-    ("``a ` b`` then [a](/a.md)", ["[a](/a.md)"]),
-    ("`a\nb` [a](/a.md)", ["[a](/a.md)"]),
-    # fences inside list items are indented; the closing fence must match
-    ("* item\n\n    ~~~\n    [[x]]\n    ~~~\n\n[a](/a.md)\n", ["[a](/a.md)"]),
-    ("```\n[[x]]\n~~~\n[[y]]\n```\n[a](/a.md)\n", ["[a](/a.md)"]),
-    # an indented code block after a blank line, outside a list
-    ("Text.\n\n    [[x]] [b](/b.md)\n\n[a](/a.md)\n", ["[a](/a.md)"]),
-    # a fence closes only with a fence indented less than 4 columns deeper than the opening one
-    ("```md\n- item\n\n    ```\n    [[x]]\n    ```\n```\n[a](/a.md)\n", ["[a](/a.md)"]),
-    # a fence in a list item ends with the item
-    ("- a\n\n      ```\n      [[x]]\n- [a](/a.md)\n", ["[a](/a.md)"]),
-    # the continuation of a footnote definition is text, a fence there is code
-    ("[^1]: First.\n\n    More [a](/a.md).\n\n    ```\n    [[x]]\n    ```\n", ["[a](/a.md)"]),
-])
+@pytest.mark.parametrize(
+    ("text", "visible"),
+    [
+        # a stray backtick stays literal and does not mask the paragraphs after it
+        ("Use ` here.\n\nSee [a](/a.md) and `x`.\n", ["[a](/a.md)"]),
+        # code spans need a closing run of the same length, in the same paragraph
+        ("``a ` b`` then [a](/a.md)", ["[a](/a.md)"]),
+        ("`a\nb` [a](/a.md)", ["[a](/a.md)"]),
+        # fences inside list items are indented; the closing fence must match
+        ("* item\n\n    ~~~\n    [[x]]\n    ~~~\n\n[a](/a.md)\n", ["[a](/a.md)"]),
+        ("```\n[[x]]\n~~~\n[[y]]\n```\n[a](/a.md)\n", ["[a](/a.md)"]),
+        # an indented code block after a blank line, outside a list
+        ("Text.\n\n    [[x]] [b](/b.md)\n\n[a](/a.md)\n", ["[a](/a.md)"]),
+        # a fence closes only with a fence indented less than 4 columns deeper than the opening one
+        ("```md\n- item\n\n    ```\n    [[x]]\n    ```\n```\n[a](/a.md)\n", ["[a](/a.md)"]),
+        # a fence in a list item ends with the item
+        ("- a\n\n      ```\n      [[x]]\n- [a](/a.md)\n", ["[a](/a.md)"]),
+        # the continuation of a footnote definition is text, a fence there is code
+        ("[^1]: First.\n\n    More [a](/a.md).\n\n    ```\n    [[x]]\n    ```\n", ["[a](/a.md)"]),
+    ],
+)
 def test_mask_code(text: str, visible: list[str]) -> None:
     masked = mask_code(text)
     assert [s for s in visible if s in masked] == visible
@@ -121,8 +129,13 @@ def test_timestamps_stay_strings_with_the_c_loader() -> None:
 
 def test_document_model_is_parsed_once(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     write(repo, "systems/a b.md", "A")
-    write(repo, "systems/c.md", "C", "See [A](</systems/a b.md>) and [A again](/systems/a%20b.md).",
-          extra='related: ["[A](/systems/a%20b.md)", "[A](</systems/a b.md>)", "plain text"]\n')
+    write(
+        repo,
+        "systems/c.md",
+        "C",
+        "See [A](</systems/a b.md>) and [A again](/systems/a%20b.md).",
+        extra='related: ["[A](/systems/a%20b.md)", "[A](</systems/a b.md>)", "plain text"]\n',
+    )
     b = bundle(repo)
     doc = b.by_rel["systems/c.md"]
     assert doc.masked_body == doc.body  # nothing to mask; computed now, once
@@ -140,16 +153,26 @@ def test_document_model_is_parsed_once(repo: Path, monkeypatch: pytest.MonkeyPat
 
 def test_relation_targets_are_percent_decoded(repo: Path) -> None:
     write(repo, "systems/a b.md", "A")
-    write(repo, "systems/c.md", "C", "See [A](/systems/a%20b.md) because C needs it.",
-          extra='depends_on: ["[A](/systems/a%20b.md)"]\n')
+    write(
+        repo,
+        "systems/c.md",
+        "C",
+        "See [A](/systems/a%20b.md) because C needs it.",
+        extra='depends_on: ["[A](/systems/a%20b.md)"]\n',
+    )
     assert graph.analyze(bundle(repo))["relation_edges"] == {"depends_on": 1}
     assert [c for c in codes(repo) if c.startswith(("H03", "W03"))] == []
 
 
 def test_soft_line_break_link_satisfies_the_relation_rule(repo: Path) -> None:
     write(repo, "systems/a.md", "A")
-    write(repo, "systems/b.md", "B", "B builds on the [alpha\npage](/systems/a.md).\n",
-          extra='depends_on: ["[A](/systems/a.md)"]\n')
+    write(
+        repo,
+        "systems/b.md",
+        "B",
+        "B builds on the [alpha\npage](/systems/a.md).\n",
+        extra='depends_on: ["[A](/systems/a.md)"]\n',
+    )
     assert "H031" not in codes(repo)
 
 
@@ -171,7 +194,7 @@ def test_dot_folders_are_not_part_of_the_bundle(repo: Path) -> None:
     write(repo, "systems/a.md", "A")
     write(repo, ".trash/old.md", "Old", type_="Nope")
     (repo / "kb" / ".obsidian").mkdir()
-    (repo / "kb" / ".obsidian" / "x.md").write_text("no frontmatter\n")
+    (repo / "kb" / ".obsidian" / "x.md").write_text("no frontmatter\n", newline="\n")
     b = bundle(repo)
     assert [str(d.rel) for d in b.documents] == ["systems/a.md"]
     assert not {"H011", "H012", "O001"} & set(codes(repo))
@@ -179,7 +202,7 @@ def test_dot_folders_are_not_part_of_the_bundle(repo: Path) -> None:
 
 def test_git_listing_skips_ignored_files(repo: Path) -> None:
     git(repo, "init", "-q")
-    (repo / ".gitignore").write_text("kb/private/\n")
+    (repo / ".gitignore").write_text("kb/private/\n", newline="\n")
     write(repo, "systems/a.md", "A", "See [P](/private/p.md) and [N](/systems/new.md).")
     write(repo, "private/p.md", "P", type_="Nope")
     write(repo, "systems/new.md", "N")
@@ -194,7 +217,7 @@ def test_git_listing_skips_ignored_files(repo: Path) -> None:
 
 def test_bundle_ignored_by_an_enclosing_repository_is_read_from_disk(repo: Path) -> None:
     git(repo, "init", "-q")
-    (repo / ".gitignore").write_text("*\n")
+    (repo / ".gitignore").write_text("*\n", newline="\n")
     write(repo, "systems/a.md", "A", "See [B](/systems/b.md).")
     assert sorted(bundle(repo).files) == ["systems/a.md"]
     assert codes(repo).count("W030") == 1  # checked, not passed vacuously
@@ -209,7 +232,7 @@ def test_tracked_outside_git_warns(repo: Path, capsys: pytest.CaptureFixture) ->
 def test_tracked_option_checks_and_indexes_what_a_commit_contains(repo: Path, capsys: pytest.CaptureFixture) -> None:
     git(repo, "init", "-q")
     write(repo, "systems/a.md", "A")
-    (repo / "kb" / "systems" / "draft.md").write_text("an untracked note without frontmatter\n")
+    (repo / "kb" / "systems" / "draft.md").write_text("an untracked note without frontmatter\n", newline="\n")
     git(repo, "add", "kb/systems/a.md")
     assert cli.main(["check"]) == 1  # the working tree: the draft is an O001
     assert cli.main(["--tracked", "index"]) == 0
@@ -227,8 +250,8 @@ def test_git_listing_of_a_bundle_named_like_a_pathspec(repo: Path) -> None:
     (repo / "kb").rename(repo / "[kb]")
     b = Bundle(repo / "[kb]", repo)
     (b.root / "systems").mkdir()
-    (b.root / "systems" / "a.md").write_text("x")
-    (repo / "k.md").write_text("x")
+    (b.root / "systems" / "a.md").write_text("x", newline="\n")
+    (repo / "k.md").write_text("x", newline="\n")
     assert b.files == {"systems/a.md"}
 
 
@@ -240,14 +263,17 @@ def test_existence_is_case_exact(repo: Path) -> None:
     assert codes(repo).count("W030") == 1
 
 
-@pytest.mark.parametrize(("arg", "rel"), [
-    ("./systems/a.md", "systems/a.md"),
-    ("systems//a.md", "systems/a.md"),
-    ("systems\\a.md", "systems/a.md"),
-    ("/kb/systems/./a.md", "systems/a.md"),
-    ("systems/x/../a.md", "systems/a.md"),
-    ("kb\\systems\\a.md", "systems/a.md"),
-])
+@pytest.mark.parametrize(
+    ("arg", "rel"),
+    [
+        ("./systems/a.md", "systems/a.md"),
+        ("systems//a.md", "systems/a.md"),
+        ("systems\\a.md", "systems/a.md"),
+        ("/kb/systems/./a.md", "systems/a.md"),
+        ("systems/x/../a.md", "systems/a.md"),
+        ("kb\\systems\\a.md", "systems/a.md"),
+    ],
+)
 def test_path_arguments_are_normalized(repo: Path, arg: str, rel: str) -> None:
     write(repo, "systems/a.md", "A")
     assert bundle(repo).rel(arg) == rel
@@ -291,7 +317,7 @@ def test_orphaned_index_is_reported_and_deleted(repo: Path, capsys: pytest.Captu
     indexgen.write(bundle(repo))
     (repo / "kb/systems/old/a.md").rename(repo / "kb/systems/a.md")
     indexgen.write(bundle(repo))  # the parent indexes change too
-    (repo / "kb/systems/old/index.md").write_text("# Pages\n")  # left behind, e.g. by a checkout
+    (repo / "kb/systems/old/index.md").write_text("# Pages\n", newline="\n")  # left behind, e.g. by a checkout
     assert indexgen.stale(bundle(repo)) == [repo / "kb/systems/old/index.md"]
     diagnostics = [d for d in Checker(bundle(repo)).check_all() if d.code == "H040"]
     assert [(d.path, "without pages" in d.message) for d in diagnostics] == [("systems/old/index.md", True)]
@@ -305,8 +331,13 @@ def test_orphaned_index_is_reported_and_deleted(repo: Path, capsys: pytest.Captu
 def test_multiline_titles_are_one_line_in_indexes(repo: Path) -> None:
     write(repo, "systems/a.md", "|\n  First line\n  second line")
     taxonomy = repo / "schema" / "taxonomy.yaml"
-    taxonomy.write_text(taxonomy.read_text(encoding="utf-8").replace(
-        "systems: { group: Knowledge domains, title: Systems,", 'systems: { group: Knowledge domains, title: "Sys\\ntems",'))
+    taxonomy.write_text(
+        taxonomy.read_text(encoding="utf-8").replace(
+            "systems: { group: Knowledge domains, title: Systems,",
+            'systems: { group: Knowledge domains, title: "Sys\\ntems",',
+        ),
+        newline="\n",
+    )
     indexgen.write(bundle(repo))
     assert "* [First line second line](./a.md)" in (repo / "kb/systems/index.md").read_text(encoding="utf-8")
     assert "* [Sys tems](./systems/index.md)" in (repo / "kb/index.md").read_text(encoding="utf-8")
@@ -366,7 +397,7 @@ def test_remove_tree_deletes_read_only_files(tmp_path: Path, monkeypatch) -> Non
     tree = tmp_path / "backup"
     (tree / "objects").mkdir(parents=True)
     for path in (tree / "objects" / "ab12", tree / "0"):
-        path.write_text("x", encoding="utf-8")
+        path.write_text("x", encoding="utf-8", newline="\n")
         path.chmod(stat.S_IREAD)
     real_unlink = os.unlink
 

@@ -3,22 +3,40 @@
 from __future__ import annotations
 
 import argparse
-import sys
-
 import json
 import subprocess
+import sys
 from pathlib import Path
 
-from . import dupes, finder, graph, hooks, importer, indexgen, linkfix, obsidian, pages, rename, report, resources, retrieval_eval, search, unlinked
+from . import (
+    dupes,
+    finder,
+    graph,
+    hooks,
+    importer,
+    indexgen,
+    linkfix,
+    obsidian,
+    pages,
+    rename,
+    report,
+    resources,
+    retrieval_eval,
+    search,
+    unlinked,
+)
 from .bundle import Bundle
 from .check import Checker, exit_code
+from .fsutil import program
 
 
 def _cmd_check(bundle: Bundle, args: argparse.Namespace) -> int:
     checker = Checker(bundle)
     if args.paths:
         paths = [bundle.path_arg(p) for p in args.paths if p.endswith(".md")]
-        missing = [arg for arg, path in zip([p for p in args.paths if p.endswith(".md")], paths, strict=True) if path is None]
+        missing = [
+            arg for arg, path in zip([p for p in args.paths if p.endswith(".md")], paths, strict=True) if path is None
+        ]
         for arg in missing:
             print(f"kb: {arg} is not a file in the bundle", file=sys.stderr)
         if missing and not any(paths):
@@ -49,7 +67,9 @@ def _cmd_index(bundle: Bundle, args: argparse.Namespace) -> int:
         stale = indexgen.stale(bundle, expected)
         orphans = set(indexgen.orphans(bundle, expected))
         for path in stale:
-            print(f"{'orphaned' if path in orphans else 'out of date'}: {path.relative_to(bundle.repo_root).as_posix()}")
+            print(
+                f"{'orphaned' if path in orphans else 'out of date'}: {path.relative_to(bundle.repo_root).as_posix()}"
+            )
         return 1 if stale else 0
     _write_indexes(bundle)
     return 0
@@ -126,10 +146,12 @@ def _cmd_unlinked(bundle: Bundle, args: argparse.Namespace) -> int:
         print(json.dumps([m.__dict__ for m in found], indent=2))
     else:
         for m in found:
-            print(f"{m.page}:{m.line}  \"{m.text}\" -> {m.target}\n    {m.snippet}")
+            print(f'{m.page}:{m.line}  "{m.text}" -> {m.target}\n    {m.snippet}')
         _, ambiguous = unlinked.vocabulary(bundle, args.min_len)
         for name, owners in [] if args.pages else sorted(ambiguous.items()):
-            print(f"ambiguous name \"{name}\": {', '.join('/' + o for o in owners)} (add distinguishing titles or aliases)")
+            print(
+                f'ambiguous name "{name}": {", ".join("/" + o for o in owners)} (add distinguishing titles or aliases)'
+            )
         print(f"kb unlinked: {len(found)} unlinked mention(s)", file=sys.stderr)
     return 0
 
@@ -148,7 +170,9 @@ def _cmd_zotero(bundle: Bundle, args: argparse.Namespace) -> int:
         return _zotero_action(bundle, args, settings, zotero)
 
 
-def _zotero_action(bundle: Bundle, args: argparse.Namespace, settings, zotero) -> int:
+def _zotero_action(
+    bundle: Bundle, args: argparse.Namespace, settings: resources.Settings, zotero: resources.Zotero
+) -> int:
     if args.action == "search":
         for item in zotero.search(" ".join(args.query), limit=args.limit):
             year = (item.get("date") or "")[:4]
@@ -162,9 +186,16 @@ def _zotero_action(bundle: Bundle, args: argparse.Namespace, settings, zotero) -
     slug = args.path or f"sources/{resources.zotero_citekey_slug(item)}.md"
     link = resources.open_target(bundle, f"zotero:{item['key']}")
     path = pages.new_page(
-        bundle, "Source", slug, fm.pop("title"), fm.pop("description"),
-        [t.strip() for t in (args.tags or "").split(",") if t.strip()], args.by,
-        status="draft", resource=fm.pop("resource"), extra=fm,
+        bundle,
+        "Source",
+        slug,
+        fm.pop("title"),
+        fm.pop("description"),
+        [t.strip() for t in (args.tags or "").split(",") if t.strip()],
+        args.by,
+        status="draft",
+        resource=fm.pop("resource"),
+        extra=fm,
         body_intro=f"Open in Zotero: [{item['key']}]({link})\n\n",
     )
     print(path.relative_to(bundle.repo_root).as_posix())
@@ -223,8 +254,12 @@ def _cmd_obsidian(bundle: Bundle, args: argparse.Namespace) -> int:
 def _cmd_setup(bundle: Bundle, args: argparse.Namespace) -> int:
     """First-time setup of a clone: git repository, pre-commit hooks, indexes (uv has synced the tools)."""
     repo = bundle.repo_root
-    if subprocess.run(["git", "rev-parse", "--git-dir"], cwd=repo, capture_output=True, check=False).returncode != 0:
-        subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    try:
+        git = program("git")
+    except FileNotFoundError as exc:
+        raise SystemExit(f"kb setup: {exc}; install git first") from None
+    if subprocess.run([git, "rev-parse", "--git-dir"], cwd=repo, capture_output=True, check=False).returncode != 0:
+        subprocess.run([git, "init", "-q"], cwd=repo, check=True)
         print("initialized a git repository", flush=True)
     subprocess.run([sys.executable, "-m", "pre_commit", "install"], cwd=repo, check=True)
     repaired = hooks.repair_skills_link(repo)  # Windows checkouts without symlink support
@@ -256,8 +291,9 @@ def _cmd_search(bundle: Bundle, args: argparse.Namespace) -> int:
 
 
 def _cmd_eval(bundle: Bundle, args: argparse.Namespace) -> int:
-    return retrieval_eval.run(bundle, args.questions, k=args.k, as_json=args.json, min_recall=args.min_recall,
-                              use_qmd=not args.no_qmd)
+    return retrieval_eval.run(
+        bundle, args.questions, k=args.k, as_json=args.json, min_recall=args.min_recall, use_qmd=not args.no_qmd
+    )
 
 
 def _cmd_rename_bundle(bundle: Bundle, args: argparse.Namespace) -> int:
@@ -271,8 +307,11 @@ def _cmd_hook(bundle: Bundle, args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kb", description=__doc__)
     parser.add_argument("--bundle", help="bundle root (default: the folder named in [tool.kb] bundle, else <repo>/kb)")
-    parser.add_argument("--tracked", action="store_true",
-                        help="only files git tracks or has staged (what a commit contains), as the pre-commit hooks use it")
+    parser.add_argument(
+        "--tracked",
+        action="store_true",
+        help="only files git tracks or has staged (what a commit contains), as the pre-commit hooks use it",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("check", help="validate OKF conformance and house rules")
@@ -305,8 +344,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--title", required=True)
     p.add_argument("--description", required=True, help="one sentence")
     p.add_argument("--tags", help="comma-separated kebab-case tags")
-    p.add_argument("--status", default="draft", choices=["draft", "stable", "deprecated"],
-                   help="new pages start as draft; set stable when complete")
+    p.add_argument(
+        "--status",
+        default="draft",
+        choices=["draft", "stable", "deprecated"],
+        help="new pages start as draft; set stable when complete",
+    )
     p.add_argument("--resource", help="canonical URL (required for Source pages)")
     p.add_argument("--by", help="actor, e.g. claude-code/<model> (default: $KB_ACTOR)")
     p.set_defaults(func=_cmd_new)
@@ -326,8 +369,12 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=_cmd_folders)
 
     p = sub.add_parser("graph", help="link-graph analytics (generated index hubs excluded)")
-    p.add_argument("--scope", choices=["knowledge", "all"], default="knowledge",
-                   help="all = include personal areas (projects, journal, ...)")
+    p.add_argument(
+        "--scope",
+        choices=["knowledge", "all"],
+        default="knowledge",
+        help="all = include personal areas (projects, journal, ...)",
+    )
     p.add_argument("--top", type=int, default=15)
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=_cmd_graph)
@@ -376,7 +423,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--print", action="store_true", help="only print what would be opened")
     p.set_defaults(func=_cmd_open)
 
-    p = sub.add_parser("import", help="convert an Obsidian vault or Logseq graph into the bundle (see docs/importing.md)")
+    p = sub.add_parser(
+        "import", help="convert an Obsidian vault or Logseq graph into the bundle (see docs/importing.md)"
+    )
     p.add_argument("source", help="vault or graph directory (never modified)")
     p.add_argument("--into", required=True, help="bundle folder that relative `to` paths start from")
     p.add_argument("--map", required=True, help="mapping file (YAML): rules for paths, types and properties")
@@ -398,7 +447,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("search", help="search: qmd hybrid search when set up, otherwise a text search")
     p.add_argument("query", nargs="*", help="words to search for")
     mode = p.add_mutually_exclusive_group()
-    mode.add_argument("--setup", action="store_true", help="one-time qmd setup: collection, folder contexts, embeddings")
+    mode.add_argument(
+        "--setup", action="store_true", help="one-time qmd setup: collection, folder contexts, embeddings"
+    )
     mode.add_argument("--reindex", action="store_true", help="refresh the qmd index after changes")
     p.set_defaults(func=_cmd_search)
 
@@ -410,7 +461,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-qmd", action="store_true", help="skip the qmd tier even when it is set up")
     p.set_defaults(func=_cmd_eval)
 
-    p = sub.add_parser("rename-bundle", help="rename the knowledge-base folder (and Obsidian vault); close Obsidian first")
+    p = sub.add_parser(
+        "rename-bundle", help="rename the knowledge-base folder (and Obsidian vault); close Obsidian first"
+    )
     p.add_argument("new", help="new folder name (kebab-case)")
     p.set_defaults(func=_cmd_rename_bundle)
 

@@ -24,7 +24,9 @@ def test_actions_are_pinned_and_agree() -> None:
         assert pins, path
         for action, ref, version in pins:
             assert re.fullmatch(r"[0-9a-f]{40}", ref), f"{path.name}: {action}@{ref} is not pinned by commit SHA"
-            assert version and re.fullmatch(r"v\d+(\.\d+)*", version), f"{path.name}: {action} lacks a `# vX.Y.Z` comment"
+            assert version and re.fullmatch(r"v\d+(\.\d+)*", version), (
+                f"{path.name}: {action} lacks a `# vX.Y.Z` comment"
+            )
             seen.setdefault(action, set()).add((ref, version))
     disagree = {action: pins for action, pins in seen.items() if len(pins) > 1}
     assert not disagree, f"update kb.yml and every workflow to the same pin: {disagree}"

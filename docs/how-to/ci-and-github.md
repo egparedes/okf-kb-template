@@ -6,7 +6,7 @@ workflow has two jobs.
 
 | Job | Runs on | What it does |
 |---|---|---|
-| `validate` | every push and pull request, and manual runs | Installs uv, installs the tooling from `uv.lock` (`uv sync --locked`) and runs `uv run poe ci`: `kb check`, the independent OKF validator, the tooling tests, and `kb index --check` |
+| `validate` | every push and pull request, and manual runs | Installs uv, installs the tooling from `uv.lock` (`uv sync --locked`) and runs `uv run poe ci`: `kb check`, the independent OKF validator, lint and type checks of the tooling (ruff, mypy), the tooling tests, and `kb index --check` |
 | `links` | every Monday at 06:00 UTC, and manual runs | Checks the external `http` and `https` URLs in the pages of the knowledge-base folder with [lychee](https://lychee.cli.rs) and fails on dead links |
 
 Both jobs have read-only access to the repository.
@@ -127,6 +127,12 @@ diagnostic as `path:line: CODE message`; the
 one. Typical causes are a commit made with `--no-verify`, which skips the
 pre-commit hook, and edits made on another machine without the hook
 installed (`uv run poe setup` installs it).
+
+When the `lint` part fails, the tooling in `tools/` has a lint, format or
+type error. The tooling is managed by the template, so this happens after a
+local edit to `tools/`: run `uv run ruff format tools` for formatting, and
+fix what `uv run poe lint` reports otherwise. Put your own scripts outside
+`tools/`, or keep them to the same rules.
 
 When the *Install the tooling* step fails because the lockfile needs to be
 updated, `pyproject.toml` changed without `uv.lock`. Run `uv lock`, commit

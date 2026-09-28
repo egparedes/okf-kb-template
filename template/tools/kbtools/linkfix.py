@@ -26,6 +26,7 @@ if a step fails.
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import posixpath
@@ -42,7 +43,7 @@ from urllib.parse import unquote
 import yaml
 
 from .bundle import RESERVED, Bundle, Document, record_touched
-from .fsutil import remove_tree
+from .fsutil import program, remove_tree
 from .mdlinks import Relation, encode_path, parse_relation, resolve
 
 BACKUPS = ".cache/kb-backup"
@@ -50,6 +51,13 @@ QUESTIONS = "tools/retrieval-eval/questions.yaml"  # retrieval_eval.QUESTIONS
 _SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 _STR_TAG = "tag:yaml.org,2002:str"
 _PROPERTIES = re.compile(r"(?:[&!]\S*\s+)*")  # a node's anchor and tag, before its scalar
+
+
+def _after_properties(raw: str, start: int, end: int) -> int:
+    """Where a node's scalar starts: after its anchor and tag, if any."""
+    m = _PROPERTIES.match(raw, start, end)  # always matches (possibly empty)
+    return m.end() if m else start
+
 
 # A rewrite maps a link target as written (percent-encoded, with its #fragment)
 # to its new form, or None to leave it as it is.
@@ -121,9 +129,9 @@ def _yaml_edits(raw: str, offset: int, rewrite: Rewrite) -> list[Edit]:
             new = _fm_value(key, node.value, rewrite)
             if new is not None:
                 start, end = node.start_mark.index, node.end_mark.index
-                start = _PROPERTIES.match(raw, start, end).end()  # keep `&anchor` and `!!str`
+                start = _after_properties(raw, start, end)  # keep `&anchor` and `!!str`
                 span = raw[start:end]
-                trailing = span[len(span.rstrip()):] if node.style in ("|", ">") else ""  # a block scalar's line ends
+                trailing = span[len(span.rstrip()) :] if node.style in ("|", ">") else ""  # a block scalar's line ends
                 edits.append((offset + start, offset + end, _quoted(new, node.style) + trailing))
 
     walk(root, None)
@@ -221,7 +229,9 @@ def _retarget(target: str, folder: str, old_rel: str, new_target: str, rebase: b
     return _rebase(target, folder) if rebase else None
 
 
-def retarget(bundle: Bundle, old_rel: str, new_rel: str, overrides: dict[str, Document] | None = None) -> dict[str, str]:
+def retarget(
+    bundle: Bundle, old_rel: str, new_rel: str, overrides: dict[str, Document] | None = None
+) -> dict[str, str]:
     """New text of every page that links to `old_rel`, with those links pointing to `/new_rel`.
 
     Reads the bundle as it is (nothing is written). `overrides` replaces the
@@ -238,7 +248,9 @@ def retarget(bundle: Bundle, old_rel: str, new_rel: str, overrides: dict[str, Do
             out[rel] = doc.text
         if rel == old_rel or doc.rel.name == "index.md" or name not in unquote(doc.text):
             continue
-        text = rewrite_text(doc, lambda t, folder=doc.folder: _retarget(t, folder, old_rel, new_target, False))
+        text = rewrite_text(
+            doc, functools.partial(_retarget, folder=doc.folder, old_rel=old_rel, new_target=new_target, rebase=False)
+        )
         if text != doc.text:
             out[rel] = text
     return out
@@ -268,7 +280,7 @@ def _question_edits(path: Path, old: str, new: str) -> str | None:
             edits.append((expected.start_mark.index, expected.end_mark.index, f"[{kept}]"))
             continue
         for node in matches:
-            start = _PROPERTIES.match(raw, node.start_mark.index, node.end_mark.index).end()
+            start = _after_properties(raw, node.start_mark.index, node.end_mark.index)
             if node is rename:
                 edits.append((start, node.end_mark.index, _quoted(new, node.style)))
                 continue
@@ -276,7 +288,10 @@ def _question_edits(path: Path, old: str, new: str) -> str | None:
             line = raw.rfind("\n", 0, node.start_mark.index) + 1
             end = raw.find("\n", node.end_mark.index)
             end = len(raw) if end < 0 else end + 1
-            if raw[line : node.start_mark.index].strip() != "-" or raw[node.end_mark.index : end].strip()[:1] not in ("", "#"):
+            if raw[line : node.start_mark.index].strip() != "-" or raw[node.end_mark.index : end].strip()[:1] not in (
+                "",
+                "#",
+            ):
                 raise SystemExit(f"kb: cannot update {path}: put `{old}` on a line of its own")
             edits.append((line, end, ""))
     return apply(raw, edits) if edits else None
@@ -290,7 +305,9 @@ def _expected_lists(root: yaml.Node | None) -> list[yaml.SequenceNode]:
     out = []
     for item in questions.value if isinstance(questions, yaml.SequenceNode) else []:
         if isinstance(item, yaml.MappingNode):
-            out += [v for k, v in item.value if getattr(k, "value", None) == "expected" and isinstance(v, yaml.SequenceNode)]
+            out += [
+                v for k, v in item.value if getattr(k, "value", None) == "expected" and isinstance(v, yaml.SequenceNode)
+            ]
     return out
 
 
@@ -307,8 +324,13 @@ def _questions(bundle: Bundle, old_rel: str, new_rel: str) -> dict[Path, str]:
 def _ignored(bundle: Bundle, path: Path) -> bool:
     """True if git ignores the path (False outside a git work tree)."""
     try:
-        result = subprocess.run(["git", "check-ignore", "-q", "--", str(path)], cwd=bundle.root,
-                                capture_output=True, check=False, timeout=60)
+        result = subprocess.run(
+            [program("git"), "check-ignore", "-q", "--", str(path)],
+            cwd=bundle.root,
+            capture_output=True,
+            check=False,
+            timeout=60,
+        )
     except (OSError, subprocess.SubprocessError):
         return False
     return result.returncode == 0
@@ -325,16 +347,23 @@ def _destination(bundle: Bundle, old_rel: str, new_arg: str) -> str:
         new_rel += suffix
     name = PurePosixPath(new_rel)
     if not new_rel or name.suffix.lower() != suffix.lower():
-        raise SystemExit(f"kb: {new_arg}: keep the file extension ({suffix or 'none'}); "
-                         f"to move into a new folder, end the path with `/`")
+        raise SystemExit(
+            f"kb: {new_arg}: keep the file extension ({suffix or 'none'}); "
+            f"to move into a new folder, end the path with `/`"
+        )
     if name.name in RESERVED:
         raise SystemExit(f"kb: {name.name} is reserved (a generated index or the log)")
     if any(part.startswith(".") for part in name.parts):
         raise SystemExit(f"kb: {new_rel} is in a hidden folder, which is not part of the bundle")
     dest = bundle.root / new_rel
     case_only = new_rel != old_rel and new_rel.casefold() == old_rel.casefold()
-    if new_rel == old_rel or bundle.exists(new_rel) or (
-        dest.exists() and not (case_only and dest.samefile(bundle.root / old_rel))  # macOS/Windows: Foo.md "exists" as foo.md
+    if (
+        new_rel == old_rel
+        or bundle.exists(new_rel)
+        or (
+            dest.exists()
+            and not (case_only and dest.samefile(bundle.root / old_rel))  # macOS/Windows: Foo.md "exists" as foo.md
+        )
     ):
         raise SystemExit(f"kb: {bundle.show(new_rel)} already exists")
     if bundle.root not in dest.resolve().parents:
@@ -446,8 +475,11 @@ def merge(bundle: Bundle, old_rel: str, into_rel: str, actor: str, dry_run: bool
     if sources:
         fm["sources"] = list(sources.values())
     for key in bundle.config.relations:
-        values = [v for v in _union(fm.get(key) or [], extra.get(key) or [])
-                  if isinstance(v, str) and _relation_target(key, v) not in (old_rel, into_rel)]
+        values = [
+            v
+            for v in _union(fm.get(key) or [], extra.get(key) or [])
+            if isinstance(v, str) and _relation_target(key, v) not in (old_rel, into_rel)
+        ]
         if values:
             fm[key] = values
         else:
@@ -455,16 +487,26 @@ def merge(bundle: Bundle, old_rel: str, into_rel: str, actor: str, dry_run: bool
     fm.pop("verified", None)  # merged content has not been reviewed yet
     fm["generated"] = {"by": actor, "at": now_utc()}
     header = f"---\n{yaml.safe_dump(fm, sort_keys=False, allow_unicode=True, width=1000)}---\n"
-    merged = Document(path=into_doc.path, rel=into_doc.rel, text=header + into_doc.body, has_frontmatter=True,
-                      frontmatter=fm, fm_end=len(header))
+    merged = Document(
+        path=into_doc.path,
+        rel=into_doc.rel,
+        text=header + into_doc.body,
+        has_frontmatter=True,
+        frontmatter=fm,
+        fm_end=len(header),
+    )
     changed = retarget(bundle, old_rel, into_rel, overrides={into_rel: merged})
     questions = _questions(bundle, old_rel, into_rel)
     others = sorted(rel for rel in changed if rel != into_rel)
     plan = [f"merge metadata of {bundle.show(old_rel)} into {bundle.show(into_rel)}", f"delete {bundle.show(old_rel)}"]
     shown = [path.relative_to(bundle.repo_root).as_posix() for path in questions]
     if dry_run:
-        return (plan + [f"would update links in {bundle.show(rel)}" for rel in others]
-                + [f"would update {path}" for path in shown] + ["(dry run: nothing written)"])
+        return (
+            plan
+            + [f"would update links in {bundle.show(rel)}" for rel in others]
+            + [f"would update {path}" for path in shown]
+            + ["(dry run: nothing written)"]
+        )
     writes = {bundle.root / rel: text for rel, text in changed.items()} | questions
     _commit(bundle, writes, delete=[old_doc.path], what="kb merge")
     bundle.invalidate()
@@ -505,14 +547,32 @@ def _write(path: Path, text: str, like: bytes | None) -> None:
         raise
 
 
+def _manifest_path(bundle: Bundle, path: Path) -> str:
+    """How the backup MANIFEST names a file: relative to the repository root, with `/` on every OS."""
+    try:
+        return path.relative_to(bundle.repo_root).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def _restorer(saved: dict[Path, Path], path: Path) -> Callable[[], None]:
+    """An undo step that puts the saved copy of `path` back."""
+    return lambda: _restore(saved[path], path)
+
+
 def _restore(copy: Path, path: Path) -> None:
     tmp = path.with_name(f".{path.name}.restore.tmp")
     shutil.copy2(copy, tmp)
     os.replace(tmp, path)
 
 
-def _commit(bundle: Bundle, writes: dict[Path, str], move: tuple[Path, Path] | None = None,
-            delete: Iterable[Path] = (), what: str = "kb") -> None:
+def _commit(
+    bundle: Bundle,
+    writes: dict[Path, str],
+    move: tuple[Path, Path] | None = None,
+    delete: Iterable[Path] = (),
+    what: str = "kb",
+) -> None:
     """Move a file, write texts, delete files: all of it or nothing.
 
     The originals are copied to `.cache/kb-backup/<time>-…/` first. If a step
@@ -531,8 +591,8 @@ def _commit(bundle: Bundle, writes: dict[Path, str], move: tuple[Path, Path] | N
             if path not in saved and path.is_file():
                 saved[path] = backup / str(len(saved))
                 shutil.copy2(path, saved[path])
-                manifest.append(f"{len(saved) - 1}\t{path}")
-        (backup / "MANIFEST").write_text("\n".join(manifest) + "\n", encoding="utf-8")
+                manifest.append(f"{len(saved) - 1}\t{_manifest_path(bundle, path)}")
+        (backup / "MANIFEST").write_text("\n".join(manifest) + "\n", encoding="utf-8", newline="\n")
     except BaseException:  # nothing was changed yet
         remove_tree(backup, ignore_errors=True)
         raise
@@ -550,10 +610,10 @@ def _commit(bundle: Bundle, writes: dict[Path, str], move: tuple[Path, Path] | N
         for path, text in writes.items():
             existed = path.exists()
             _write(path, text, saved[path].read_bytes() if path in saved else None)
-            undo.append((lambda p=path: _restore(saved[p], p)) if existed else path.unlink)
+            undo.append(_restorer(saved, path) if existed else path.unlink)
         for path in delete:
             path.unlink()
-            undo.append(lambda p=path: _restore(saved[p], p))
+            undo.append(_restorer(saved, path))
     except BaseException as exc:
         failed = []
         for step in reversed(undo):
@@ -562,8 +622,10 @@ def _commit(bundle: Bundle, writes: dict[Path, str], move: tuple[Path, Path] | N
             except OSError as undo_exc:
                 failed.append(str(undo_exc))
         if failed:
-            raise SystemExit(f"{what}: failed ({exc}), and could not undo every step ({'; '.join(failed)}); "
-                             f"the original files are in {backup} (see its MANIFEST)") from exc
+            raise SystemExit(
+                f"{what}: failed ({exc}), and could not undo every step ({'; '.join(failed)}); "
+                f"the original files are in {backup} (see its MANIFEST)"
+            ) from exc
         remove_tree(backup, ignore_errors=True)
         if isinstance(exc, Exception):
             raise SystemExit(f"{what}: failed ({exc}); nothing was changed") from exc

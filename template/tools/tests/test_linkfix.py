@@ -5,9 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from test_model import bundle, git, repo, write  # noqa: F401 - fixtures
 
 from kbtools import check, cli, linkfix, names, rename, retrieval_eval
-from test_model import bundle, git, repo, write  # noqa: F401 - fixture
 
 QUESTIONS = """\
 # my questions
@@ -31,10 +31,12 @@ def snapshot(repo: Path) -> dict[str, bytes]:
 def test_mv_rewrites_flow_frontmatter_and_reference_definitions(repo: Path) -> None:
     write(repo, "systems/a.md", "A")
     ref = write(
-        repo, "data/r.md", "R",
-        "See [A][a] and [again][rel].\n\n[a]: /systems/a.md#top\n[rel]: <../systems/a.md> \"title\"\n",
+        repo,
+        "data/r.md",
+        "R",
+        'See [A][a] and [again][rel].\n\n[a]: /systems/a.md#top\n[rel]: <../systems/a.md> "title"\n',
         "sources: [{id: s, resource: /systems/a.md}, {id: t, resource: 'https://x.org'}]  # cited\n"
-        "related: [\"[A](../systems/a.md)\"]\n",
+        'related: ["[A](../systems/a.md)"]\n',
     )
     linkfix.move(bundle(repo), "systems/a.md", "systems/net/a.md")
     text = ref.read_text(encoding="utf-8")
@@ -48,7 +50,10 @@ def test_fix_links_normalizes_frontmatter_values_and_reference_definitions(repo:
     write(repo, "systems/a.md", "A")
     write(repo, "sources/x.md", "X")
     ref = write(
-        repo, "systems/r.md", "R", "[A][a]\n\n[a]: a.md\n",
+        repo,
+        "systems/r.md",
+        "R",
+        "[A][a]\n\n[a]: a.md\n",
         "sources:\n  - id: s  # first\n    resource: ../sources/x.md\n  - id: t\n    resource: https://x.org/a.md\n"
         "flow: {nested: ['[A](a.md)']}\n",
     )
@@ -64,8 +69,13 @@ def test_fix_links_normalizes_frontmatter_values_and_reference_definitions(repo:
 def test_mv_of_an_image_rewrites_links_to_it(repo: Path) -> None:
     (repo / "kb/attachments").mkdir(parents=True)
     (repo / "kb/attachments/net.png").write_bytes(b"\x89PNG")
-    ref = write(repo, "systems/a.md", "A", "![n](../attachments/net.png) [png][p]\n\n[p]: /attachments/net.png\n",
-                "resource: /attachments/net.png\n")
+    ref = write(
+        repo,
+        "systems/a.md",
+        "A",
+        "![n](../attachments/net.png) [png][p]\n\n[p]: /attachments/net.png\n",
+        "resource: /attachments/net.png\n",
+    )
     assert cli.main(["mv", "kb/attachments/net.png", "attachments/diagrams/network"]) == 0
     assert (repo / "kb/attachments/diagrams/network.png").read_bytes() == b"\x89PNG"
     text = ref.read_text(encoding="utf-8")
@@ -92,10 +102,15 @@ def test_mv_into_a_folder_keeps_the_name(repo: Path, new: str) -> None:
 def test_mv_keeps_yaml_anchors_and_tags(repo: Path) -> None:
     write(repo, "systems/a.md", "A")
     write(repo, "systems/b.md", "B")
-    ref = write(repo, "data/r.md", "R", extra=(
-        "sources:\n  - id: s\n    resource: &r ../systems/a.md\n  - id: t\n    resource: *r\n"
-        "  - id: u\n    resource: !!str ../systems/b.md\n  - id: v\n    resource: !!str &q '../systems/a.md'\n"
-    ))
+    ref = write(
+        repo,
+        "data/r.md",
+        "R",
+        extra=(
+            "sources:\n  - id: s\n    resource: &r ../systems/a.md\n  - id: t\n    resource: *r\n"
+            "  - id: u\n    resource: !!str ../systems/b.md\n  - id: v\n    resource: !!str &q '../systems/a.md'\n"
+        ),
+    )
     linkfix.move(bundle(repo), "systems/a.md", "systems/z.md")
     linkfix.move(bundle(repo), "systems/b.md", "systems/y.md")
     text = ref.read_text(encoding="utf-8")
@@ -135,8 +150,13 @@ def test_mv_keeps_crlf_line_ends(repo: Path) -> None:
 def test_merge_rebases_the_old_pages_relative_metadata(repo: Path) -> None:
     write(repo, "sources/x.md", "X")
     write(repo, "systems/peer.md", "Peer")
-    write(repo, "systems/old.md", "Old", extra="sources: [{id: x, resource: ../sources/x.md}]\n"
-                                              "related: ['[Peer](peer.md)', '[Into](../data/into.md)']\n")
+    write(
+        repo,
+        "systems/old.md",
+        "Old",
+        extra="sources: [{id: x, resource: ../sources/x.md}]\n"
+        "related: ['[Peer](peer.md)', '[Into](../data/into.md)']\n",
+    )
     write(repo, "data/into.md", "Into", "Self [link](../systems/old.md).\n")
     linkfix.merge(bundle(repo), "systems/old.md", "data/into.md", "test/0")
     doc = bundle(repo).by_rel["data/into.md"]
@@ -153,7 +173,7 @@ def test_mv_renames_expected_pages_and_keeps_comments(repo: Path, capsys: pytest
         write(repo, f"systems/{name}.md", name.upper())
     questions = repo / retrieval_eval.QUESTIONS
     questions.parent.mkdir(parents=True)
-    questions.write_text(QUESTIONS, encoding="utf-8")
+    questions.write_text(QUESTIONS, encoding="utf-8", newline="\n")
     assert cli.main(["mv", "systems/a.md", "systems/z.md"]) == 0
     assert questions.read_text(encoding="utf-8") == QUESTIONS.replace("/systems/a.md", "/systems/z.md")
     assert "updated tools/retrieval-eval/questions.yaml" in capsys.readouterr().out
@@ -165,16 +185,19 @@ def test_merge_drops_an_expected_page_the_question_already_has(repo: Path) -> No
         write(repo, f"systems/{name}.md", name.upper())
     questions = repo / retrieval_eval.QUESTIONS
     questions.parent.mkdir(parents=True)
-    questions.write_text(QUESTIONS, encoding="utf-8")
+    questions.write_text(QUESTIONS, encoding="utf-8", newline="\n")
     assert "would update tools/retrieval-eval/questions.yaml" in linkfix.merge(
-        bundle(repo), "systems/a.md", "systems/b.md", "test/0", dry_run=True)
+        bundle(repo), "systems/a.md", "systems/b.md", "test/0", dry_run=True
+    )
     assert questions.read_text(encoding="utf-8") == QUESTIONS
     linkfix.merge(bundle(repo), "systems/a.md", "systems/b.md", "test/0")
     text = questions.read_text(encoding="utf-8")
     assert "keep me" not in text and "# the classic" in text and "      - /systems/b.md\n" in text
     assert "expected: [/systems/b.md, /systems/c.md]" in text
     assert [q.expected for q in retrieval_eval.load_questions(bundle(repo), questions)] == [
-        ["/systems/b.md"], ["/systems/b.md", "/systems/c.md"]]
+        ["/systems/b.md"],
+        ["/systems/b.md", "/systems/c.md"],
+    ]
 
 
 # -- what gets refused -----------------------------------------------------------------------
@@ -207,13 +230,13 @@ def test_merge_drops_an_expected_page_the_question_already_has(repo: Path) -> No
 def test_mv_refuses(repo: Path, old: str, new: str, message: str) -> None:
     write(repo, "systems/a.md", "A")
     write(repo, "systems/b.md", "B")
-    (repo / "kb/systems/index.md").write_text("# Systems\n")
-    (repo / "kb/log.md").write_text("# Log\n")
+    (repo / "kb/systems/index.md").write_text("# Systems\n", newline="\n")
+    (repo / "kb/log.md").write_text("# Log\n", newline="\n")
     (repo / "kb/.obsidian").mkdir()
-    (repo / "kb/.obsidian/app.md").write_text("x")
+    (repo / "kb/.obsidian/app.md").write_text("x", newline="\n")
     (repo / "kb/attachments").mkdir()
     (repo / "kb/attachments/x.png").write_bytes(b"png")
-    (repo / "outside.md").write_text("---\ntype: Concept\n---\n")
+    (repo / "outside.md").write_text("---\ntype: Concept\n---\n", newline="\n")
     before = snapshot(repo)
     with pytest.raises(SystemExit, match=message):
         linkfix.move(bundle(repo), old, new)
@@ -222,7 +245,7 @@ def test_mv_refuses(repo: Path, old: str, new: str, message: str) -> None:
 
 def test_mv_refuses_a_destination_git_ignores(repo: Path) -> None:
     write(repo, "systems/a.md", "A")
-    (repo / ".gitignore").write_text("kb/private/\n")
+    (repo / ".gitignore").write_text("kb/private/\n", newline="\n")
     git(repo, "init", "-q")
     with pytest.raises(SystemExit, match="git ignores"):
         linkfix.move(bundle(repo), "systems/a.md", "private/a.md")
@@ -251,7 +274,7 @@ def _bundle_with_links(repo: Path) -> None:
         write(repo, f"data/{name}.md", name.upper(), "See [A](/systems/a.md).\n", 'related: ["[A](/systems/a.md)"]\n')
     questions = repo / retrieval_eval.QUESTIONS
     questions.parent.mkdir(parents=True)
-    questions.write_text(QUESTIONS, encoding="utf-8")
+    questions.write_text(QUESTIONS, encoding="utf-8", newline="\n")
 
 
 def _fail_on(monkeypatch: pytest.MonkeyPatch, call: int) -> None:
@@ -271,7 +294,7 @@ def test_mv_failing_midway_changes_nothing(repo: Path, monkeypatch: pytest.Monke
     _bundle_with_links(repo)
     before = snapshot(repo)
     _fail_on(monkeypatch, call)
-    with pytest.raises(SystemExit, match="No space left on device.*nothing was changed"):
+    with pytest.raises(SystemExit, match=r"No space left on device.*nothing was changed"):
         linkfix.move(bundle(repo), "systems/a.md", "net/deep/a.md")
     assert snapshot(repo) == before
     assert not (repo / "kb/net").exists() and not any((repo / linkfix.BACKUPS).iterdir())
@@ -301,7 +324,8 @@ def test_mv_keeps_the_backup_when_undoing_fails(repo: Path, monkeypatch: pytest.
     backup = next((repo / linkfix.BACKUPS).iterdir())
     assert str(backup) in str(raised.value)
     manifest = (backup / "MANIFEST").read_text(encoding="utf-8")
-    kept = next(line.split("\t")[0] for line in manifest.splitlines() if line.endswith("data/c.md"))
+    entries = {path: n for n, path in (line.split("\t") for line in manifest.splitlines())}  # `/` on every OS
+    kept = entries["kb/data/c.md"]
     assert (backup / kept).read_bytes() == original
 
 
@@ -338,19 +362,27 @@ def test_an_interrupted_backup_leaves_nothing_behind(repo: Path, monkeypatch: py
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        ("questions:\n  - question: q\n    expected:\n      - /a.md\n      - /a.md  # again\n      - /c.md\n",
-         "questions:\n  - question: q\n    expected:\n      - /z.md\n      - /c.md\n"),
-        ("questions:\n  - question: q\n    expected:\n      - /a.md\n      - /z.md\n      - /a.md\n",
-         "questions:\n  - question: q\n    expected:\n      - /z.md\n"),
-        ("questions:\n  - {question: q, expected: [/a.md, /c.md, /a.md]}\n",
-         "questions:\n  - {question: q, expected: [/z.md, /c.md]}\n"),
-        ("questions:\n  - {question: q, expected: [/c.md, '/a.md']}\n",
-         "questions:\n  - {question: q, expected: [/c.md, '/z.md']}\n"),
+        (
+            "questions:\n  - question: q\n    expected:\n      - /a.md\n      - /a.md  # again\n      - /c.md\n",
+            "questions:\n  - question: q\n    expected:\n      - /z.md\n      - /c.md\n",
+        ),
+        (
+            "questions:\n  - question: q\n    expected:\n      - /a.md\n      - /z.md\n      - /a.md\n",
+            "questions:\n  - question: q\n    expected:\n      - /z.md\n",
+        ),
+        (
+            "questions:\n  - {question: q, expected: [/a.md, /c.md, /a.md]}\n",
+            "questions:\n  - {question: q, expected: [/z.md, /c.md]}\n",
+        ),
+        (
+            "questions:\n  - {question: q, expected: [/c.md, '/a.md']}\n",
+            "questions:\n  - {question: q, expected: [/c.md, '/z.md']}\n",
+        ),
     ],
 )
 def test_every_expected_entry_of_a_page_is_renamed(tmp_path: Path, text: str, expected: str) -> None:
     path = tmp_path / "questions.yaml"
-    path.write_text(text, encoding="utf-8")
+    path.write_text(text, encoding="utf-8", newline="\n")
     assert linkfix._question_edits(path, "/a.md", "/z.md") == expected
 
 

@@ -12,7 +12,17 @@ dependencies = [
 kb = "kbtools.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "pre-commit>=4", "poethepoet>=0.48"]
+dev = [
+    "pytest>=8",
+    "pre-commit>=4",
+    "poethepoet>=0.48",
+    # Bounded to a minor (ruff) or major (mypy) range: a newer release may format or type-check the
+    # template-managed tools/ differently. Each template release moves the bounds to what it tests.
+    "ruff>=0.16,<0.17",
+    "mypy>=2.0,<3",
+    "types-PyYAML>=6.0",
+    "types-jsonschema>=4.23",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -60,6 +70,9 @@ cmd = "kb find"
 
 [tool.poe.tasks.links-online]
 help = "Check external URLs (source rot); needs lychee"
+# lychee is not a Python tool: run it directly (found through PATH and PATHEXT), not through `uv run`,
+# which on Windows does not find a lychee.cmd/.bat and would sync the environment first.
+executor = "simple"
 cmd = "lychee --no-progress --scheme https --scheme http --accept 200..=299,403,429 --root-dir \"${POE_ROOT}/{{ bundle_dir }}\" --exclude-path {{ bundle_dir }}/.obsidian '{{ bundle_dir }}/**/*.md'"
 
 [tool.poe.tasks.search]
@@ -90,9 +103,13 @@ cmd = "kb rename-bundle"
 help = "Run the tooling tests"
 cmd = "pytest -q"
 
+[tool.poe.tasks.lint]
+help = "Lint, format check and type check of the tooling (ruff, mypy); `uv run ruff format tools` fixes the formatting"
+sequence = [{ cmd = "ruff check tools" }, { cmd = "ruff format --check tools" }, { cmd = "mypy" }]
+
 [tool.poe.tasks.ci]
-help = "Everything CI runs: check, independent validator, tests, index freshness"
-sequence = [{ ref = "check" }, { ref = "validate-okf" }, { ref = "test" }, { cmd = "kb index --check" }]
+help = "Everything CI runs: check, independent validator, lint, tests, index freshness"
+sequence = [{ ref = "check" }, { ref = "validate-okf" }, { ref = "lint" }, { ref = "test" }, { cmd = "kb index --check" }]
 
 [tool.kb]
 # Folder of the knowledge base (OKF bundle) in this repository; rename it with `uv run poe rename-bundle`.
@@ -100,3 +117,37 @@ bundle = "{{ bundle_dir }}"
 
 [tool.pytest.ini_options]
 testpaths = ["tools/tests"]
+
+# Lint and type-check configuration of the tooling (`uv run poe lint`).
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# An explicit list (the classic ruff defaults E4, E7, E9, F, plus bugbear, pyupgrade, simplify,
+# import sorting and ruff's own rules), so a newer ruff with other defaults checks the same.
+select = ["E4", "E7", "E9", "F", "B", "UP", "SIM", "I", "RUF"]
+# Codes of security and naming linters the code documents its exceptions with.
+external = ["S", "BLE", "N802"]
+ignore = [
+    "SIM108", # a ternary is not always clearer than if/else
+    "SIM905", # "a b c".split() reads better than a long list of short strings
+    "RUF001", "RUF002", "RUF003", # typographic characters (›, –, ’) are deliberate in a Markdown tool
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests import pytest fixtures from sibling test modules; using one as a parameter "redefines" it.
+"tools/tests/*" = ["F811"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["kbtools"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["tools/kbtools"]
+check_untyped_defs = true
+disallow_untyped_defs = true
+no_implicit_reexport = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unused_ignores = true

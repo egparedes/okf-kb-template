@@ -37,7 +37,7 @@ def repo(tmp_path: Path) -> Path:
 def write(repo: Path, rel: str, text: str) -> Path:
     path = repo / "kb" / rel
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    path.write_text(text, encoding="utf-8", newline="\n")
     return path
 
 
@@ -64,8 +64,8 @@ def test_missing_frontmatter_and_type_are_conformance_errors(repo: Path) -> None
 
 
 def test_frontmatter_only_allowed_in_root_index(repo: Path) -> None:
-    write(repo, "systems/index.md", "---\nokf_version: \"0.2\"\n---\n# Pages\n")
-    write(repo, "index.md", "---\nokf_version: \"0.2\"\nextra: 1\n---\n# Pages\n")
+    write(repo, "systems/index.md", '---\nokf_version: "0.2"\n---\n# Pages\n')
+    write(repo, "index.md", '---\nokf_version: "0.2"\nextra: 1\n---\n# Pages\n')
     diagnostics = Checker(fresh(repo)).check_all()
     assert {str(d.path) for d in diagnostics if d.code == "O003"} == {"systems/index.md", "index.md"}
 
@@ -102,6 +102,16 @@ def test_footnotes_must_match_sources(repo: Path) -> None:
     assert "H020" in found and "H021" in found
 
 
+def test_numeric_and_text_source_ids_do_not_crash_the_check(repo: Path) -> None:
+    """A YAML number as a source id (the schema reports it) next to a text id used to raise TypeError."""
+    extra = (
+        "sources:\n  - id: 7\n    resource: https://example.com/7\n  - id: good\n    resource: https://example.com\n"
+    )
+    write(repo, "systems/a.md", page("A", "Claim.\n", extra))
+    found = codes(repo)
+    assert found.count("W020") == 2 and "H010" in found
+
+
 def test_relation_needs_prose_link(repo: Path) -> None:
     write(repo, "systems/b.md", page("B"))
     write(repo, "systems/a.md", page("A", "No link here.\n", 'depends_on: ["[B](/systems/b.md)"]\n'))
@@ -125,7 +135,11 @@ def test_links_in_code_are_ignored(repo: Path) -> None:
 
 def test_vocabulary_extends_schema(repo: Path) -> None:
     write(repo, "systems/b.md", page("B"))
-    write(repo, "systems/a.md", page("A", "Uses [B](/systems/b.md).\n", 'related: ["[B](/systems/b.md)"]\nisbn: "978-3"\n'))
+    write(
+        repo,
+        "systems/a.md",
+        page("A", "Uses [B](/systems/b.md).\n", 'related: ["[B](/systems/b.md)"]\nisbn: "978-3"\n'),
+    )
     indexgen.write(fresh(repo))
     assert codes(repo) == []
     write(repo, "systems/a.md", page("A", "Uses [B](/systems/b.md).\n", 'related: "/systems/b.md"\nisbn: "abc"\n'))
@@ -147,8 +161,7 @@ def test_fix_links_makes_links_bundle_absolute(repo: Path) -> None:
         "systems/dns.md",
         page(
             "DNS",
-            "[rel](tcp.md) [vault](data/sql.md#joins) [abs](/systems/tcp.md) "
-            "[web](https://x.org) `[code](tcp.md)`\n",
+            "[rel](tcp.md) [vault](data/sql.md#joins) [abs](/systems/tcp.md) [web](https://x.org) `[code](tcp.md)`\n",
             'related: ["[SQL](../data/sql.md)"]\n',
         ),
     )
@@ -188,8 +201,16 @@ def test_log_entries_are_newest_first(repo: Path) -> None:
 
 
 def test_new_page_is_valid(repo: Path) -> None:
-    pages.new_page(fresh(repo), "Source", "sources/rfc-9110.md", "RFC 9110", "HTTP semantics.", ["http"],
-                   "test/0", resource="https://www.rfc-editor.org/rfc/rfc9110")
+    pages.new_page(
+        fresh(repo),
+        "Source",
+        "sources/rfc-9110.md",
+        "RFC 9110",
+        "HTTP semantics.",
+        ["http"],
+        "test/0",
+        resource="https://www.rfc-editor.org/rfc/rfc9110",
+    )
     indexgen.write(fresh(repo))
     assert codes(repo) == []
     assert "# Summary" in (repo / "kb/sources/rfc-9110.md").read_text()
@@ -228,8 +249,15 @@ def test_log_never_goes_below_a_newer_section(repo: Path) -> None:
 def test_mv_keeps_fragments_quoted_resources_and_rebases(repo: Path) -> None:
     write(repo, "systems/b.md", page("B", "Peer [A](./a.md) and [self](#top)."))
     write(repo, "systems/a.md", page("A"))
-    ref = write(repo, "data/r.md", page("R", "[B](/systems/b.md 'title')", 'related: ["[B](/systems/b.md#part)"]\n'
-                                    'sources:\n  - id: b\n    resource: "/systems/b.md"\n'))
+    ref = write(
+        repo,
+        "data/r.md",
+        page(
+            "R",
+            "[B](/systems/b.md 'title')",
+            'related: ["[B](/systems/b.md#part)"]\nsources:\n  - id: b\n    resource: "/systems/b.md"\n',
+        ),
+    )
     linkfix.move(fresh(repo), "systems/b.md", "systems/net/b.md")
     text = ref.read_text()
     assert '"[B](/systems/net/b.md#part)"' in text
@@ -253,7 +281,7 @@ def test_path_arguments_accept_bundle_and_repo_paths(repo: Path) -> None:
     write(repo, "systems/a.md", page("A"))
     b = fresh(repo)
     assert b.path_arg("systems/a.md") == b.path_arg("kb/systems/a.md") == (repo / "kb/systems/a.md").resolve()
-    (repo / "README.md").write_text("x")
+    (repo / "README.md").write_text("x", newline="\n")
     assert b.path_arg(str(repo / "README.md")) is None
 
 
@@ -288,20 +316,20 @@ def test_kb_commands_in_agent_sessions_are_tracked(repo: Path, monkeypatch) -> N
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
     monkeypatch.setenv("CLAUDECODE", "1")
     created = pages.new_page(fresh(repo), "Concept", "systems/new.md", "New", "New.", [], "test/0")
-    created.write_text(created.read_text() + "\nSee [[Wiki]].\n")  # edited via Bash, not the Edit tool
+    created.write_text(created.read_text() + "\nSee [[Wiki]].\n", newline="\n")  # edited via Bash, not the Edit tool
     monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
     assert hooks.stop(fresh(repo)) == 2
 
 
 def test_bundle_folder_comes_from_pyproject(tmp_path: Path) -> None:
     assert bundle_dir(tmp_path) == "kb"  # no pyproject.toml
-    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\n\n[tool.kb]\nbundle = "my-notes"\n')
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\n\n[tool.kb]\nbundle = "my-notes"\n', newline="\n")
     assert bundle_dir(tmp_path) == "my-notes"
     shutil.copytree(FIXTURES / "schema", tmp_path / "schema")
     shutil.copy(REPO / "schema" / "frontmatter.schema.json", tmp_path / "schema")
     (tmp_path / "my-notes" / "systems").mkdir(parents=True)
     page_path = tmp_path / "my-notes" / "systems" / "a.md"
-    page_path.write_text(page("A", "Broken [link](/nowhere.md)."))
+    page_path.write_text(page("A", "Broken [link](/nowhere.md)."), newline="\n")
     b = Bundle(tmp_path / "my-notes", tmp_path)
     assert b.prefix == "my-notes" and b.show("log.md") == "my-notes/log.md"
     assert b.rel("my-notes/systems/a.md") == b.rel("/systems/a.md") == "systems/a.md"
@@ -311,7 +339,7 @@ def test_bundle_folder_comes_from_pyproject(tmp_path: Path) -> None:
 
 
 def test_prefix_that_is_also_a_folder_inside_the_bundle(tmp_path: Path) -> None:
-    (tmp_path / "pyproject.toml").write_text('[tool.kb]\nbundle = "notes"\n')
+    (tmp_path / "pyproject.toml").write_text('[tool.kb]\nbundle = "notes"\n', newline="\n")
     shutil.copytree(FIXTURES / "schema", tmp_path / "schema")
     shutil.copy(REPO / "schema" / "frontmatter.schema.json", tmp_path / "schema")
     (tmp_path / "notes" / "notes").mkdir(parents=True)  # a domain folder named like the bundle

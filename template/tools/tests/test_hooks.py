@@ -46,7 +46,7 @@ def repo(tmp_path: Path, monkeypatch) -> Path:
 def write(repo: Path, rel: str, title: str = "Page", body: str = "") -> Path:
     path = repo / "kb" / rel
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(PAGE.format(title=title, body=body), encoding="utf-8")
+    path.write_text(PAGE.format(title=title, body=body), encoding="utf-8", newline="\n")
     return path
 
 
@@ -60,7 +60,9 @@ def hook(monkeypatch, repo: Path, event: str, agent: str = "claude", **payload) 
 
 
 def git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=repo, check=True, capture_output=True
+    )
 
 
 # -- Stop: the log check without git (B7) -------------------------------------------------
@@ -109,7 +111,7 @@ def test_stale_touched_paths_are_dropped(repo: Path, monkeypatch, tmp_path: Path
     (repo / TOUCHED).parent.mkdir(parents=True, exist_ok=True)
     moved_away = tmp_path / "old-location" / "kb" / "systems" / "a.md"  # the repository was moved
     write(repo, "systems/a.md", "A", "See [[Wiki]].")  # the same page at the new location is not claimed
-    (repo / TOUCHED).write_text(f"{moved_away}\n{repo / 'README.md'}\n../outside.md\n", encoding="utf-8")
+    (repo / TOUCHED).write_text(f"{moved_away}\n{repo / 'README.md'}\n../outside.md\n", encoding="utf-8", newline="\n")
     assert hook(monkeypatch, repo, "stop") == 0
     assert not (repo / TOUCHED).exists()
 
@@ -118,7 +120,7 @@ def test_kb_commands_are_claimed_by_the_running_session(repo: Path, monkeypatch)
     monkeypatch.setenv("CLAUDECODE", "1")
     hook(monkeypatch, repo, "pre-tool", session_id="s1", tool_use_id="t1")
     created = pages.new_page(fresh(repo), "Concept", "systems/new.md", "New", "New.", [], "test/0")
-    created.write_text(created.read_text() + "\nSee [[Wiki]].\n")
+    created.write_text(created.read_text() + "\nSee [[Wiki]].\n", newline="\n")
     hook(monkeypatch, repo, "post-tool", session_id="s1", tool_use_id="t1")
     assert not (repo / TOUCHED).exists()
     assert "systems/new.md" in (repo / session.STATE / "s1" / "touched").read_text()
@@ -135,11 +137,11 @@ def test_shell_changes_are_recorded_and_checked(repo: Path, monkeypatch, capsys)
     indexgen.write(fresh(repo))
     assert hook(monkeypatch, repo, "pre-tool", session_id="s", tool_use_id="t1") == 0
     # what `sed -i`, `cat >` or `rm` would do
-    keep.write_text(keep.read_text() + "\nSee [[Wiki]].\n", encoding="utf-8")
+    keep.write_text(keep.read_text() + "\nSee [[Wiki]].\n", encoding="utf-8", newline="\n")
     write(repo, "systems/new.md", "New")
     gone.unlink()
     (repo / "kb" / ".obsidian").mkdir()
-    (repo / "kb" / ".obsidian" / "notes.md").write_text("not a page")
+    (repo / "kb" / ".obsidian" / "notes.md").write_text("not a page", newline="\n")
     assert hook(monkeypatch, repo, "post-tool", session_id="s", tool_use_id="t1") == 2
     err = capsys.readouterr().err
     assert "systems/keep.md" in err and "H032" in err and "new.md" not in err
@@ -172,11 +174,11 @@ def test_unchanged_content_does_not_count(repo: Path, monkeypatch) -> None:
     back = write(repo, "systems/back.md", "Back")
     hook(monkeypatch, repo, "pre-tool", session_id="s", tool_use_id="t")
     text = same.read_text()
-    same.write_text(text)  # rewritten with the same text (a new mtime)
+    same.write_text(text, newline="\n")  # rewritten with the same text (a new mtime)
     os.utime(same, ns=(1, 1))
     original = back.read_text()
-    back.write_text("changed")
-    back.write_text(original)  # changed and changed back, like `git stash; …; git stash pop`
+    back.write_text("changed", newline="\n")
+    back.write_text(original, newline="\n")  # changed and changed back, like `git stash; …; git stash pop`
     hook(monkeypatch, repo, "post-tool", session_id="s", tool_use_id="t")
     assert not (repo / session.STATE / "s" / "touched").exists()
 
@@ -186,7 +188,7 @@ def test_hash_cache_is_optional(repo: Path, monkeypatch, cache: str | None) -> N
     hashes = repo / session.STATE / session.HASHES
     hashes.parent.mkdir(parents=True)
     if cache is not None:
-        hashes.write_text(cache)
+        hashes.write_text(cache, newline="\n")
     real_replace = os.replace
 
     def locked(src, dst):  # Windows: the cache is open in another hook
@@ -206,7 +208,7 @@ def test_clear_removes_stale_temporary_files(repo: Path) -> None:
     state = repo / session.STATE
     state.mkdir(parents=True)
     old, new = state / f"{session.HASHES}.1.tmp", state / f"{session.HASHES}.2.tmp"
-    old.write_text("{}"), new.write_text("{}")
+    old.write_text("{}", newline="\n"), new.write_text("{}", newline="\n")
     os.utime(old, (1, 1))
     session.Session(repo / "kb", repo, "s").clear()
     assert not old.exists() and new.exists()
@@ -222,12 +224,19 @@ def test_overlapping_commands_without_ids_share_the_first_snapshot(repo: Path, m
     assert set((repo / session.STATE / "g" / "touched").read_text().split()) == {"systems/a.md", "systems/b.md"}
 
 
-@pytest.mark.parametrize("argv", [
-    ["pre-tool", "--agent", "nobody"], ["pre-tool", "--bogus"], ["pre-tool"],
-    # Codex and Gemini CLI tool hooks report through JSON: no shell `|| true` needed (Codex on Windows)
-    ["post-tool", "--agent", "codex", "--bogus"], ["post-edit", "--agent", "gemini", "--bogus"],
-    ["post-tool", "--agent=codex", "--bogus"], ["post-edit", "--agent=gemini", "--bogus"],
-])
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["pre-tool", "--agent", "nobody"],
+        ["pre-tool", "--bogus"],
+        ["pre-tool"],
+        # Codex and Gemini CLI tool hooks report through JSON: no shell `|| true` needed (Codex on Windows)
+        ["post-tool", "--agent", "codex", "--bogus"],
+        ["post-edit", "--agent", "gemini", "--bogus"],
+        ["post-tool", "--agent=codex", "--bogus"],
+        ["post-edit", "--agent=gemini", "--bogus"],
+    ],
+)
 def test_tool_hooks_never_block(tmp_path: Path, monkeypatch, capsys, argv: list[str]) -> None:
     monkeypatch.delenv("KB_REPO_ROOT", raising=False)
     monkeypatch.chdir(tmp_path)  # not inside a knowledge base
@@ -240,7 +249,7 @@ def test_tool_hooks_never_block(tmp_path: Path, monkeypatch, capsys, argv: list[
 
 
 def test_pre_tool_survives_unwritable_state(repo: Path, monkeypatch) -> None:
-    (repo / ".cache").write_text("a file where the cache folder should be")
+    (repo / ".cache").write_text("a file where the cache folder should be", newline="\n")
     assert hook(monkeypatch, repo, "pre-tool", session_id="s") == 0
 
 
@@ -271,18 +280,18 @@ def test_gemini_success_prints_json(repo: Path, monkeypatch, capsys) -> None:
 
 def test_files_outside_the_bundle_listing_are_not_pages(repo: Path, monkeypatch, capsys) -> None:
     git(repo, "init", "-q")
-    (repo / ".gitignore").write_text("kb/private/\n")
+    (repo / ".gitignore").write_text("kb/private/\n", newline="\n")
     indexgen.write(fresh(repo))
     ignored = repo / "kb" / "private" / "draft.md"
     ignored.parent.mkdir(parents=True)
-    ignored.write_text("no frontmatter\n")
+    ignored.write_text("no frontmatter\n", newline="\n")
     trash = repo / "kb" / ".trash" / "old.md"
     trash.parent.mkdir(parents=True)
-    trash.write_text("no frontmatter\n")
+    trash.write_text("no frontmatter\n", newline="\n")
     for path in (ignored, trash):  # a file tool writes them: not checked, not recorded
         assert hook(monkeypatch, repo, "post-edit", session_id="s", tool_input={"file_path": str(path)}) == 0
     assert hook(monkeypatch, repo, "pre-tool", session_id="s", tool_use_id="t") == 0
-    ignored.write_text("changed, still no frontmatter\n")  # a shell command changes it
+    ignored.write_text("changed, still no frontmatter\n", newline="\n")  # a shell command changes it
     assert hook(monkeypatch, repo, "post-tool", session_id="s", tool_use_id="t") == 0
     assert hook(monkeypatch, repo, "stop", session_id="s") == 0  # nothing to check, nothing to log
     assert capsys.readouterr().err == ""
@@ -313,12 +322,15 @@ def test_actor_pattern_matches_the_schema() -> None:
     assert pages.ACTOR.pattern == schema["$defs"]["actor"]["pattern"]
 
 
-@pytest.mark.parametrize(("given", "expected"), [
-    ("claude-code/claude-opus-5-5[1m]", "claude-code/claude-opus-5-5"),
-    ("claude-code/opus", "claude-code/opus"),
-    ("human:me", "human:me"),
-    ("codex/gpt-5.5:high", "codex/gpt-5.5:high"),
-])
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ("claude-code/claude-opus-5-5[1m]", "claude-code/claude-opus-5-5"),
+        ("claude-code/opus", "claude-code/opus"),
+        ("human:me", "human:me"),
+        ("codex/gpt-5.5:high", "codex/gpt-5.5:high"),
+    ],
+)
 def test_new_page_writes_valid_generated(repo: Path, given: str, expected: str) -> None:
     path = pages.new_page(fresh(repo), "Concept", "systems/x.md", "X", "X.", [], given)
     fm = load_yaml(path.read_text(encoding="utf-8").split("---")[1])
@@ -329,7 +341,9 @@ def test_new_page_writes_valid_generated(repo: Path, given: str, expected: str) 
     assert [str(d) for d in Checker(fresh(repo)).check_all() if d.is_error] == []
 
 
-@pytest.mark.parametrize("actor", ["claude code", "x/y, extra: 1", "x/y }", "claude-code/", "human:Me", "x/y\nz: 1", "#x/y"])
+@pytest.mark.parametrize(
+    "actor", ["claude code", "x/y, extra: 1", "x/y }", "claude-code/", "human:Me", "x/y\nz: 1", "#x/y"]
+)
 def test_invalid_actors_are_rejected(repo: Path, monkeypatch, actor: str) -> None:
     with pytest.raises(SystemExit, match="not an actor"):
         pages.new_page(fresh(repo), "Concept", "systems/x.md", "X", "X.", [], actor)
@@ -340,8 +354,9 @@ def test_invalid_actors_are_rejected(repo: Path, monkeypatch, actor: str) -> Non
 
 
 def test_generated_in_extra_frontmatter_is_replaced(repo: Path) -> None:
-    path = pages.new_page(fresh(repo), "Concept", "systems/x.md", "X", "X.", [], "test/0",
-                          extra={"generated": {"by": "evil", "at": "x"}})
+    path = pages.new_page(
+        fresh(repo), "Concept", "systems/x.md", "X", "X.", [], "test/0", extra={"generated": {"by": "evil", "at": "x"}}
+    )
     assert load_yaml(path.read_text(encoding="utf-8").split("---")[1])["generated"]["by"] == "test/0"
 
 
@@ -352,7 +367,7 @@ def test_generated_in_extra_frontmatter_is_replaced(repo: Path) -> None:
 def test_log_messages_stay_on_one_line(repo: Path, message: str) -> None:
     pages.add_log_entry(fresh(repo), "update", message)
     text = (repo / "kb" / "log.md").read_text(encoding="utf-8")
-    assert text.count("\n## ") == 1 and len([l for l in text.splitlines() if l.startswith("* ")]) == 1
+    assert text.count("\n## ") == 1 and len([line for line in text.splitlines() if line.startswith("* ")]) == 1
     assert not [d for d in Checker(fresh(repo)).check_all() if d.code == "O005"]
 
 
@@ -369,10 +384,10 @@ def test_log_rejects_bad_ops_and_empty_messages(repo: Path, op: str, message: st
 def _placeholder(repo: Path) -> Path:
     skills = repo / ".agents" / "skills" / "kb-ingest"
     skills.mkdir(parents=True)
-    (skills / "SKILL.md").write_text("---\nname: kb-ingest\n---\n")
+    (skills / "SKILL.md").write_text("---\nname: kb-ingest\n---\n", newline="\n")
     link = repo / ".claude" / "skills"
     link.parent.mkdir()
-    link.write_text("../.agents/skills")  # what git writes with core.symlinks=false
+    link.write_text("../.agents/skills", newline="\n")  # what git writes with core.symlinks=false
     return link
 
 
@@ -380,13 +395,16 @@ def test_skills_placeholder_becomes_a_link(repo: Path) -> None:
     link = _placeholder(repo)
     git(repo, "init", "-q")
     git(repo, "config", "core.symlinks", "false")  # as Git for Windows without symlink support
-    blob = subprocess.run(["git", "hash-object", "-w", str(link)], cwd=repo, capture_output=True, text=True).stdout.strip()
+    blob = subprocess.run(
+        ["git", "hash-object", "-w", str(link)], cwd=repo, capture_output=True, text=True
+    ).stdout.strip()
     git(repo, "update-index", "--add", "--cacheinfo", f"120000,{blob},.claude/skills")  # tracked as a symlink
     git(repo, "commit", "-qm", "checkout")
 
     def status() -> str:
-        return subprocess.run(["git", "status", "--porcelain", "--", ".claude"], cwd=repo,
-                              capture_output=True, text=True).stdout
+        return subprocess.run(
+            ["git", "status", "--porcelain", "--", ".claude"], cwd=repo, capture_output=True, text=True
+        ).stdout
 
     assert status() == ""
     how = hooks.repair_skills_link(repo) or ""
@@ -408,7 +426,7 @@ def test_skills_placeholder_falls_back_to_a_copy(repo: Path, monkeypatch) -> Non
     assert "copy" in (hooks.repair_skills_link(repo) or "")
     assert (link / "kb-ingest" / "SKILL.md").is_file() and not link.is_symlink()
     (repo / ".agents" / "skills" / "kb-query").mkdir()
-    (repo / ".agents" / "skills" / "kb-query" / "SKILL.md").write_text("x")
+    (repo / ".agents" / "skills" / "kb-query" / "SKILL.md").write_text("x", newline="\n")
     assert "refreshed" in (hooks.repair_skills_link(repo) or "")
     assert (link / "kb-query" / "SKILL.md").is_file()
 
@@ -433,5 +451,5 @@ def test_skills_repair_leaves_other_files_alone(repo: Path, content: str | None)
         link.unlink()
         link.mkdir()
     else:
-        link.write_text(content)
+        link.write_text(content, newline="\n")
     assert hooks.repair_skills_link(repo) is None

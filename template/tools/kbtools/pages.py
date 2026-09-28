@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import yaml
@@ -21,7 +21,7 @@ _LOG_OP = re.compile(r"[A-Za-z][A-Za-z-]*")
 
 
 def now_utc() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def validate_actor(actor: str, source: str = "--by") -> str:
@@ -44,9 +44,7 @@ def validate_actor(actor: str, source: str = "--by") -> str:
 def resolve_actor(by: str | None) -> str:
     actor = by or os.environ.get("KB_ACTOR")
     if not actor:
-        raise SystemExit(
-            "kb: pass --by or set KB_ACTOR (e.g. claude-code/<model> or human:<id>)"
-        )
+        raise SystemExit("kb: pass --by or set KB_ACTOR (e.g. claude-code/<model> or human:<id>)")
     return validate_actor(actor, "--by" if by else "KB_ACTOR")
 
 
@@ -109,7 +107,7 @@ def add_log_entry(bundle: Bundle, op: str, message: str, day: date | None = None
     message = " ".join(part.strip() for part in message.splitlines() if part.strip())
     if not message:
         raise SystemExit("kb log: the message is empty")
-    day_str = (day or datetime.now(timezone.utc).date()).isoformat()
+    day_str = (day or datetime.now(UTC).date()).isoformat()
     path = bundle.root / "log.md"
     text = path.read_text(encoding="utf-8") if path.exists() else LOG_HEADER
     entry = f"* **{op}**: {message}\n"

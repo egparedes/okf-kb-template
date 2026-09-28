@@ -44,7 +44,7 @@ Requirements: [uv](https://docs.astral.sh/uv/), git
 ```sh
 cp .env.example .env   # then fill in paths and keys for this machine
 uv run poe setup       # git init if needed, pre-commit hooks, indexes (uv syncs the tools)
-uv run poe ci          # kb check, independent OKF validator, tests, index freshness
+uv run poe ci          # kb check, independent OKF validator, lint, tests, index freshness
 ```
 
 `uv run poe` lists every task. Tip: `uv tool install poethepoet` once, and

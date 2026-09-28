@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .bundle import Bundle, Document
 
@@ -27,7 +27,7 @@ def _is_stale(doc: Document, now: datetime) -> bool:
 
 
 def build(bundle: Bundle) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     concepts = list(bundle.pages("all").values())
     knowledge = list(bundle.pages("knowledge").values())
 
@@ -64,7 +64,11 @@ def build(bundle: Bundle) -> str:
     section("Stale pages", [str(d.rel) for d in concepts if _is_stale(d, now)])
     section(
         "Uncited knowledge pages (no `sources`)",
-        [str(d.rel) for d in knowledge if d.type not in ("Source", "Person", "Organization") and not d.frontmatter.get("sources")],
+        [
+            str(d.rel)
+            for d in knowledge
+            if d.type not in ("Source", "Person", "Organization") and not d.frontmatter.get("sources")
+        ],
     )
     section(
         "Unused sources (Source pages nothing cites)",

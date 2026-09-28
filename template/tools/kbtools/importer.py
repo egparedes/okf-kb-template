@@ -24,6 +24,7 @@ The mapping format is documented in docs/importing.md.
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import json
 import os
@@ -33,14 +34,15 @@ import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, BinaryIO
 from urllib.parse import unquote
 
 import yaml
 
 from .bundle import RESERVED, Bundle, load_yaml, record_touched
+from .fsutil import program
 from .mdlinks import encode_path, find_links, mask_code, reference_definitions
 from .names import slug
 from .pages import CONTEXT_SUFFIX
@@ -63,8 +65,21 @@ _LOGSEQ_BLOCK_PROP = re.compile(r"^[ \t]*(?:id|collapsed):: .*\n", re.M)
 _FRONTMATTER = re.compile(r"---\n(?P<yaml>.*?\n)??---[ \t]*(?:\n|$)", re.S)
 _PAGE_REF = re.compile(r"\[\[([^\[\]]*)\]\]")
 WRITTEN_KEYS = ("status", "generated", "verified")  # set by the importer; a source value needs a rule
-MAPPING_KEYS = {"label", "actor", "exclude", "notes", "files", "properties", "timestamp", "rewrite", "tags",
-                "description_skip", "unresolved", "max_bytes", "links"}
+MAPPING_KEYS = {
+    "label",
+    "actor",
+    "exclude",
+    "notes",
+    "files",
+    "properties",
+    "timestamp",
+    "rewrite",
+    "tags",
+    "description_skip",
+    "unresolved",
+    "max_bytes",
+    "links",
+}
 RULE_KEYS = {"match", "to", "skip", "type", "title", "tags", "status", "alias_stem", "kebab"}
 PROPERTY_KEYS = {"rename", "map", "relation", "target"}
 TYPE_KEYS = {"from", "map", "default"}
@@ -78,7 +93,7 @@ _SIZE = re.compile(r"^\d+(x\d+)?$")
 # -- mapping ------------------------------------------------------------------
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def glob_regex(pattern: str, ignore_case: bool = False) -> re.Pattern[str]:
     """`**` crosses folders, `*` and `?` do not; brackets are literal (vault names use them)."""
     out, i = [], 0
@@ -161,10 +176,16 @@ class Mapping:
         unknown = sorted(set(data) - MAPPING_KEYS)
         if unknown:
             raise _fail(f"unknown mapping key(s) {', '.join(unknown)} in {path}")
-        for key, kind, name in (("notes", list, "a list of rules"), ("files", list, "a list of rules"),
-                                ("properties", dict, "a mapping"), ("links", dict, "a mapping of name to bundle path"),
-                                ("tags", dict, "a mapping"), ("timestamp", str, "a property name"),
-                                ("label", str, "a string"), ("actor", str, "a string")):
+        for key, kind, name in (
+            ("notes", list, "a list of rules"),
+            ("files", list, "a list of rules"),
+            ("properties", dict, "a mapping"),
+            ("links", dict, "a mapping of name to bundle path"),
+            ("tags", dict, "a mapping"),
+            ("timestamp", str, "a property name"),
+            ("label", str, "a string"),
+            ("actor", str, "a string"),
+        ):
             if data.get(key) is not None and not isinstance(data[key], kind):
                 raise _fail(f"`{key}` must be {name}")
         properties = data.get("properties") or {}
@@ -208,7 +229,9 @@ class Mapping:
             _check_keys(rule, REWRITE_KEYS, f"rewrite[{i}]")
             if "pattern" not in rule:
                 raise _fail(f"`rewrite[{i}]` needs a `pattern`")
-            rewrite.append((_regex(rule["pattern"], f"rewrite[{i}].pattern", re.M | re.S), str(rule.get("replace") or "")))
+            rewrite.append(
+                (_regex(rule["pattern"], f"rewrite[{i}].pattern", re.M | re.S), str(rule.get("replace") or ""))
+            )
         try:
             max_bytes = int(data.get("max_bytes") or DEFAULT_MAX_BYTES)
         except (TypeError, ValueError):
@@ -227,7 +250,9 @@ class Mapping:
                 "drop": [_regex(p, f"tags.drop[{i}]") for i, p in enumerate(_as_list(tags.get("drop")))],
                 "map": dict(tags.get("map") or {}),
             },
-            description_skip=[_regex(p, f"description_skip[{i}]") for i, p in enumerate(_as_list(data.get("description_skip")))],
+            description_skip=[
+                _regex(p, f"description_skip[{i}]") for i, p in enumerate(_as_list(data.get("description_skip")))
+            ],
             unresolved=unresolved,
             max_bytes=max_bytes,
             links={str(k).casefold(): "/" + str(v).strip("/") for k, v in (data.get("links") or {}).items()},
@@ -244,7 +269,9 @@ def check_actor(bundle: Bundle, actor: str) -> str:
         actor = CONTEXT_SUFFIX.sub("", actor)
     pattern = ((bundle.config.schema.get("$defs") or {}).get("actor") or {}).get("pattern") or ACTOR
     if not re.fullmatch(pattern, actor):
-        raise _fail(f"actor `{actor}` is not valid: use human:<id>, process:<id> or <agent>/<model> (pattern {pattern})")
+        raise _fail(
+            f"actor `{actor}` is not valid: use human:<id>, process:<id> or <agent>/<model> (pattern {pattern})"
+        )
     return actor
 
 
@@ -358,7 +385,9 @@ def _scan(source: Path) -> list[tuple[str, str]]:
                 found.append((posixpath.join(rel, name).removeprefix("./"), "symbolic link: not followed"))
         for name in files:
             path = base / name
-            reason = "symbolic link: not followed" if path.is_symlink() else "" if path.is_file() else "not a regular file"
+            reason = (
+                "symbolic link: not followed" if path.is_symlink() else "" if path.is_file() else "not a regular file"
+            )
             found.append((posixpath.join(rel, name).removeprefix("./"), reason))
     return sorted(found)
 
@@ -376,7 +405,9 @@ def build_plan(bundle: Bundle, source: Path, into: str, mapping: Mapping) -> Pla
             continue
         item = Item(src=src, note=src.lower().endswith(".md"))
         plan.items[src] = item
-        if _matches(src, mapping.exclude, ignore_case=True) or (problem and _matches(src + "/", mapping.exclude, ignore_case=True)):
+        if _matches(src, mapping.exclude, ignore_case=True) or (
+            problem and _matches(src + "/", mapping.exclude, ignore_case=True)
+        ):
             item.reason = "excluded by the mapping"
             continue
         if problem:
@@ -416,8 +447,10 @@ def _check_destinations(bundle: Bundle, plan: Plan) -> None:
             if other.dest == dest:
                 plan.errors.append(f"{item.src} and {other.src} both map to {bundle.show(dest)}")
             else:
-                plan.errors.append(f"{item.src} and {other.src} map to {bundle.show(dest)} and "
-                                   f"{bundle.show(other.dest)}, which differ only in case (one file on macOS and Windows)")
+                plan.errors.append(
+                    f"{item.src} and {other.src} map to {bundle.show(dest)} and "
+                    f"{bundle.show(other.dest)}, which differ only in case (one file on macOS and Windows)"
+                )
         for parent in PurePosixPath(dest).parents:
             if str(parent) != ".":
                 folders.setdefault(str(parent).casefold(), item)
@@ -476,7 +509,7 @@ def _linked_attachments(plan: Plan) -> None:
     wanted: set[str] = set()
     for item in [i for i in plan.imported if i.note]:
         note = parse_note(plan, item)
-        texts = [mask_code(note.body)] + _strings(note.props)
+        texts = [mask_code(note.body), *_strings(note.props)]
         for text in texts:
             for m in _WIKILINK.finditer(text):
                 target = _resolve_name(plan, _wikilink_name(m), item.src)
@@ -713,11 +746,11 @@ def _block_ids(masked: str) -> list[tuple[int, int]]:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(microsecond=0)
+    return datetime.now(UTC).replace(microsecond=0)
 
 
 def _iso(instant: datetime) -> str:
-    return min(instant.astimezone(timezone.utc), _now()).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return min(instant.astimezone(UTC), _now()).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _commit_times(plan: Plan) -> dict[str, str]:
@@ -726,9 +759,25 @@ def _commit_times(plan: Plan) -> dict[str, str]:
         plan.commit_times = {}
         try:
             git = subprocess.run(
-                ["git", "-c", "core.quotepath=off", "log", "--relative", "--format=%x01%cI", "-z", "--name-only", "--", "."],
-                cwd=plan.source, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                timeout=GIT_TIMEOUT, check=False,
+                [
+                    program("git"),
+                    "-c",
+                    "core.quotepath=off",
+                    "log",
+                    "--relative",
+                    "--format=%x01%cI",
+                    "-z",
+                    "--name-only",
+                    "--",
+                    ".",
+                ],
+                cwd=plan.source,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=GIT_TIMEOUT,
+                check=False,
             )
         except subprocess.TimeoutExpired:
             plan.issue(".", f"`git log` took more than {GIT_TIMEOUT} s: used file modification times")
@@ -755,7 +804,7 @@ def _timestamp(plan: Plan, item: Item, props: dict[str, Any]) -> str:
             if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
                 return _iso(datetime.fromisoformat(text + "T00:00:00+00:00"))
             parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-            return _iso(parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc))
+            return _iso(parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC))
         except ValueError:
             plan.issue(item.src, f"`{key}: {text}` is not a date; used the file time")
     committed = _commit_times(plan).get(item.src)
@@ -764,7 +813,7 @@ def _timestamp(plan: Plan, item: Item, props: dict[str, Any]) -> str:
             return _iso(datetime.fromisoformat(committed))
         except ValueError:
             pass
-    return _iso(datetime.fromtimestamp((plan.source / item.src).stat().st_mtime, timezone.utc))
+    return _iso(datetime.fromtimestamp((plan.source / item.src).stat().st_mtime, UTC))
 
 
 def _yaml_flow_scalar(text: str) -> str:
@@ -793,10 +842,16 @@ class _Converter:
 
     # links
 
-    def link_target(self, src: str, fragment: str, from_item: Item, raw: str, fallback: str = "kept as text") -> str | None:
+    def link_target(
+        self, src: str, fragment: str, from_item: Item, raw: str, fallback: str = "kept as text"
+    ) -> str | None:
         item = self.by_src[src]
         if not item.dest:
-            why = "an excluded note" if item.reason == "excluded by the mapping" else f"a file that is not imported ({item.reason})"
+            why = (
+                "an excluded note"
+                if item.reason == "excluded by the mapping"
+                else f"a file that is not imported ({item.reason})"
+            )
             self.plan.issue(from_item.src, f"`{raw}` points to {why}: {fallback}")
             return None
         if fragment.startswith("^"):
@@ -825,7 +880,7 @@ class _Converter:
         href = self.link_target(src, fragment, item, raw) if src else None
         if src is None and name.strip().casefold() in self.plan.links:
             return f"[{display}]({encode_path(self.plan.links[name.strip().casefold()])})"
-        if href is None:
+        if href is None or src is None:  # (a link target implies a source)
             if src is None:
                 if self.plan.mapping.unresolved == "wanted" and not embed and slug(name):
                     wanted = "/" + encode_path(posixpath.join(self.plan.into, slug(name) + ".md"))
@@ -902,7 +957,9 @@ class _Converter:
             if key in WRITTEN_KEYS and not (
                 spec == "drop" or (isinstance(spec, dict) and spec.get("rename", key) not in WRITTEN_KEYS)
             ):
-                self.plan.errors.append(f"{item.src}: property `{key}` would clash with the `{key}` the importer writes; add a `drop` or `rename` rule")
+                self.plan.errors.append(
+                    f"{item.src}: property `{key}` would clash with the `{key}` the importer writes; add a `drop` or `rename` rule"
+                )
                 continue
             self.property(fm, key, value, item)
 
@@ -1025,7 +1082,7 @@ def _is_image(path: str) -> bool:
 # -- entry point --------------------------------------------------------------
 
 
-def _open_source(plan: Plan, item: Item):
+def _open_source(plan: Plan, item: Item) -> BinaryIO:
     """A source file opened for reading without following a symlink (one that appeared after the scan)."""
     path = plan.source / item.src
     nofollow = getattr(os, "O_NOFOLLOW", 0)
@@ -1091,10 +1148,8 @@ def _write(bundle: Bundle, plan: Plan) -> list[Path]:
         for path in reversed(moved):
             path.unlink(missing_ok=True)
         for folder in reversed(created):
-            try:
+            with contextlib.suppress(OSError):
                 folder.rmdir()
-            except OSError:
-                pass
         if isinstance(exc, Exception):
             raise _fail(f"{exc}; nothing was written") from None
         raise
@@ -1103,7 +1158,9 @@ def _write(bundle: Bundle, plan: Plan) -> list[Path]:
     return moved
 
 
-def run(bundle: Bundle, source: Path, into: str, mapping: Mapping, dry_run: bool, redirects: Path | None) -> tuple[Plan, list[str]]:
+def run(
+    bundle: Bundle, source: Path, into: str, mapping: Mapping, dry_run: bool, redirects: Path | None
+) -> tuple[Plan, list[str]]:
     plan = build_plan(bundle, source, into, mapping)
     converter = _Converter(plan)
     notes = [i for i in plan.imported if i.note]
@@ -1128,6 +1185,7 @@ def run(bundle: Bundle, source: Path, into: str, mapping: Mapping, dry_run: bool
     target.write_text(
         "source\tbundle_path\n" + "".join(f"{i.src}\t/{i.dest}\n" for i in sorted(plan.imported, key=lambda i: i.src)),
         encoding="utf-8",
+        newline="\n",
     )
     lines.append(f"wrote {len(written)} file(s); redirect table: {target}")
     return plan, lines
