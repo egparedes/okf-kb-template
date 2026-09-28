@@ -71,7 +71,8 @@ refusing:
   a path cannot walk around a rule;
 - a pattern also matches every **parent** folder, so denying a folder
   denies everything in it;
-- matching **ignores case** on every platform;
+- matching **ignores case** on every platform, and compares accented names
+  in one Unicode form, as macOS and Linux store them differently;
 - brackets are **literal**, so a folder named `[Zotero]` can be denied by
   name.
 
@@ -82,3 +83,20 @@ local machine sees. The two lists are combined.
 Deny rules are a guard against accidents, not an access-control system. The
 stronger measure is to map each root to exactly the folder its description
 names, never to a broader parent.
+
+## What the tool hands to other programs
+
+Two commands start other programs, and both are kept narrow:
+
+- `kb open` passes its target to the desktop opener (`open` or `xdg-open`),
+  which would also start applications or mount network shares for other
+  kinds of address. It therefore accepts only `http://` and `https://` URLs
+  with a host, the `zotero://select/…` URLs it builds itself, and files
+  under a declared root.
+- `kb fetch` converts non-text files with markitdown, at a pinned version.
+  The converter runs without the secrets loaded from `.env`, without API
+  keys or tokens from the shell environment, and with a time limit.
+
+API keys only go to the configured addresses. `kb` never follows a redirect
+with a key, and warns when an address uses `http://` to another machine,
+where the key would travel unencrypted.

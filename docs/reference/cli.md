@@ -383,7 +383,15 @@ uv run kb fetch REF
 | `file:<root>/<path>` | The root's local path from `KB_ROOT_<ROOT>`; non-text files converted with markitdown |
 | `https://…` or `karakeep:<url>` | KaraKeep, archiving the page first if it has no bookmark |
 
-Denied paths are refused.
+Denied paths are refused. A `karakeep:` reference must be an `http://` or
+`https://` URL with a host.
+
+Non-text files are converted with `markitdown` when it is installed, and
+otherwise with `uvx --from markitdown[all]==0.1.8` (set `KB_MARKITDOWN` for
+another version). The converter runs without the variables loaded from
+`.env` and without secrets such as `*_API_KEY` or `*_TOKEN` (see
+[environment variables](environment-variables.md#the-env-file)), and is
+stopped after 5 minutes.
 
 ### `kb open`
 
@@ -398,6 +406,12 @@ uv run kb open REF [--print]
 |---|---|
 | `REF` | Same forms as `kb fetch`. Zotero items open as `zotero://select/…`. |
 | `--print` | Only print what would be opened. |
+
+`kb open` only hands three kinds of target to the desktop: `http://` and
+`https://` URLs with a host, `zotero://select/…` URLs that it builds from a
+checked item key, and absolute paths of files under a declared root. Other
+schemes (`smb:`, `file:` URLs, custom ones) and anything starting with `-`
+are refused.
 
 ### `kb import`
 
@@ -415,10 +429,13 @@ uv run kb import SOURCE --into FOLDER --map MAPPING [--dry-run] [--by ACTOR] [--
 | `--into` | Required. Bundle folder that relative `to` paths start from. |
 | `--map` | Required. Mapping file (YAML). |
 | `--dry-run` | Print the plan and issues; write nothing. |
-| `--by` | Actor for `generated.by` (default: `actor` in the mapping). |
+| `--by` | Actor for `generated.by` (default: `actor` in the mapping). It must match the schema's actor pattern: `human:<id>`, `process:<id>` or `<agent>/<model>`. A context-window suffix on the model is dropped: `claude-code/claude-opus-5-5[1m]` is written as `claude-code/claude-opus-5-5`. |
 | `--redirects` | Where to write the source → bundle path table (default `.cache/import/<vault>-redirects.tsv`). |
 
-Exits 1 when the plan has errors; a real run then writes nothing.
+Exits 1 when the plan has errors; a real run then writes nothing. A real
+run writes every file to a staging folder in `.cache/import/` first and
+moves them into place at the end. If anything fails, it removes what it
+had moved, so no partial import remains.
 
 ### `kb obsidian setup`
 

@@ -44,8 +44,13 @@ uv run kb open  "file:talks/2024-05-conference-talk/slides.pdf"   # open with th
 ```
 
 `kb fetch` converts non-text files with
-[markitdown](https://github.com/microsoft/markitdown) (`markitdown[all]`),
-through `uvx` when markitdown is not installed.
+[markitdown](https://github.com/microsoft/markitdown). It uses the installed
+`markitdown` if there is one, and otherwise runs a pinned version through
+`uvx` (`markitdown[all]==0.1.8`; set `KB_MARKITDOWN` in `.env` to choose
+another, for example `KB_MARKITDOWN=markitdown[all]==0.1.7`). The converter
+runs without the variables that `kb` loaded from `.env` and without API
+keys, tokens or passwords from your shell environment, and it is stopped
+after 5 minutes.
 
 ## Keep private material out: deny patterns
 
@@ -76,6 +81,7 @@ How patterns match:
 | Parent folders | A pattern also matches every parent folder, so `docs/Private` covers everything inside it. |
 | Wildcards | `*` and `**` both match any characters, including `/` (shell-style `fnmatch`); `?` matches one character. Brackets are literal: `bibliography/[Zotero]/**` names a folder called `[Zotero]`. |
 | Case | Ignored on every platform. |
+| Accents | Compared in the same Unicode form (NFC), so `Café` matches whether the disk stores the `é` as one character or two, as macOS does. |
 
 ## What `kb check` reports
 

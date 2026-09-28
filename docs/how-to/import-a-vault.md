@@ -71,14 +71,25 @@ Adjust the mapping and run the dry run again. Typical refinements:
 
 A real run refuses to start while the plan has errors, for example:
 
-- two notes with the same destination;
+- two notes with the same destination, or with destinations that differ
+  only in case;
+- a destination that is also the folder of another destination;
 - an existing page, a reserved name (`index.md`, `log.md`), or a destination
   outside the bundle;
-- a placeholder that is not available for a file, in `to` or `title`;
+- a placeholder that is not available for a file, or an invalid template,
+  in `to` or `title`;
 - a rule without a `type`, or a `type: {from: …}` mapping with no match and
   no default;
 - a source note with its own `status`, `generated` or `verified` property
   that has no `drop` or `rename` rule.
+
+Mistakes in the mapping file itself stop the command before the plan: an
+unknown key at any level, an invalid regular expression, or an `actor` that
+is not `human:<id>`, `process:<id>` or `<agent>/<model>`. The message names
+the key.
+
+Symbolic links in the vault are listed as not imported. Copy a linked file
+into the vault if you want to import it.
 
 Types are not checked against `schema/vocabulary.yaml` during the import;
 `kb check` reports unknown ones afterwards (H011).
@@ -89,7 +100,10 @@ Types are not checked against `schema/vocabulary.yaml` during the import;
 uv run kb import ~/notes/old-vault --into projects/old --map imports/old-vault.yaml
 ```
 
-The import writes the pages, regenerates the indexes, and writes a redirect
+The import writes the pages to a staging folder in `.cache/import/` and
+moves them into place when all are written. If it fails part-way, for
+example on a full disk, it removes what it had moved, and the bundle is as
+before. It then regenerates the indexes, and writes a redirect
 table (source path → bundle path) to `.cache/import/<vault>-redirects.tsv`,
 or to the file given with `--redirects`.
 

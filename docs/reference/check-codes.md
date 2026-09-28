@@ -45,7 +45,7 @@ run.
 | H032 | A wikilink or embed (`[[…]]`, `![[…]]`) outside code. | Write `[text](/path.md)`, or `![alt](/path.png)` for images. |
 | H040 | An `index.md` is missing or out of date. | Run `uv run poe index` (or `uv run poe fix`). |
 | H060 | A locator points at material that a deny pattern covers. | Remove the locator. |
-| H061 | `schema/resources.yaml` has the wrong shape: `roots` not a mapping, `deny` not a list of strings, or `zotero` not a mapping. | Correct the file. |
+| H061 | `schema/resources.yaml` has the wrong shape: `roots` not a mapping, `deny` not a list of strings, `zotero` not a mapping, or `zotero.user_id` or `zotero.group_id` not a number. | Correct the file. |
 
 ## Warnings
 
