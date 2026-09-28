@@ -41,7 +41,10 @@ Settings live in two places:
    - put it in `.env` as `ZOTERO_API_KEY`;
    - put your numeric user id in `schema/resources.yaml`.
 
-   With Zotero File Storage, the web API also serves full text.
+   With Zotero File Storage, the web API also serves full text. When the
+   local API does not know an item yet (not synced), `kb` asks the web API.
+   For a group library, set `group_id` in `schema/resources.yaml`: the local
+   API, the web API and the database snapshot then all read that group.
 4. Recommended: set `ZOTERO_DATA_DIR` to the Zotero data directory. When
    Zotero is closed and no web key is set, `kb` falls back to a read-only
    snapshot of `zotero.sqlite`, copied to a temporary directory, and reads
@@ -59,7 +62,9 @@ uv run kb open zotero:ABCD2345                   # select the item in Zotero
 ## KaraKeep
 
 Set `KARAKEEP_URL` (the server address, e.g. `https://cloud.karakeep.app`;
-a trailing `/api` or `/api/v1` is accepted too) and `KARAKEEP_API_KEY` in `.env`. The same two settings
+a trailing `/api` or `/api/v1` is accepted too) and `KARAKEEP_API_KEY` in `.env`. The address
+must start with `https://` (or `http://`; `kb` warns about it unless the
+server is on this machine, since the key would travel unencrypted). The same two settings
 work for the hosted service and for a self-hosted instance. Pages never
 store bookmark ids, which differ per instance: resolution goes by the page's
 `resource` URL. Moving to another instance therefore only changes `.env`.
@@ -91,10 +96,15 @@ error for locators that point at denied material.
 - **Where to put them:** generic patterns go in `schema/resources.yaml`.
   Patterns that would reveal sensitive names go in `KB_DENY` in `.env`,
   separated by `;`.
-- Non-text files are converted with `markitdown[all]` (through `uvx` when
-  markitdown is not installed).
+- Non-text files are converted with markitdown: the installed one, or else
+  `markitdown[all]` at a pinned version through `uvx` (`KB_MARKITDOWN` in
+  `.env` selects another). It runs without the `.env` variables and without
+  API keys or tokens from the environment, and is stopped after 5 minutes.
 
 ```sh
 uv run kb fetch "file:talks/2024-05-conference-talk/slides.pdf"   # converted with markitdown
 uv run kb open  "file:talks/2024-05-conference-talk/slides.pdf"
 ```
+
+`kb open` hands only `http(s)://` URLs, `zotero://select/…` URLs and files
+under a declared root to the desktop; other schemes are refused.
