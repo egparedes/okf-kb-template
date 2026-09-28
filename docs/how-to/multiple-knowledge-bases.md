@@ -13,6 +13,8 @@ is per repository.
 | Scratch space (fetched sources, drafts) | `.cache/` |
 | git hooks | `.git/hooks/pre-commit` |
 | Claude Code settings, hooks and `KB_ACTOR` | `.claude/settings.json` |
+| Codex and Gemini CLI hooks, if added | `.codex/hooks.json`, `.gemini/settings.json` |
+| The hooks' session state | `.cache/kb-hooks/` |
 | Obsidian vault and its plugins | the knowledge-base folder and its `.obsidian/` |
 | Search collection | a qmd collection named after the knowledge base |
 

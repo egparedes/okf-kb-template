@@ -65,6 +65,8 @@ Copier asks these questions. Press Enter to accept the default shown.
 | Folder that holds the knowledge base itself | `my-kb` (the default: the slug) |
 | Configure the knowledge-base folder as an Obsidian vault? | `Yes` |
 | Add Claude Code settings, hooks and CLAUDE.md? | `Yes` if you use Claude Code |
+| Add Codex hooks? | `Yes` if you use Codex |
+| Add Gemini CLI settings that make it read AGENTS.md, with hooks? | `Yes` if you use Gemini CLI |
 | Add a GitHub Actions workflow? | `Yes` |
 | Run the post-copy tasks? | `Yes` |
 
@@ -203,9 +205,10 @@ The agent follows the `kb-ingest` skill. Expect it to:
    `my-kb/log.md` with `uv run kb log Ingest …`;
 6. report the key takeaways and the pages it created or updated.
 
-With Claude Code, hooks check each file as it is written, and the session
-cannot end while a page it changed fails `kb check` or the log entry is
-missing. See [Agents and hooks](../explanation/agents-and-hooks.md).
+With Claude Code (and Codex or Gemini CLI, if you added their hooks),
+hooks check each page as it is written or changed by a command, and the
+session cannot end while a page it changed fails `kb check` or the log
+entry is missing. See [Agents and hooks](../explanation/agents-and-hooks.md).
 
 Look at the result: in Obsidian, or with `git status` and your editor.
 Each new page starts with frontmatter like this:

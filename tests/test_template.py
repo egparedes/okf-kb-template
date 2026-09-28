@@ -14,7 +14,7 @@ TEMPLATE = Path(__file__).resolve().parents[1]
 
 VARIANTS = {
     "defaults": {},
-    "custom-folder": {"kb_name": "team-notes", "bundle_dir": "notes-vault"},
+    "custom-folder": {"kb_name": "team-notes", "bundle_dir": "notes-vault", "codex": True, "gemini_cli": True},
     "minimal": {
         "kb_name": "cookbook",
         "obsidian": False,
@@ -72,6 +72,47 @@ def test_rendered_knowledge_base_is_conformant(tmp_path: Path, variant: str) -> 
     out = subprocess.run([poe, "validate-okf"], cwd=dst, env=env, capture_output=True, text=True).stdout
     assert out.rstrip().endswith(f"okf_validate.py {bundle}"), out
     assert not (dst / "justfile").exists() and (dst / "tasks.toml").is_file()
+    _check_agent_hooks(dst, answers)
+
+
+def _check_agent_hooks(dst: Path, answers: dict) -> None:
+    """Each agent's hook configuration parses, and every hook command it names runs."""
+    import json
+
+    configs = {
+        "claude": (dst / ".claude" / "settings.json", answers.get("claude_code", True)),
+        "codex": (dst / ".codex" / "hooks.json", answers.get("codex", False)),
+        "gemini": (dst / ".gemini" / "settings.json", answers.get("gemini_cli", False)),
+    }
+    for agent, (path, wanted) in configs.items():
+        assert path.is_file() == wanted, path
+        if not wanted:
+            continue
+        config = json.loads(path.read_text())
+        commands = [h["command"] for groups in config["hooks"].values() for group in groups for h in group["hooks"]]
+        assert commands and all("python -m kbtools.hooks" in c for c in commands)
+        # Hooks that must never block the tool end in a shell-neutral "succeed anyway";
+        # the stop hook must be able to exit 2. Gemini runs bash -c on POSIX, PowerShell on Windows.
+        never_block = {"claude": ("pre-tool",), "codex": ("pre-tool", "post-tool"),
+                       "gemini": ("pre-tool", "post-tool", "post-edit")}[agent]
+        suffix = "; exit 0" if agent == "gemini" else "|| true"
+        for command in commands:
+            event = command.split("kbtools.hooks ", 1)[1].split()[0]
+            assert command.endswith(suffix) == (event in never_block), (agent, command)
+        assert any(" pre-tool" in c for c in commands)
+        if agent == "claude":  # failed Bash commands fire PostToolUseFailure, not PostToolUse
+            assert [g["matcher"] for g in config["hooks"]["PostToolUseFailure"]] == ["Bash"]
+        if agent == "gemini":  # Gemini runs hooks in the project dir and quotes $GEMINI_PROJECT_DIR itself
+            assert not any("$GEMINI_PROJECT_DIR" in c or "&&" in c or "||" in c for c in commands)
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(dst))
+        for command in commands:
+            payload = '{"session_id": "template-test", "tool_input": {}}'
+            result = subprocess.run(command, shell=True, cwd=dst, env=env, input=payload, capture_output=True, text=True)
+            assert result.returncode == 0, (agent, command, result.stderr)
+            assert result.stdout.strip() == ("{}" if agent == "gemini" else ""), (agent, command, result.stdout)
+    if answers.get("gemini_cli"):
+        assert json.loads(configs["gemini"][0].read_text())["context"]["fileName"][0] == "AGENTS.md"
+    shutil.rmtree(dst / ".cache" / "kb-hooks", ignore_errors=True)
 
 
 @pytest.mark.parametrize("domains", [
@@ -110,7 +151,8 @@ def test_update_keeps_owned_files_and_updates_managed_ones(tmp_path: Path) -> No
 
 def test_optional_parts_are_omitted(tmp_path: Path) -> None:
     dst = render(tmp_path, {**VARIANTS["minimal"], "run_setup": False})
-    for path in (".claude", "CLAUDE.md", ".github", "cookbook/.obsidian", "cookbook/_templates", "docs/obsidian-setup.md"):
+    for path in (".claude", "CLAUDE.md", ".codex", ".gemini", ".github", "cookbook/.obsidian", "cookbook/_templates",
+                 "docs/obsidian-setup.md"):
         assert not (dst / path).exists(), path
     assert "Obsidian vault" not in (dst / "AGENTS.md").read_text()
 

@@ -111,7 +111,7 @@ depends_on: ["[Consistency models](/systems/distributed/consistency-models.md)"]
 
 A change is done when:
 
-- `uv run poe check` reports 0 errors{% if claude_code %} (in Claude Code, hooks enforce this){% endif %};
+- `uv run poe check` reports 0 errors{% if claude_code or codex or gemini_cli %} (the hooks of {{ [claude_code and "Claude Code", codex and "Codex", gemini_cli and "Gemini CLI"] | select | join(", ") }} check the pages you change){% endif %};
 - knowledge edits have a `log.md` entry;
 - you have told the human which pages changed.
 

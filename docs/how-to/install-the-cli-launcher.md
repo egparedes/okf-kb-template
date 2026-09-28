@@ -80,6 +80,12 @@ kb -C notes --which
 
 A path that is not a knowledge base is marked `(missing)`.
 
+The launcher reads the configuration file only when it needs it: for a
+registered name, for the `default`, and for `--list`. A path in `-C` or
+`KB_DIR`, or a current directory inside a knowledge base, works even when
+the file is broken. When it is needed, a broken file stops the launcher
+with a message that names the file and the problem.
+
 `kb -h` and `kb <command> -h` show the help of the knowledge base's own
 tool; `kb --help-launcher` shows the launcher's.
 

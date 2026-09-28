@@ -214,6 +214,9 @@ def _cmd_setup(bundle: Bundle, args: argparse.Namespace) -> int:
         subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
         print("initialized a git repository", flush=True)
     subprocess.run([sys.executable, "-m", "pre_commit", "install"], cwd=repo, check=True)
+    repaired = hooks.repair_skills_link(repo)  # Windows checkouts without symlink support
+    if repaired:
+        print(repaired)
     for path in indexgen.write(bundle):
         print(f"wrote {path.relative_to(repo)}")
     return 0
@@ -250,7 +253,7 @@ def _cmd_rename_bundle(bundle: Bundle, args: argparse.Namespace) -> int:
 
 
 def _cmd_hook(bundle: Bundle, args: argparse.Namespace) -> int:
-    return hooks.post_edit(bundle) if args.event == "post-edit" else hooks.stop(bundle)
+    return hooks.run(args.event, args.agent, bundle)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -397,8 +400,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("new", help="new folder name (kebab-case)")
     p.set_defaults(func=_cmd_rename_bundle)
 
-    p = sub.add_parser("hook", help="Claude Code hook entry points")
-    p.add_argument("event", choices=["post-edit", "stop"])
+    p = sub.add_parser("hook", help="agent hook entry points (Claude Code, Codex, Gemini CLI)")
+    p.add_argument("event", choices=hooks.EVENTS)
+    p.add_argument("--agent", choices=hooks.AGENTS, default="claude", help="the CLI that runs the hook")
     p.set_defaults(func=_cmd_hook)
 
     args = parser.parse_args(argv)
