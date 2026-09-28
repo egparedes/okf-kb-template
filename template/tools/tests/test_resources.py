@@ -48,7 +48,12 @@ def test_markitdown_runs_pinned_without_secrets_and_with_a_timeout(repo: Path, m
         seen.update(command=command, **kwargs)
         return subprocess.CompletedProcess(command, 0, "converted text", "")
 
-    monkeypatch.setattr(resources.subprocess, "run", run)
+    real_run = subprocess.run
+
+    def only_uvx(fake):  # other commands (a bundle's git listing) really run
+        return lambda command, **kwargs: fake(command, **kwargs) if command[0] == "uvx" else real_run(command, **kwargs)
+
+    monkeypatch.setattr(resources.subprocess, "run", only_uvx(run))
     doc = tmp_path / "a.pdf"
     doc.write_bytes(b"%PDF")
     assert resources._convert(doc) == "converted text"
@@ -61,7 +66,7 @@ def test_markitdown_runs_pinned_without_secrets_and_with_a_timeout(repo: Path, m
     def slow(command, **kwargs):
         raise subprocess.TimeoutExpired(command, kwargs["timeout"])
 
-    monkeypatch.setattr(resources.subprocess, "run", slow)
+    monkeypatch.setattr(resources.subprocess, "run", only_uvx(slow))
     with pytest.raises(SystemExit, match="took more than"):
         resources._convert(doc)
     os.environ.pop("ZOTERO_API_KEY", None)

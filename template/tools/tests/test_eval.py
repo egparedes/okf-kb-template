@@ -15,6 +15,12 @@ from kbtools.cli import main
 
 REPO = Path(__file__).resolve().parents[2]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+REAL_RUN = subprocess.run
+
+
+def _fake_qmd(fake):
+    """A subprocess.run stand-in that fakes `qmd` only; other commands (the bundle's git listing) really run."""
+    return lambda cmd, **kwargs: fake(cmd, **kwargs) if cmd[0] == "qmd" else REAL_RUN(cmd, **kwargs)
 
 
 def _page(title: str, description: str, body: str, tags: str = "[]", type_: str = "Concept") -> str:
@@ -149,7 +155,7 @@ def test_eval_qmd_tier(repo: Path, monkeypatch: pytest.MonkeyPatch, capsys) -> N
         rows = [{"file": "qmd://demo/systems/dhcp.md"}, {"file": "qmd://demo/systems/dns.md?index=index"}]
         return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps(rows), stderr="")
 
-    monkeypatch.setattr(retrieval_eval.subprocess, "run", fake_run)
+    monkeypatch.setattr(retrieval_eval.subprocess, "run", _fake_qmd(fake_run))
     assert main(["eval", "--json"]) == 0
     captured = capsys.readouterr()
     qmd = json.loads(captured.out)["questions"][0]["tiers"]["qmd"]
@@ -169,7 +175,7 @@ def test_eval_qmd_timeout_is_an_error_cell(repo: Path, monkeypatch: pytest.Monke
         assert kwargs["timeout"] == retrieval_eval.QMD_TIMEOUT
         raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
 
-    monkeypatch.setattr(retrieval_eval.subprocess, "run", slow)
+    monkeypatch.setattr(retrieval_eval.subprocess, "run", _fake_qmd(slow))
     assert main(["eval"]) == 0
     out = capsys.readouterr().out
     assert "error" in out.splitlines()[1] and "timed out after" in out
@@ -180,7 +186,7 @@ def test_eval_qmd_failure_is_reported(repo: Path, monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(search, "qmd_ready", lambda collection: True)
     monkeypatch.setattr(
         retrieval_eval.subprocess, "run",
-        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 2, stdout="", stderr="no models"),
+        _fake_qmd(lambda cmd, **kw: subprocess.CompletedProcess(cmd, 2, stdout="", stderr="no models")),
     )
     assert main(["eval"]) == 0
     out = capsys.readouterr().out

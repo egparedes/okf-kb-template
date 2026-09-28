@@ -19,9 +19,9 @@ import jsonschema
 from . import indexgen
 from .bundle import Bundle, Document
 from .mdlinks import line_at, resolve
+from .names import KEBAB
 from .resources import Settings, deny_patterns, load_env, read_config
 
-KEBAB = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 DATE_HEADING = re.compile(r"^## (\d{4}-\d{2}-\d{2})\s*$")
 INDEX_ENTRY = re.compile(r"^[*-] \[(?:[^\]\\]|\\.)+\]\([^)\s]+\)( - .+)?$")
 WIKILINK = re.compile(r"!?\[\[[^\]\n]+\]\]")

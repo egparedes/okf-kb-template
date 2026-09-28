@@ -76,7 +76,7 @@ set in the environment take precedence.
 | [`check`](#kb-check) | Validate OKF conformance and house rules |
 | [`index`](#kb-index) | Regenerate every `index.md` |
 | [`fix-links`](#kb-fix-links) | Rewrite internal links as bundle-absolute `/paths` |
-| [`mv`](#kb-mv) | Move or rename a page and rewrite inbound links |
+| [`mv`](#kb-mv) | Move or rename a page or file and rewrite inbound links |
 | [`merge`](#kb-merge) | Fold a duplicate page into another |
 | [`new`](#kb-new) | Create a page skeleton with valid frontmatter |
 | [`log`](#kb-log) | Add an entry to the bundle's `log.md` |
@@ -133,10 +133,28 @@ uv run kb index [--check]
 
 ### `kb fix-links`
 
-Rewrite internal links as bundle-absolute `/paths`, in bodies and in
-frontmatter relations. A link is resolved relative to the linking file
-first, then relative to the bundle root; a link that resolves to nothing is
-left as it is. Generated `index.md` files are skipped.
+Rewrite internal links as bundle-absolute `/paths`. A link is resolved
+relative to the linking file first, then relative to the bundle root; a
+link that resolves to nothing is left as it is. Generated `index.md` files
+are skipped.
+
+The links it reads, and `kb mv` and `kb merge` rewrite:
+
+- inline links and images of the body;
+- reference definitions, `[label]: /path.md`;
+- frontmatter values that are exactly one link, `[text](/path.md)`, under
+  any key and at any depth, in block or flow collections (relations);
+- frontmatter `resource` values that are not URLs, such as
+  `sources[].resource`.
+
+Only the changed values are edited, so the rest of the frontmatter keeps its
+layout, comments, anchors (`&name`) and tags (`!!str`). A changed value
+written as a block scalar (`|` or `>`) becomes a double-quoted one. The file
+keeps its byte order mark and its line ends; a file with mixed line ends
+gets `\r\n` everywhere.
+
+Not rewritten: HTML attributes (`<img src="…">`, `<a href="…">`), and
+paths in other frontmatter keys, such as `image: /attachments/x.png`.
 
 ```sh
 uv run kb fix-links [PATHS…]
@@ -148,8 +166,32 @@ uv run kb fix-links [PATHS…]
 
 ### `kb mv`
 
-Move or rename a page, rewrite every link to it, and regenerate the
-indexes.
+Move or rename a page, or another file of the knowledge base such as an
+image, rewrite every link to it, and regenerate the indexes. A moved page's
+own relative links are rewritten as `/paths`. An `expected` entry for the
+page in `tools/retrieval-eval/questions.yaml` is renamed too, keeping the
+file's comments.
+
+It refuses:
+
+- a source outside the knowledge base, ignored by git, in a hidden folder,
+  or reserved (`index.md`, `log.md`);
+- a destination that exists, is reserved, is outside the knowledge base, is
+  in a hidden folder, or that git ignores. On a disk that ignores case
+  (macOS, Windows), an existing file whose name differs only in case counts
+  as existing, except for the file being moved: `kb mv Foo.md foo.md` is a
+  case-only rename;
+- an empty `NEW` (`""`, `/`, `.`);
+- a change of file extension.
+
+`kb mv` and `kb merge` change files all or nothing. They compute every edit
+first, back up the originals in `.cache/kb-backup/`, and write each file
+through a temporary file. If a step fails, they put the originals back and
+exit with an error; the backup is removed. If putting them back fails too,
+the message names the backup folder, whose `MANIFEST` lists the original
+path of each copy: copy the files back, then delete the folder. Only a
+process killed outright (not Ctrl-C) can leave a hidden `.NAME.….tmp` file
+next to a page; delete it.
 
 ```sh
 uv run kb mv OLD NEW
@@ -157,8 +199,8 @@ uv run kb mv OLD NEW
 
 | Argument | Meaning |
 |---|---|
-| `OLD` | Bundle-relative path of the page, e.g. `ai/llm.md`. |
-| `NEW` | New bundle-relative path. |
+| `OLD` | Bundle-relative path of the page or file, e.g. `ai/llm.md`. |
+| `NEW` | New bundle-relative path. Without an extension, `OLD`'s is added (`ai/llms` means `ai/llms.md`). An existing folder, or a path that ends with `/`, keeps the file name (`kb mv ai/llm.md ml/` moves it to `ml/llm.md`); end a new folder whose name has a dot with `/` (`releases/v1.2/`). |
 
 ### `kb merge`
 
@@ -169,11 +211,17 @@ hand. It:
   tags, sources and relations;
 - drops `INTO`'s `verified` (the merged page needs a new review) and sets
   its `generated` to the actor and the current time;
-- deletes `OLD` and points every link to it at `INTO`;
-- regenerates the indexes.
+- rewrites `OLD`'s relative relation and resource values as `/paths`, so
+  they keep working from `INTO`'s folder;
+- deletes `OLD` and points every link to it at `INTO`, and its `expected`
+  entries in `tools/retrieval-eval/questions.yaml` (a question that already
+  expects `INTO` loses the entry);
+- regenerates the indexes and prints the ones it wrote or deleted.
 
-It refuses reserved files, merging a page into itself, pages without valid
-frontmatter, and two sources with the same id but different resources.
+It refuses files that are not pages of the knowledge base, reserved files,
+merging a page into itself, pages without valid frontmatter, and two
+sources with the same id but different resources. Like `kb mv`, it changes
+files all or nothing.
 
 ```sh
 uv run kb merge OLD INTO [--dry-run] [--by ACTOR]
@@ -331,9 +379,9 @@ The question file holds a list under `questions`. Each entry has:
 
 `kb eval` checks the whole file first and stops with one line per problem
 (unknown keys, missing, malformed or repeated values, pages, types or
-folders that do not exist). `kb mv` and `kb merge` do not rewrite the
-question file: update or remove an entry after moving, merging or deleting
-an expected page.
+folders that do not exist). `kb mv` and `kb merge` rename the `expected`
+entries of the page they move or merge. After deleting an expected page,
+update or remove its entries by hand.
 
 For each question it ranks the pages with each tier:
 

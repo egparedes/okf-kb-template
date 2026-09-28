@@ -22,8 +22,8 @@ import yaml
 
 from . import indexgen, search
 from .bundle import TOUCHED, Bundle
+from .names import KEBAB
 
-KEBAB = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 REPOSITORY_FOLDERS = {"schema", "tools", "docs", "imports", "template", "launcher", "site"}
 STANDARD_FOLDERS = {"sources", "syntheses", "entities", "projects", "journal"}
 ANSWERS = ".copier-answers.yml"

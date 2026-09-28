@@ -37,8 +37,8 @@ duplicates, weak pages and missing connections.
    - **Retrieval misses** (`uv run poe eval`): for a question whose expected
      pages index+text does not reach, sharpen those pages' titles and
      descriptions. When `kb eval` stops on a missing page, the page was
-     moved, merged or deleted (or the path is mistyped): update or remove
-     the entry in `tools/retrieval-eval/questions.yaml`.
+     deleted, or moved outside `kb mv` (or the path is mistyped): update or
+     remove the entry in `tools/retrieval-eval/questions.yaml`.
 
 4. **Semantic pass.**
    - Review the 10 most recently changed pages (`git log --name-only -20 -- {{ bundle_dir }}`)

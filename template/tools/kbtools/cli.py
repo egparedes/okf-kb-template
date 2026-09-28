@@ -63,8 +63,8 @@ def _cmd_fix_links(bundle: Bundle, args: argparse.Namespace) -> int:
 
 
 def _cmd_mv(bundle: Bundle, args: argparse.Namespace) -> int:
-    for rel in linkfix.move(bundle, args.old, args.new):
-        print(f"updated links in {bundle.show(rel)}")
+    for line in linkfix.move(bundle, args.old, args.new):
+        print(line)
     _write_indexes(Bundle(bundle.root, bundle.repo_root, bundle.tracked_only))
     return 0
 
@@ -138,7 +138,7 @@ def _cmd_merge(bundle: Bundle, args: argparse.Namespace) -> int:
     for line in linkfix.merge(bundle, args.old, args.into, pages.resolve_actor(args.by), dry_run=args.dry_run):
         print(line)
     if not args.dry_run:
-        indexgen.write(Bundle(bundle.root, bundle.repo_root, bundle.tracked_only))
+        _write_indexes(Bundle(bundle.root, bundle.repo_root, bundle.tracked_only))
     return 0
 
 
@@ -283,8 +283,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("paths", nargs="*")
     p.set_defaults(func=_cmd_fix_links)
 
-    p = sub.add_parser("mv", help="move/rename a page, rewrite inbound links, regenerate indexes")
-    p.add_argument("old", help="bundle-relative path of the page")
+    p = sub.add_parser("mv", help="move/rename a page (or an image, a PDF), rewrite inbound links, regenerate indexes")
+    p.add_argument("old", help="bundle-relative path of the page or file")
     p.add_argument("new", help="new bundle-relative path")
     p.set_defaults(func=_cmd_mv)
 

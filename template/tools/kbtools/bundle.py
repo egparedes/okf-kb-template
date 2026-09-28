@@ -20,8 +20,6 @@ from . import mdlinks
 from .mdlinks import Link, RefDef, Relation
 
 RESERVED = {"index.md", "log.md"}
-# Bound at import: tests that stub subprocess.run for other tools must not see the bundle listing.
-_run_git = subprocess.run
 DEFAULT_BUNDLE_DIR = "kb"
 TOUCHED = ".cache/kb-touched.txt"
 SCOPES = ("knowledge", "all")
@@ -374,7 +372,7 @@ class Bundle:
         if not self.tracked_only:
             args += ["--others", "--exclude-standard"]
         try:
-            result = _run_git(
+            result = subprocess.run(
                 [*args, "--", f":(literal){prefix or '.'}"], cwd=cwd, capture_output=True, check=False, timeout=60
             )
         except (OSError, subprocess.SubprocessError):

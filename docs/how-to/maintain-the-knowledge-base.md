@@ -71,8 +71,9 @@ For each pair, read both pages. Then:
     uv run kb merge ai/llm.md ai/large-language-models.md
     ```
 
-    `kb merge` removes the old page, rewrites every link to it, and
-    regenerates the indexes. The merged page loses `verified`: it needs a
+    `kb merge` removes the old page, rewrites every link to it and its
+    entries in `tools/retrieval-eval/questions.yaml`, and regenerates the
+    indexes. The merged page loses `verified`: it needs a
     new review.
 
 ## 5. Link unlinked mentions
@@ -112,7 +113,9 @@ uv run kb graph --json          # for scripts
 
 - A folder with more than about 20 pages and a clear subtopic gets a
   subfolder. Register it in `schema/taxonomy.yaml`, then move pages with
-  `uv run kb mv <old> <new>`, which rewrites every inbound link.
+  `uv run kb mv <old> <new>`, which rewrites every inbound link and the
+  page's entries in `tools/retrieval-eval/questions.yaml`. `kb mv` also
+  moves images and other files, with the links to them.
 - Keep the tree at most 3 levels deep.
 
 ## 8. Close

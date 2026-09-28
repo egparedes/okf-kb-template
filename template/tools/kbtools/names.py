@@ -11,6 +11,7 @@ STOPWORDS = frozenset(
     "a an and at by for from in into of on or the to vs with without".split()
 )
 _NON_WORD = re.compile(r"[^\w]+")
+KEBAB = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")  # a file or folder name, a tag, a bundle folder
 
 
 def fold(text: str) -> str:

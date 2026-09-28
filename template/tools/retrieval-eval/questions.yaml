@@ -20,7 +20,8 @@
 #             /systems/dns.md (required; generated index.md files are not allowed);
 #   filters   optional `kb find` filters: type, tag (a tag or a list of tags,
 #             all must match), status, folder, trust.
-# After moving, merging or deleting a page, update or remove its entries here.
+# `kb mv` and `kb merge` rename the entries of the pages they move or merge;
+# after deleting a page, remove its entries here.
 questions: []
 #  - question: How does X relate to Y?
 #    expected:

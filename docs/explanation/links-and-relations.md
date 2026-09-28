@@ -36,7 +36,9 @@ links in its own format. Three things close the gap:
 - **`kb fix-links`** (run by `uv run poe fix` and by the pre-commit hook) rewrites
   any internal link to the `/` form. It tries the target relative to the
   linking file first, then relative to the bundle root, and leaves links it
-  cannot resolve alone;
+  cannot resolve alone. It covers body links and images, reference
+  definitions (`[label]: path`), relation values and `sources[].resource`,
+  in block or flow style frontmatter, and edits only the changed values;
 - **`kb check`** reports a link that is not bundle-absolute (W031) and any
   wikilink or embed (H032, an error).
 
@@ -47,6 +49,12 @@ onto the next line. An image inside a link, `[![alt](/img.png)](/page.md)`,
 counts as two links. A target exists only when a file of the bundle has
 exactly that path, including case: `/General/Foo.md` does not reach
 `general/foo.md`, even on a disk that ignores case.
+
+`kb mv` and `kb merge` rewrite the same links when a page moves or is
+merged away, and `kb mv` also moves images and other files with the links
+to them. Both compute every edit before they write, and put the original
+files back if a write fails, so a failure never leaves half the links
+rewritten.
 
 Links in generated `index.md` files are the exception: they use `./`
 relative paths, so a subtree copied out of the bundle keeps working

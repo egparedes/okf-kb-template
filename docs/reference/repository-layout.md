@@ -147,7 +147,7 @@ editing a managed file.
 | Path | Why |
 |---|---|
 | `.env`, `.env.*` (except `.env.example`) | secrets and machine paths |
-| `.cache/` | fetched sources, drafts, import redirect tables, the hooks' session state (`.cache/kb-hooks/`, `.cache/kb-touched.txt`) |
+| `.cache/` | fetched sources, drafts, import redirect tables, the hooks' session state (`.cache/kb-hooks/`, `.cache/kb-touched.txt`), backups while `kb mv`, `kb merge` or `kb fix-links` write (`.cache/kb-backup/`) |
 | `.venv/`, `__pycache__/`, `.pytest_cache/` | Python environment |
 | `<folder>/.obsidian/plugins/*/*` except Templater's `data.json` | plugin code (downloaded, never redistributed) and plugin settings that may hold keys |
 | `<folder>/.obsidian/workspace*.json`, `<folder>/.obsidian/graph.json.bak`, `<folder>/.obsidian/themes/` | per-device state |
