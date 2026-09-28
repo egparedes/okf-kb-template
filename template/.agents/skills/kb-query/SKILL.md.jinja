@@ -36,6 +36,10 @@ visible instead of silently filling them with your own knowledge.
      the wiki.
    - Flag stale or unverified pages when the answer depends on them.
    - If the wiki cannot answer, say so and propose sources to ingest.
+   - If the answer was in the wiki but hard to find (the first searches
+     missed the pages), add the question and those pages to
+     `tools/retrieval-eval/questions.yaml`. `uv run poe eval` then shows
+     whether a heavier search tier (qmd) would reach them.
 
 5. **File back.**
    - **When to file:** file the answer if it synthesizes three or more pages,

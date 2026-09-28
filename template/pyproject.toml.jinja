@@ -74,6 +74,10 @@ cmd = "kb search --setup"
 help = "Refresh the qmd index after changes"
 cmd = "kb search --reindex"
 
+[tool.poe.tasks.eval]
+help = "Retrieval evaluation: recall@k of each search tier on tools/retrieval-eval/questions.yaml, e.g. `--min-recall 0.8`"
+cmd = "kb eval"
+
 [tool.poe.tasks.obsidian-setup]
 help = "Install the vault's pinned Obsidian community plugins, e.g. `--add omnisearch` or `--open`"
 cmd = "kb obsidian setup"

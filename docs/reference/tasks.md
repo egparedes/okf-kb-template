@@ -50,6 +50,7 @@ given. `uv run poe --help <task>` shows the usage of one task.
 | `search QUERY…` | [`kb search QUERY…`](cli.md#kb-search) | Hybrid search with qmd when the knowledge base's collection exists; otherwise a built-in text search over the words of the query. |
 | `search-setup` | `kb search --setup` | One-time qmd setup for this knowledge base: the collection, a context per folder, the embeddings. The collection records the folder's path: after a rename, remove the collection and run this again. |
 | `search-reindex` | `kb search --reindex` | Refresh the qmd index after changes (`qmd update`, `qmd embed`). |
+| `eval [ARGS…]` | [`kb eval [ARGS…]`](cli.md#kb-eval) | Retrieval evaluation: recall@k of each search tier on `tools/retrieval-eval/questions.yaml`; `--k`, `--json`, `--min-recall`, `--no-qmd` as in `kb eval`. |
 | `obsidian-setup [ARGS…]` | `kb obsidian setup [ARGS…]` | Install the pinned Obsidian plugins; `--add`, `--force`, `--open` as in [`kb obsidian setup`](cli.md#kb-obsidian-setup). |
 | `rename-bundle NEW` | [`kb rename-bundle NEW`](cli.md#kb-rename-bundle) | Rename the knowledge-base folder to `NEW`, re-render the template-managed files that name it, and stage the result. Close Obsidian first. See [Rename the knowledge-base folder](../how-to/rename-the-knowledge-base-folder.md). |
 | `test` | `pytest -q` | Run the tooling's own tests. |

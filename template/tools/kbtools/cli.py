@@ -9,7 +9,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from . import dupes, graph, hooks, importer, indexgen, linkfix, obsidian, pages, rename, report, resources, search, unlinked
+from . import dupes, finder, graph, hooks, importer, indexgen, linkfix, obsidian, pages, rename, report, resources, retrieval_eval, search, unlinked
 from .bundle import Bundle
 from .check import Checker, exit_code
 
@@ -83,20 +83,7 @@ def _cmd_report(bundle: Bundle, args: argparse.Namespace) -> int:
 
 def _cmd_find(bundle: Bundle, args: argparse.Namespace) -> int:
     """Frontmatter filter (retrieval tier 2): print matching concepts as `path<TAB>type<TAB>title`."""
-    for doc in bundle.concepts():
-        fm = doc.frontmatter
-        if doc.frontmatter_error or not doc.type:
-            continue
-        if args.type and doc.type != args.type:
-            continue
-        if args.tag and not set(args.tag) <= set(fm.get("tags") or []):
-            continue
-        if args.status and fm.get("status", "stable") != args.status:
-            continue
-        if args.folder and not str(doc.rel).startswith(bundle.rel(args.folder).strip("/") + "/"):
-            continue
-        if args.trust and report.trust_tier(doc) != args.trust:
-            continue
+    for doc in finder.find_pages(bundle, args.type, args.tag, args.status, args.folder, args.trust):
         print(f"/{doc.rel}\t{doc.type}\t{doc.title}")
     return 0
 
@@ -253,6 +240,11 @@ def _cmd_search(bundle: Bundle, args: argparse.Namespace) -> int:
     return search.search(bundle, " ".join(args.query))
 
 
+def _cmd_eval(bundle: Bundle, args: argparse.Namespace) -> int:
+    return retrieval_eval.run(bundle, args.questions, k=args.k, as_json=args.json, min_recall=args.min_recall,
+                              use_qmd=not args.no_qmd)
+
+
 def _cmd_rename_bundle(bundle: Bundle, args: argparse.Namespace) -> int:
     return rename.rename(bundle, args.new)
 
@@ -392,6 +384,14 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--setup", action="store_true", help="one-time qmd setup: collection, folder contexts, embeddings")
     mode.add_argument("--reindex", action="store_true", help="refresh the qmd index after changes")
     p.set_defaults(func=_cmd_search)
+
+    p = sub.add_parser("eval", help="retrieval evaluation: do the search tiers reach the expected pages?")
+    p.add_argument("--questions", help="question file (default tools/retrieval-eval/questions.yaml)")
+    p.add_argument("--k", type=int, default=10, help="recall@k cut-off (default 10)")
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--min-recall", type=float, metavar="R", help="exit 1 when index+text recall@k is below R (0-1)")
+    p.add_argument("--no-qmd", action="store_true", help="skip the qmd tier even when it is set up")
+    p.set_defaults(func=_cmd_eval)
 
     p = sub.add_parser("rename-bundle", help="rename the knowledge-base folder (and Obsidian vault); close Obsidian first")
     p.add_argument("new", help="new folder name (kebab-case)")

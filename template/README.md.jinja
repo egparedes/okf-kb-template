@@ -85,6 +85,7 @@ Talk to your agent from the repository root:
 | `uv run poe report` | Trust tiers, stale pages, uncited pages and wanted pages |
 | `uv run poe find --type Concept --tag x` | Frontmatter queries |
 | `uv run poe search "question"` | qmd hybrid search, falling back to a text search |
+| `uv run poe eval` | Do the search tiers reach the expected pages of `tools/retrieval-eval/questions.yaml`? |
 | `uv run poe health` | Link graph (index hubs excluded), duplicate candidates, unlinked mentions |
 | `uv run kb mv old.md new.md` | Move a page and rewrite every inbound link |
 | `uv run kb merge old.md into.md` | Fold a duplicate into another page (after merging the text) |

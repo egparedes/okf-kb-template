@@ -74,6 +74,7 @@ set in the environment take precedence.
 | [`find`](#kb-find) | List pages by frontmatter |
 | [`folders`](#kb-folders) | Print the indexed folders and their descriptions |
 | [`search`](#kb-search) | Search the pages: qmd when set up, otherwise text search |
+| [`eval`](#kb-eval) | Retrieval evaluation: do the search tiers reach the expected pages? |
 | [`report`](#kb-report) | Health report |
 | [`graph`](#kb-graph) | Link-graph analytics |
 | [`dupes`](#kb-dupes) | Near-duplicate candidates |
@@ -277,6 +278,65 @@ With a query, `kb search`:
 
 `--setup` and `--reindex` stop with "qmd is not installed" when `qmd` is
 not on the `PATH`.
+
+### `kb eval`
+
+*New in v0.7.0.* Measure whether each retrieval tier reaches the pages a
+question needs, from the questions in `tools/retrieval-eval/questions.yaml`.
+See [Enable search](../how-to/enable-search.md#is-qmd-worth-it).
+
+```sh
+uv run kb eval [--questions FILE] [--k K] [--json] [--min-recall R] [--no-qmd]
+```
+
+| Option | Meaning |
+|---|---|
+| `--questions FILE` | Question file (default `tools/retrieval-eval/questions.yaml`). |
+| `--k K` | Cut-off for recall@k (default 10). |
+| `--json` | Print the full result as JSON: per question and tier, the status, the rank of the first expected page, the expected pages found in the top K, recall@K and the top K pages; then a summary per tier. |
+| `--min-recall R` | Exit 1 when the mean index+text recall@K is below `R` (0 to 1). For CI. |
+| `--no-qmd` | Skip the qmd tier even when qmd is set up. |
+
+The question file holds a list under `questions`. Each entry has:
+
+| Key | Meaning |
+|---|---|
+| `question` | Required. The question, as you would ask it. |
+| `expected` | Required. Bundle-absolute paths of the pages a good answer uses, e.g. `/systems/dns.md`, each listed once. Each must be an existing page, with the exact case; generated `index.md` files are not allowed. |
+| `filters` | Optional. [`kb find`](#kb-find) filters: `type` (a type of `schema/vocabulary.yaml`), `tag` (a tag or a non-empty list of tags, all must match), `status`, `folder` (an existing folder of the knowledge base), `trust`. |
+
+`kb eval` checks the whole file first and stops with one line per problem
+(unknown keys, missing, malformed or repeated values, pages, types or
+folders that do not exist). `kb mv` and `kb merge` do not rewrite the
+question file: update or remove an entry after moving, merging or deleting
+an expected page.
+
+For each question it ranks the pages with each tier:
+
+- **index+text**: index navigation first, then text search. Index
+  navigation ranks the pages whose index entry (title and description)
+  contains whole words of the question, most distinct words first. It
+  ignores words under 3 characters and common question words such as
+  `what`, `the` or `does`. When 3 or more words remain, an entry must
+  contain at least 2 of them. The [text search](#kb-search) of `kb search`
+  then adds the pages the index did not surface, in its order. Pages in `.`
+  and `_` folders get no index entry.
+- **filters**: the pages `kb find` prints for the question's `filters`, in
+  path order. Skipped (`-`) when the question has no `filters`.
+- **qmd**: `qmd query -c <collection> --json -n N -- QUESTION`, when qmd is
+  on the `PATH` and the collection exists; otherwise `skipped`. qmd's local
+  models rank these results; the other tiers are fully deterministic.
+  `kb eval` prints one line on stderr before the first call, because the
+  first run of qmd downloads its models. A `qmd query` that fails or takes
+  more than 10 minutes is reported as `error` for that question.
+
+The output is one line per question and tier: `found/expected @rank`, the
+number of expected pages in the top K, and the rank of the first expected
+page anywhere in the tier's ranking (`@-` when it holds none). The
+last line gives, per tier, the mean recall@K over the questions it ran on
+and the number of questions with at least one expected page in the top K.
+The exit status is 0 unless `--min-recall` fails or the question file is
+invalid. With no questions, `kb eval` says so and exits 0.
 
 ### `kb report`
 

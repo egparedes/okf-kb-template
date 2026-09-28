@@ -32,7 +32,7 @@ my-kb/
 │   ├── kbtools/                 the kb command line (Python)
 │   ├── tests/                   its tests
 │   ├── obsidian-plugins.json    pinned Obsidian plugins (new in v0.4.0)
-│   └── retrieval-eval/questions.yaml   questions for judging search tiers
+│   └── retrieval-eval/questions.yaml   questions for kb eval, which judges the search tiers
 ├── my-kb/                       the knowledge-base folder: OKF bundle and Obsidian vault
 │   ├── index.md                 generated
 │   ├── log.md                   newest-first update log
@@ -122,7 +122,7 @@ template's `copier.yml`, so `copier update` never overwrites them:
 | `schema/vocabulary.yaml` | page types, relations, `fields` |
 | `schema/taxonomy.yaml` | the folder tree |
 | `schema/resources.yaml` | file roots, deny patterns, Zotero ids |
-| `tools/retrieval-eval/questions.yaml` | retrieval evaluation questions |
+| `tools/retrieval-eval/questions.yaml` | retrieval evaluation questions for [`kb eval`](cli.md#kb-eval) |
 | `tasks.toml` | the knowledge base's own [tasks](tasks.md#local-tasks-taskstoml) (new in v0.6.0) |
 | `{{ bundle_dir }}/log.md` | the update log |
 | `{{ bundle_dir }}/.obsidian/*.json` | Obsidian settings, including `community-plugins.json` |

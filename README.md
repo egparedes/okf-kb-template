@@ -67,5 +67,5 @@ own licences.
 - The maintenance analytics (`kb graph`, `kb dupes`, `kb unlinked`) are
   inspired by Ar9av/obsidian-wiki and reimplemented deterministically.
 - `tools/retrieval-eval/questions.yaml` is a hand-maintained set of
-  questions for judging whether a heavier search tier is worth enabling. No
-  tool reads it yet.
+  questions for judging whether a heavier search tier is worth enabling.
+  `kb eval` measures, deterministically, which tiers reach the expected pages.
