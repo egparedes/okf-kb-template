@@ -16,11 +16,11 @@ from difflib import SequenceMatcher
 from itertools import combinations
 
 from .bundle import Bundle, Document, load_yaml
-from .mdlinks import mask_code, resolve
 from .names import acronym, page_names, tokens
 
 DISTINCT_RELATIONS = ("alternative_to", "supersedes", "contradicts")
 _WORD = re.compile(r"\w+")
+MAX_BLOCK = 200  # pages sharing one name token or prefix; bigger blocks are too common to compare
 
 
 @dataclass
@@ -36,19 +36,17 @@ def _jaccard(x: set, y: set) -> float:
 
 
 def _shingles(doc: Document, size: int = 5) -> set[tuple[str, ...]]:
-    words = _WORD.findall(mask_code(doc.body).casefold())
+    words = _WORD.findall(doc.masked_body.casefold())
     return {tuple(words[i : i + size]) for i in range(len(words) - size + 1)}
 
 
 def _distinct_pairs(bundle: Bundle, docs: dict[str, Document]) -> set[frozenset]:
     pairs: set[frozenset] = set()
     for rel, doc in docs.items():
-        for key in DISTINCT_RELATIONS:
-            for value in doc.frontmatter.get(key) or []:
-                if isinstance(value, str) and "](" in value:
-                    target = resolve(value.split("](", 1)[1].rstrip(")").split("#")[0], doc.folder)
-                    if target:
-                        pairs.add(frozenset((rel, target)))
+        for relation in doc.relations(DISTINCT_RELATIONS):
+            target = doc.resolve(relation)
+            if target:
+                pairs.add(frozenset((rel, target)))
     path = bundle.repo_root / "schema" / "distinct.yaml"
     if path.is_file():
         for pair in (load_yaml(path.read_text(encoding="utf-8")) or {}).get("distinct") or []:
@@ -57,31 +55,20 @@ def _distinct_pairs(bundle: Bundle, docs: dict[str, Document]) -> set[frozenset]
     return pairs
 
 
-def _pages(bundle: Bundle, scope: str) -> dict[str, Document]:
-    personal = bundle.config.personal_folders
-    out = {}
-    for doc in bundle.concepts():
-        if doc.frontmatter_error or not doc.type or doc.type == "Template":
-            continue
-        if any(part.startswith(("_", ".")) for part in doc.rel.parts[:-1]):
-            continue
-        if scope != "all" and len(doc.rel.parts) > 1 and doc.rel.parts[0] in personal:
-            continue
-        out[str(doc.rel)] = doc
-    return out
-
-
 def find(bundle: Bundle, min_score: float = 0.6, body: bool = False, scope: str = "knowledge") -> list[Candidate]:
-    docs = _pages(bundle, scope)
+    docs = bundle.pages(scope)
     names = {rel: [tokens(n) for n in page_names(doc)] for rel, doc in docs.items()}
     acronyms = {rel: {acronym(n) for n in page_names(doc) if len(tokens(n)) >= 2} for rel, doc in docs.items()}
     distinct = _distinct_pairs(bundle, docs)
 
     # Blocking: only compare pages that share a name token, a 4-letter token
-    # prefix (catches typos), an acronym or a resource.
+    # prefix (catches typos), an acronym, a whole name or a resource. Blocks of
+    # a common token are too big to compare pairwise and are skipped; whole
+    # names (`n:`) and resources (`r:`) are exact matches and always compared.
     blocks: dict[str, set[str]] = defaultdict(set)
     for rel, doc in docs.items():
         for name in names[rel]:
+            blocks["n:" + " ".join(name)].add(rel)
             for token in name:
                 blocks[f"t:{token}"].add(rel)
                 blocks[f"p:{token[:4]}"].add(rel)
@@ -93,8 +80,8 @@ def find(bundle: Bundle, min_score: float = 0.6, body: bool = False, scope: str 
         if isinstance(resource, str) and resource:
             blocks[f"r:{resource.rstrip('/')}"].add(rel)
     pairs: set[tuple[str, str]] = set()
-    for members in blocks.values():
-        if len(members) <= 200:
+    for key, members in blocks.items():
+        if len(members) <= MAX_BLOCK or key.startswith(("n:", "r:")):
             pairs.update(combinations(sorted(members), 2))
 
     shingles = {rel: _shingles(doc) for rel, doc in docs.items()} if body else {}

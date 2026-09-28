@@ -23,26 +23,35 @@ def _cmd_check(bundle: Bundle, args: argparse.Namespace) -> int:
             print(f"kb: {arg} is not a file in the bundle", file=sys.stderr)
         if missing and not any(paths):
             return 1
-        diagnostics = checker.check_files([bundle.document(p) for p in paths if p])
+        docs = [bundle.document(p) for p in paths if p]
+        diagnostics = checker.check_files(docs)
+        count = len(docs)  # only the given files are read
     else:
         diagnostics = checker.check_all()
+        count = len(bundle.documents)
     shown = [d for d in diagnostics if d.is_error or not args.errors_only]
     for diagnostic in shown:
         print(diagnostic)
     errors = sum(d.is_error for d in diagnostics)
     warnings = len(diagnostics) - errors
-    print(f"kb check: {errors} error(s), {warnings} warning(s) in {len(bundle.documents)} file(s)", file=sys.stderr)
+    print(f"kb check: {errors} error(s), {warnings} warning(s) in {count} file(s)", file=sys.stderr)
     return exit_code(diagnostics, args.strict)
+
+
+def _write_indexes(bundle: Bundle) -> None:
+    for path in indexgen.write(bundle):
+        print(f"{'wrote' if path.exists() else 'deleted'} {path.relative_to(bundle.repo_root)}")
 
 
 def _cmd_index(bundle: Bundle, args: argparse.Namespace) -> int:
     if args.check:
-        stale = indexgen.stale(bundle)
+        expected = indexgen.generate(bundle)
+        stale = indexgen.stale(bundle, expected)
+        orphans = set(indexgen.orphans(bundle, expected))
         for path in stale:
-            print(f"out of date: {path.relative_to(bundle.repo_root)}")
+            print(f"{'orphaned' if path in orphans else 'out of date'}: {path.relative_to(bundle.repo_root)}")
         return 1 if stale else 0
-    for path in indexgen.write(bundle):
-        print(f"wrote {path.relative_to(bundle.repo_root)}")
+    _write_indexes(bundle)
     return 0
 
 
@@ -56,8 +65,7 @@ def _cmd_fix_links(bundle: Bundle, args: argparse.Namespace) -> int:
 def _cmd_mv(bundle: Bundle, args: argparse.Namespace) -> int:
     for rel in linkfix.move(bundle, args.old, args.new):
         print(f"updated links in {bundle.show(rel)}")
-    for path in indexgen.write(Bundle(bundle.root, bundle.repo_root)):
-        print(f"wrote {path.relative_to(bundle.repo_root)}")
+    _write_indexes(Bundle(bundle.root, bundle.repo_root, bundle.tracked_only))
     return 0
 
 
@@ -130,7 +138,7 @@ def _cmd_merge(bundle: Bundle, args: argparse.Namespace) -> int:
     for line in linkfix.merge(bundle, args.old, args.into, pages.resolve_actor(args.by), dry_run=args.dry_run):
         print(line)
     if not args.dry_run:
-        indexgen.write(Bundle(bundle.root, bundle.repo_root))
+        indexgen.write(Bundle(bundle.root, bundle.repo_root, bundle.tracked_only))
     return 0
 
 
@@ -197,8 +205,7 @@ def _cmd_import(bundle: Bundle, args: argparse.Namespace) -> int:
     if args.dry_run:
         print("(dry run: nothing written)")
     else:
-        for path in indexgen.write(Bundle(bundle.root, bundle.repo_root)):
-            print(f"wrote {path.relative_to(bundle.repo_root)}")
+        _write_indexes(Bundle(bundle.root, bundle.repo_root, bundle.tracked_only))
     return 0
 
 
@@ -217,8 +224,7 @@ def _cmd_setup(bundle: Bundle, args: argparse.Namespace) -> int:
     repaired = hooks.repair_skills_link(repo)  # Windows checkouts without symlink support
     if repaired:
         print(repaired)
-    for path in indexgen.write(bundle):
-        print(f"wrote {path.relative_to(repo)}")
+    _write_indexes(Bundle(bundle.root, repo))  # listed afresh, now that git knows the repository
     return 0
 
 
@@ -259,6 +265,8 @@ def _cmd_hook(bundle: Bundle, args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kb", description=__doc__)
     parser.add_argument("--bundle", help="bundle root (default: the folder named in [tool.kb] bundle, else <repo>/kb)")
+    parser.add_argument("--tracked", action="store_true",
+                        help="only files git tracks or has staged (what a commit contains), as the pre-commit hooks use it")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("check", help="validate OKF conformance and house rules")
@@ -406,7 +414,7 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=_cmd_hook)
 
     args = parser.parse_args(argv)
-    bundle = Bundle.discover(args.bundle)
+    bundle = Bundle.discover(args.bundle, tracked_only=args.tracked)
     resources.load_env(bundle.repo_root)  # .env settings such as KB_ACTOR apply to every command
     return args.func(bundle, args)
 

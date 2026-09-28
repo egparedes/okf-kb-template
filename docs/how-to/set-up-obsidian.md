@@ -127,7 +127,7 @@ knowledge base: template updates never overwrite them.
 | Use `[[Wikilinks]]` | off | OKF links are standard markdown links. Typing `[[` still autocompletes, but inserts a markdown link. |
 | New link format | Path from vault folder | Better Markdown Links adds the leading `/`. `uv run poe fix` repairs any link written without it. |
 | Automatically update internal links | on | Renames inside Obsidian keep links working. `uv run poe fix` restores the `/` form afterwards. |
-| Deleted files | Move to system trash | A `.trash/` folder inside the vault would put files without frontmatter into the bundle. |
+| Deleted files | Move to system trash | `kb` skips a `.trash/` folder inside the vault, but other OKF readers of the folder would count its files as pages. |
 | Properties in document | Source | The Properties editor rewrites the whole YAML block, reordering keys and dropping quotes. Edit frontmatter as text. |
 | Default location for new notes | Same folder as current file | |
 | Attachment folder | `assets` | |

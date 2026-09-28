@@ -139,12 +139,14 @@ def move(bundle: Bundle, old_rel: str, new_rel: str) -> list[str]:
     source, dest = bundle.root / old_rel, bundle.root / new_rel
     if not source.is_file():
         raise SystemExit(f"kb: {source} does not exist")
-    if dest.exists():
+    case_only = new_rel != old_rel and new_rel.casefold() == old_rel.casefold()
+    if dest.exists() and not (case_only and dest.samefile(source)):  # macOS/Windows: Foo.md "exists" as foo.md
         raise SystemExit(f"kb: {dest} already exists")
     if bundle.root.resolve() not in dest.resolve().parents:
         raise SystemExit(f"kb: {new_rel} is outside the bundle")
     dest.parent.mkdir(parents=True, exist_ok=True)
     source.rename(dest)
+    bundle.invalidate()
     changed = retarget(bundle, old_rel, new_rel, moved_from=old_rel)
     record_touched(bundle.repo_root, [dest, *(bundle.root / rel for rel in changed)])
     return changed
@@ -218,6 +220,7 @@ def merge(bundle: Bundle, old_rel: str, into_rel: str, actor: str, dry_run: bool
     header = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True, width=1000)
     into.write_text(f"---\n{header}---\n{into_doc.body}", encoding="utf-8")
     old.unlink()
+    bundle.invalidate()
     changed = retarget(bundle, old_rel, into_rel)
     record_touched(bundle.repo_root, [into, *(bundle.root / rel for rel in changed)])
     return plan + [f"updated links in {bundle.show(rel)}" for rel in changed]

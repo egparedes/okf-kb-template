@@ -151,7 +151,7 @@ editing a managed file.
 | `.venv/`, `__pycache__/`, `.pytest_cache/` | Python environment |
 | `<folder>/.obsidian/plugins/*/*` except Templater's `data.json` | plugin code (downloaded, never redistributed) and plugin settings that may hold keys |
 | `<folder>/.obsidian/workspace*.json`, `<folder>/.obsidian/graph.json.bak`, `<folder>/.obsidian/themes/` | per-device state |
-| `<folder>/.trash/` | deleted notes; `.md` files there would break the bundle |
+| `<folder>/.trash/` | deleted notes; `kb` skips dot-folders, but other OKF readers of the folder would count them |
 | `<folder>/.smart-env/` | a plugin's local cache |
 | `.qmd/`, `.ck/` | local search indexes |
 | `.claude/settings.local.json` | personal Claude Code overrides |

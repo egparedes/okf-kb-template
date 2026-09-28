@@ -14,7 +14,6 @@ from dataclasses import dataclass, field
 from itertools import combinations
 
 from .bundle import Bundle, Document
-from .mdlinks import find_links, resolve
 from .report import trust_tier
 
 SYNTHESIS_TYPES = ("Synthesis", "Comparison")
@@ -34,35 +33,18 @@ class Graph:
             self.inc[dst].add(src)
 
 
-def _in_scope(doc: Document, bundle: Bundle, scope: str) -> bool:
-    if doc.is_reserved or doc.frontmatter_error or not doc.type:
-        return False
-    top = doc.rel.parts[0] if len(doc.rel.parts) > 1 else ""
-    if any(part.startswith(("_", ".")) for part in doc.rel.parts[:-1]):
-        return False
-    return scope == "all" or top not in bundle.config.personal_folders
-
-
 def build(bundle: Bundle, scope: str = "knowledge") -> Graph:
-    candidates = {str(d.rel): d for d in bundle.documents if _in_scope(d, bundle, scope)}
+    candidates = bundle.pages(scope)
     sources = {rel for rel, d in candidates.items() if d.type == "Source"}
     graph = Graph(pages={rel: d for rel, d in candidates.items() if rel not in sources})
     for rel, doc in candidates.items():
-        targets = set()
-        for link in find_links(doc.body):
-            if link.is_external or link.is_anchor_only or not link.path:
-                continue
-            target = resolve(link.path, doc.folder)
+        targets = {t for t in doc.link_targets if t}
+        for relation in doc.relations(bundle.config.relations):
+            target = doc.resolve(relation)
             if target:
                 targets.add(target)
-        for key in bundle.config.relations:
-            for value in doc.frontmatter.get(key) or []:
-                if isinstance(value, str) and "](" in value:
-                    target = resolve(value.split("](", 1)[1].rstrip(")").split("#")[0], doc.folder)
-                    if target:
-                        targets.add(target)
-                        if rel in graph.pages and target in graph.pages:
-                            graph.relations[key] += 1
+                if rel in graph.pages and target in graph.pages:
+                    graph.relations[relation.key] += 1
         for target in targets:
             if rel in sources or target in sources:
                 if target in sources and rel not in sources:

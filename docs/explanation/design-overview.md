@@ -80,8 +80,9 @@ Consequences:
 
 - every `.md` file in the knowledge-base folder needs frontmatter, including Obsidian
   templates, which have `type: Template`;
-- Obsidian must delete to the system trash, because a `.trash/` folder
-  would put non-conforming files into the bundle;
+- Obsidian must delete to the system trash: `kb` skips dot-folders such as
+  `.trash/`, but other OKF readers of the folder would count their files as
+  pages;
 - Obsidian plugins that only understand wikilinks cannot be used.
 
 ## Generated indexes

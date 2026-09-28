@@ -12,19 +12,19 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
+from urllib.parse import unquote
 
 import jsonschema
 
 from . import indexgen
 from .bundle import Bundle, Document
-from .mdlinks import find_links, footnote_defs, footnote_refs, mask_code, reference_definitions, resolve
+from .mdlinks import line_at, resolve
 from .resources import Settings, deny_patterns, load_env, read_config
 
 KEBAB = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 DATE_HEADING = re.compile(r"^## (\d{4}-\d{2}-\d{2})\s*$")
 INDEX_ENTRY = re.compile(r"^[*-] \[(?:[^\]\\]|\\.)+\]\([^)\s]+\)( - .+)?$")
 WIKILINK = re.compile(r"!?\[\[[^\]\n]+\]\]")
-RELATION_VALUE = re.compile(r"^\[(?P<text>[^\]]+)\]\((?P<target>[^)\s]+)\)$")
 
 
 @dataclass(frozen=True)
@@ -149,9 +149,9 @@ class Checker:
     def check_citations(self, doc: Document) -> None:
         sources = doc.frontmatter.get("sources") or []
         ids = {s.get("id") for s in sources if isinstance(s, dict) and s.get("id")}
-        defs = footnote_defs(doc.body)
+        defs = doc.footnote_defs
         cited = set()
-        for label, line in footnote_refs(doc.body):
+        for label, line in doc.footnote_refs:
             cited.add(label)
             line += doc.body_line_offset
             if label not in ids:
@@ -163,11 +163,12 @@ class Checker:
         for source in sources:
             if isinstance(source, dict) and isinstance(source.get("resource"), str):
                 res = source["resource"]
-                if res.startswith("/") and not self.bundle.exists(res.lstrip("/").split("#")[0]):
+                target = resolve(unquote(res.split("#")[0]), doc.folder) if res.startswith("/") else ""
+                if target is None or (target and not self.bundle.exists(target)):
                     self.report(doc, 1, "W021", f"source resource `{res}` does not exist in the bundle")
 
     def check_links(self, doc: Document) -> None:
-        for link in find_links(doc.body):
+        for link in doc.links:
             line = link.line + doc.body_line_offset
             if link.is_external or link.is_anchor_only or not link.path:
                 continue
@@ -181,9 +182,9 @@ class Checker:
                 self.report(doc, line, "W031", f"link `{link.target}` should be bundle-absolute (`/{target}`); run `uv run poe fix`")
 
     def check_wikilinks(self, doc: Document) -> None:
-        masked = mask_code(doc.body)
+        masked = doc.masked_body
         for m in WIKILINK.finditer(masked):
-            line = masked.count("\n", 0, m.start()) + 1 + doc.body_line_offset
+            line = line_at(masked, m.start()) + doc.body_line_offset
             self.report(doc, line, "H032", f"`{m.group(0)[:60]}` is a wikilink or embed, not an OKF link; use [text](/path.md)")
 
     def check_timestamps(self, doc: Document) -> None:
@@ -202,29 +203,19 @@ class Checker:
                 self.report(doc, 1, "W041", f"{where} {value} is in the future")
 
     def check_reference_links(self, doc: Document) -> None:
-        for line in reference_definitions(doc.body):
-            self.report(doc, line + doc.body_line_offset, "W033",
+        for definition in doc.ref_defs:
+            self.report(doc, definition.line + doc.body_line_offset, "W033",
                         "reference-style link definition: kb tooling only follows inline links [text](/path.md)")
 
     def check_relations(self, doc: Document) -> None:
-        body_targets = {
-            resolve(link.path, doc.folder)
-            for link in find_links(doc.body)
-            if not link.is_external and not link.is_anchor_only and link.path
-        }
-        for key in self.config.relations:
-            values = doc.frontmatter.get(key)
-            if not isinstance(values, list):
-                continue
-            for value in values:
-                match = RELATION_VALUE.match(value) if isinstance(value, str) else None
-                if not match:
-                    continue  # shape errors are reported by the schema
-                target = resolve(match.group("target").split("#")[0], doc.folder)
-                if target and not self.bundle.exists(target):
-                    self.report(doc, 1, "W032", f"{key}: target `{match.group('target')}` does not exist")
-                if target not in body_targets:
-                    self.report(doc, 1, "H031", f"{key}: `{match.group('target')}` is not linked from the body (explain the relation in prose)")
+        for relation in doc.relations(self.config.relations):
+            if not isinstance(doc.frontmatter.get(relation.key), list) or not relation.is_internal:
+                continue  # shape errors are reported by the schema
+            target = resolve(relation.path, doc.folder)
+            if target and not self.bundle.exists(target):
+                self.report(doc, 1, "W032", f"{relation.key}: target `{relation.target}` does not exist")
+            if target is None or target not in doc.link_targets:
+                self.report(doc, 1, "H031", f"{relation.key}: `{relation.target}` is not linked from the body (explain the relation in prose)")
 
     def check_locators(self, doc: Document) -> None:
         for locator in doc.frontmatter.get("locators") or []:
@@ -257,7 +248,8 @@ class Checker:
                 self.report(doc, 1, "O003", "only the bundle-root index.md may have frontmatter")
             elif keys - {"okf_version"}:
                 self.report(doc, 1, "O003", "root index.md frontmatter may only contain `okf_version`")
-        for n, line in enumerate(doc.body.splitlines(), start=doc.body_line_offset + 1):
+        for n, line in enumerate(doc.body.split("\n"), start=doc.body_line_offset + 1):
+            line = line.rstrip("\r")
             if not line.strip() or line.startswith("#") or INDEX_ENTRY.match(line):
                 continue
             self.report(doc, n, "O004", "index.md lines must be headings or `* [Title](url) - description` entries")
@@ -266,7 +258,8 @@ class Checker:
         if doc.has_frontmatter:
             self.report(doc, 1, "O005", "log.md must not have frontmatter")
         previous = None
-        for n, line in enumerate(doc.body.splitlines(), start=doc.body_line_offset + 1):
+        for n, line in enumerate(doc.body.split("\n"), start=doc.body_line_offset + 1):
+            line = line.rstrip("\r")
             if not line.startswith("## "):
                 continue
             match = DATE_HEADING.match(line)
@@ -276,7 +269,7 @@ class Checker:
             if previous is not None and match.group(1) >= previous:
                 self.report(doc, n, "O005", "log.md dates must be unique and newest first")
             previous = match.group(1)
-        for link in find_links(doc.body):
+        for link in doc.links:
             if link.is_external or link.is_anchor_only or not link.path:
                 continue
             target = resolve(link.path, doc.folder)
@@ -291,9 +284,14 @@ class Checker:
                 self.report(f"{folder}/", 1, "W050", "folder has no entry in schema/taxonomy.yaml (title/description for the index)")
 
     def check_indexes(self) -> None:
-        for path in indexgen.stale(self.bundle):
+        expected = indexgen.generate(self.bundle)
+        orphans = set(indexgen.orphans(self.bundle, expected))
+        for path in indexgen.stale(self.bundle, expected):
             rel = PurePosixPath(path.relative_to(self.bundle.root).as_posix())
-            self.report(str(rel), 1, "H040", "index.md is missing or out of date; run `uv run poe index`")
+            if path in orphans:
+                self.report(str(rel), 1, "H040", "index.md is left in a folder without pages; run `uv run poe index` (deletes it)")
+            else:
+                self.report(str(rel), 1, "H040", "index.md is missing or out of date; run `uv run poe index`")
 
 
 def exit_code(diagnostics: list[Diagnostic], strict: bool) -> int:

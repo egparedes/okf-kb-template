@@ -16,8 +16,28 @@ The code's letter gives its kind:
 | `W` | Warning. OKF tolerates these (broken links, unknown keys), but they usually point at a real problem. | Exit 0, unless `--strict`. |
 
 The Claude Code hooks block on errors only. When `kb check` is given file
-paths, it runs only the per-file checks: W050, H040 and H061 need a full
+paths, it reads and checks only those files: W050, H040 and H061 need a full
 run.
+
+## Which files are checked
+
+`kb check` checks the files of the knowledge-base folder that git would
+commit: in a git repository, tracked files and untracked files that are
+not ignored (with `kb --tracked`, as the pre-commit hook runs it, tracked
+and staged files only); outside a repository, every file. Files below a
+dot-folder (`.obsidian/`, `.trash/`) are never part of the bundle.
+
+A link target exists only if it is one of these files or folders, spelled
+with the same case, so a link that works on a case-insensitive disk
+(macOS, Windows) but not on Linux is reported (W030).
+
+Links, footnotes, reference definitions and wikilinks are looked for
+outside code: fenced code blocks (fences may be indented, e.g. in list
+items), indented code blocks (four spaces after a blank line, outside lists
+and footnote definitions),
+code spans, HTML comments and backslash-escaped brackets (`\[x](y)` is
+text). A link text may wrap onto the next line, but not across a blank
+line.
 
 ## OKF conformance
 
@@ -43,7 +63,7 @@ run.
 | H030 | A link escapes the bundle (e.g. `../../README.md`). | Link inside the knowledge-base folder, or use an external URL. |
 | H031 | A relation target is not linked from the body. | Link it in a sentence that explains the relation. |
 | H032 | A wikilink or embed (`[[…]]`, `![[…]]`) outside code. | Write `[text](/path.md)`, or `![alt](/path.png)` for images. |
-| H040 | An `index.md` is missing or out of date. | Run `uv run poe index` (or `uv run poe fix`). |
+| H040 | An `index.md` is missing or out of date, or is left over in a folder that no longer holds pages. | Run `uv run poe index` (or `uv run poe fix`); it also deletes left-over indexes. |
 | H060 | A locator points at material that a deny pattern covers. | Remove the locator. |
 | H061 | `schema/resources.yaml` has the wrong shape: `roots` not a mapping, `deny` not a list of strings, `zotero` not a mapping, or `zotero.user_id` or `zotero.group_id` not a number. | Correct the file. |
 
@@ -54,7 +74,7 @@ run.
 | W010 | An unknown frontmatter key. | Fix the typo, or declare the key under `fields` in `schema/vocabulary.yaml`. |
 | W020 | A source in `sources` is never cited in the body. | Cite it with `[^id]` where it supports a claim, or remove it. |
 | W021 | A source's bundle `resource` (e.g. `/sources/x.md`) does not exist. | Create the Source page, or fix the path. |
-| W030 | A link to a page that does not exist. | Nothing, if it marks a wanted page. Fix it if it is a typo. |
+| W030 | A link to a page that does not exist in the bundle: missing, spelled with different case, or gitignored. | Nothing, if it marks a wanted page. Fix it if it is a typo. |
 | W031 | An internal link is not bundle-absolute. | Run `uv run poe fix`. It rewrites links whose target exists; fix the others by hand. |
 | W032 | A relation target does not exist. | Create the page, or fix the target. |
 | W033 | A reference-style link definition (`[x]: path`). The tooling only follows inline links. | Rewrite it as an inline link `[text](/path.md)`. |

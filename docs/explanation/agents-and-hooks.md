@@ -39,7 +39,7 @@ mechanically, at three points:
 | Where | When | What runs | Who it covers |
 |---|---|---|---|
 | Agent hooks | during the session | `kb check` on each page the agent changes; a final check before the agent stops | Claude Code; Codex and Gemini CLI when their configuration is added |
-| pre-commit | on `git commit` | `kb fix-links`, `kb index`, `kb check` | everyone who commits from a machine where `uv run poe setup` ran |
+| pre-commit | on `git commit` | `kb fix-links`, `kb index`, `kb check`, on what the commit contains (`kb --tracked`) | everyone who commits from a machine where `uv run poe setup` ran |
 | CI | on push | `uv run poe ci`, including an independent OKF validator | everything that reaches GitHub |
 
 Agents without hooks are covered by the pre-commit hook and CI. The earlier
@@ -72,7 +72,9 @@ edit. A page rewritten with the same text, or changed and changed back, does
 not count. The after-hook runs for failed commands too
 (`PostToolUseFailure`), since `sed -i … && false` still changed the page.
 
-The listing skips dot-folders such as `.obsidian/` and `.trash/`. The
+The listing skips dot-folders such as `.obsidian/` and `.trash/`, and no
+hook checks or records a gitignored file: like every `kb` command, the
+hooks treat only the files git would commit as pages. The
 hashes are cached in `.cache/kb-hooks/hashes.json` by path, modification
 time and size, so a listing reads only the files changed since the last
 one: with thousands of pages, it takes a few tens of milliseconds, and the

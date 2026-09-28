@@ -30,6 +30,13 @@ knowledge bases created before v0.5.0. `--bundle` overrides it. See
 | Global option | Meaning |
 |---|---|
 | `--bundle PATH` | Bundle root (default: the knowledge-base folder, `<repo>/<folder>`). Goes before the command. |
+| `--tracked` | Read only the files git tracks or has staged, that is what a commit contains. The pre-commit hooks use it. Goes before the command. |
+
+The bundle's files are the ones git would commit: in a git repository, the
+files of the knowledge-base folder that are tracked, or untracked and not
+ignored; outside a repository, all of them. Files below a dot-folder
+(`.obsidian/`, `.trash/`) are never part of the bundle. Every command reads
+the same set of files.
 
 Paths given to `check` and `fix-links` may be relative to the current
 directory, to the repository root, or to the bundle (with or without a
@@ -38,7 +45,9 @@ leading `<folder>/` or `/`). `new`, `mv`, `merge`, `unlinked`,
 `<folder>/` or `/` is accepted), and so do `find --folder` and the
 `links:` values of an [import mapping](import-mapping.md). With a
 knowledge-base folder named `my-kb`, `my-kb/ai/llm.md`, `/ai/llm.md` and
-`ai/llm.md` name the same page.
+`ai/llm.md` name the same page. Bundle paths are normalized: `./ai/llm.md`,
+`ai//llm.md` and `ai\llm.md` name it too, and a path that leaves the
+bundle (`../README.md`) is refused.
 
 A leading `<folder>/` is stripped only when the path does not also exist
 inside the bundle: if the path, or its parent folder, exists inside the
@@ -100,7 +109,7 @@ uv run kb check [PATHS…] [--strict] [--errors-only]
 
 | Argument or option | Meaning |
 |---|---|
-| `PATHS` | Only check these `.md` files. Bundle-level checks (folders in the taxonomy, index freshness, `resources.yaml`) are skipped. |
+| `PATHS` | Only check these `.md` files. Only they are read, so the check is fast on a large bundle; links to other pages are checked against the list of files. Bundle-level checks (folders in the taxonomy, index freshness, `resources.yaml`) are skipped. A file outside the bundle (ignored, or below a dot-folder) is refused. |
 | `--strict` | Exit 1 on warnings too. |
 | `--errors-only` | Print errors only (warnings still count in the summary). |
 
@@ -110,7 +119,9 @@ Exits 1 when there is at least one error. The codes are listed in
 ### `kb index`
 
 Regenerate every `index.md` from frontmatter and `schema/taxonomy.yaml`, and
-remove stale ones.
+delete the ones left in folders that no longer hold pages. Prints
+`wrote <path>` or `deleted <path>` for each change. Titles and folder titles
+are written on one line: line breaks and runs of spaces become one space.
 
 ```sh
 uv run kb index [--check]
@@ -118,7 +129,7 @@ uv run kb index [--check]
 
 | Option | Meaning |
 |---|---|
-| `--check` | Write nothing; print each out-of-date index and exit 1 if there is any. |
+| `--check` | Write nothing; print each index that `kb index` would change (`out of date: <path>` or `orphaned: <path>`) and exit 1 if there is any. |
 
 ### `kb fix-links`
 
@@ -355,7 +366,10 @@ invalid. With no questions, `kb eval` says so and exits 0.
 
 Print a markdown health report: pages by type, trust tiers of knowledge
 pages, status counts, stale pages, uncited knowledge pages, unused sources,
-broken links (wanted pages) and drafts.
+broken links (wanted pages) and drafts. It counts the same pages as the
+analytics commands (see
+[which pages](../explanation/maintenance-analytics.md#which-pages)), so
+Templates and pages below `_` folders are left out.
 
 ```sh
 uv run kb report

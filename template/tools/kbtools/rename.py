@@ -146,7 +146,7 @@ def rename(bundle: Bundle, new: str, recopy_command: list[str] | None = None) ->
         print("WARNING: these template-managed files had local edits that the re-render reverted (see git diff --cached):")
         print("".join(f"  {path}\n" for path in reverted), end="")
     print("Next: review git diff --cached, then commit. Your unstaged edits and untracked notes are untouched;")
-    print("note that the pre-commit hook also checks untracked pages: one without valid frontmatter blocks the commit.")
+    print("the pre-commit hook checks only what the commit contains (tracked and staged files).")
     print(f"By hand: mentions of {old}/ in README.md and in schema/*.yaml comments (not re-rendered).")
     if (repo / new / ".obsidian").is_dir():
         print(f"Obsidian: open {new}/ with Open folder as vault.")

@@ -71,13 +71,31 @@ def _report(problems: list[str], payload: dict, agent: str, header: str, blockin
     return 0
 
 
+def _full(bundle):
+    """The bundle with its configuration and file listing (the shell hooks start with bare paths)."""
+    from .bundle import Bundle
+
+    return bundle if isinstance(bundle, Bundle) else Bundle(bundle.root, bundle.repo_root)
+
+
+def _part_of_bundle(bundle, rels: list[str]) -> tuple[object, list[str]]:
+    """(full bundle, `rels` without files the bundle leaves out): dot-folders, gitignored files.
+
+    Deleted pages stay: they still count as changes. The dot-folder test is
+    free; only when paths remain is the file listing (one `git ls-files`) read.
+    """
+    rels = [r for r in rels if not any(part.startswith(".") for part in r.split("/")[:-1])]
+    if not rels:
+        return bundle, rels
+    bundle = _full(bundle)
+    return bundle, [r for r in rels if r in bundle.files or not (bundle.root / r).exists()]
+
+
 def _check(bundle, rels: list[str]) -> list[str]:
     """Errors in the given bundle pages (only the files: no bundle-wide checks)."""
-    from .bundle import Bundle
     from .check import Checker
 
-    if not isinstance(bundle, Bundle):
-        bundle = Bundle(bundle.root, bundle.repo_root)
+    bundle, rels = _part_of_bundle(bundle, rels)
     paths = [bundle.root / r for r in rels if r.endswith(".md") and (bundle.root / r).is_file()]
     if not paths:
         return []
@@ -126,11 +144,13 @@ def post_edit(bundle, agent: str = "claude") -> int:
     root = bundle.root.resolve()
     if path.suffix != ".md" or not path.is_file() or root not in path.parents:
         return _report([], payload, agent, "")
+    bundle, rels = _part_of_bundle(bundle, [path.relative_to(root).as_posix()])
+    if not rels:  # in a dot-folder or gitignored: not a page of the bundle
+        return _report([], payload, agent, "")
     session = _session(bundle, payload)
-    rel = path.relative_to(root).as_posix()
-    session.start(log_already_changed=rel == "log.md")  # an edit of log.md before any baseline counts
+    session.start(log_already_changed=rels[0] == "log.md")  # an edit of log.md before any baseline counts
     session.record([path])
-    problems = _check(bundle, [rel])
+    problems = _check(bundle, rels)
     return _report(problems, payload, agent, "kb check found problems in the file you just edited:")
 
 
@@ -141,19 +161,17 @@ def stop(bundle, agent: str = "claude") -> int:
     commands or `kb` commands), so notes the human is editing in Obsidian
     never block an unrelated agent session.
     """
-    from .bundle import Bundle
     from .check import Checker
 
     payload = _payload()
     session = _session(bundle, payload)
     if payload.get("stop_hook_active"):  # already sent back once: let it stop; the state stays with this session
         return _report([], payload, agent, "")
-    touched = session.touched()
+    bundle, touched = _part_of_bundle(bundle, session.touched())
     if not touched:
         session.clear()
         return _report([], payload, agent, "")
-    if not isinstance(bundle, Bundle):
-        bundle = Bundle(bundle.root, bundle.repo_root)
+    bundle = _full(bundle)
     root = bundle.root
     problems = _check(bundle, touched)
     checker = Checker(bundle)

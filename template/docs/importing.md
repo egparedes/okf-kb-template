@@ -93,7 +93,8 @@ is a plan error until the mapping gives that property a `drop` rule, or a
 `rename` to another key, because the importer writes these keys itself.
 
 Code blocks and inline code are never changed, apart from `rewrite` rules
-(which see the raw text). Indented code blocks are not recognised as code.
+(which see the raw text). Indented code blocks (four spaces after a blank
+line, outside lists) count as code too.
 Dataview blocks stay as code and are reported: rewrite them as Bases, or
 drop them with a `rewrite` rule.
 

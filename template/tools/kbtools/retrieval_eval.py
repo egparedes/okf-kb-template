@@ -105,7 +105,7 @@ def load_questions(bundle: Bundle, path: Path) -> list[Question]:
                 errors.append(f"{where}: filter `{key}` must be one of {', '.join(FILTER_CHOICES[key])}")
             elif key == "type" and value not in bundle.config.types:
                 errors.append(f"{where}: filter `type` {value!r} is not a type in schema/vocabulary.yaml")
-            elif key == "folder" and not (bundle.root / bundle.rel(value).strip("/")).is_dir():
+            elif key == "folder" and not _is_folder(bundle, value):
                 errors.append(f"{where}: filter `folder` {value!r} is not a folder of the bundle")
             elif key == "tag" and value in ("", []):
                 errors.append(f"{where}: filter `tag` must name at least one tag")
@@ -113,6 +113,15 @@ def load_questions(bundle: Bundle, path: Path) -> list[Question]:
     if errors:
         raise SystemExit("\n".join(f"kb eval: {path}: {e}" for e in errors))
     return out
+
+
+def _is_folder(bundle: Bundle, value: str) -> bool:
+    """A folder of the bundle that holds files (`..` escaping the bundle is not one)."""
+    try:
+        rel = bundle.rel(value).strip("/")
+    except SystemExit:
+        return False
+    return bool(rel) and rel in bundle.dirs
 
 
 def _words(text: str) -> set[str]:
@@ -130,7 +139,7 @@ def index_ranking(bundle: Bundle, query: str) -> list[str]:
     least = 2 if len(terms) >= 3 else 1
     scored = []
     for doc in bundle.concepts():
-        if any(part.startswith((".", "_")) for part in doc.rel.parts):
+        if doc.in_tooling_folder:
             continue  # folders that get no index
         score = len(terms & _words(f"{doc.title} {doc.description}"))
         if score >= least:

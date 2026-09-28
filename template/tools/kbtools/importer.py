@@ -662,9 +662,9 @@ def _without_comments(body: str) -> str:
 def _description(body: str, skip: list[re.Pattern[str]]) -> str | None:
     """First sentence of the first prose paragraph (hard-wrapped lines joined); comments never count."""
     body = _without_comments(body)
-    masked = mask_code(body).splitlines()
+    masked = mask_code(body).split("\n")  # lines end at \n only, in both texts
     paragraph: list[str] = []
-    for original, blanked in zip(body.splitlines(), masked, strict=False):
+    for original, blanked in zip(body.split("\n"), masked, strict=False):
         line = original.strip()
         structural = not blanked.strip() or line.startswith(("#", "|", ">", "<", "---", "![", "```", "~~~"))
         skipped = any(p.search(line) for p in skip)

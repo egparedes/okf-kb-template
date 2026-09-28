@@ -208,6 +208,8 @@ def test_eval_qmd_failure_is_reported(repo: Path, monkeypatch: pytest.MonkeyPatc
         ("questions:\n  - {question: q, expected: [/systems/dns.md, /systems/dns.md]}\n", "/systems/dns.md is listed more than once"),
         ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {type: Idea}}\n", "'Idea' is not a type"),
         ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {folder: nope}}\n", "'nope' is not a folder"),
+        ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {folder: ../schema}}\n", "'../schema' is not a folder"),
+        ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {folder: systems/..}}\n", "'systems/..' is not a folder"),
         ("questions:\n  - {question: q, expected: [/systems/dns.md], filters: {tag: []}}\n", "must name at least one tag"),
     ],
 )

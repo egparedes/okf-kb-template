@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import posixpath
 from pathlib import Path, PurePosixPath
 
-from .bundle import Bundle, Document
+from .bundle import RESERVED, Bundle, Document, in_tooling_folder
 from .mdlinks import encode_path
 
 OKF_VERSION = "0.2"
@@ -29,15 +30,17 @@ def folders_to_index(bundle: Bundle) -> list[str]:
     `_templates`, not knowledge) are skipped.
     """
     folders = {""}
-    for doc in bundle.documents:
-        if doc.is_reserved or any(part.startswith((".", "_")) for part in doc.rel.parts[:-1]):
+    for rel in bundle.files:
+        if not rel.endswith(".md") or posixpath.basename(rel) in RESERVED:
             continue
-        parent = doc.rel.parent
-        while str(parent) != ".":
-            folders.add(str(parent))
-            parent = parent.parent
+        parent = posixpath.dirname(rel)
+        if parent in folders or in_tooling_folder(PurePosixPath(rel)):
+            continue
+        while parent and parent not in folders:
+            folders.add(parent)
+            parent = posixpath.dirname(parent)
     for name in bundle.config.folders:
-        if any(part.startswith((".", "_")) for part in PurePosixPath(name).parts):
+        if in_tooling_folder(PurePosixPath(name, "x")):
             continue
         folders.add(name)
         parent = PurePosixPath(name).parent
@@ -58,7 +61,8 @@ def _child_folders(folder: str, all_folders: list[str]) -> list[str]:
 
 def _folder_meta(bundle: Bundle, folder: str) -> tuple[str, str]:
     spec = bundle.config.folder_spec(folder) or {}
-    title = spec.get("title") or PurePosixPath(folder).name.replace("-", " ").capitalize()
+    title = " ".join(str(spec.get("title") or "").split())  # a block-scalar title may hold line breaks
+    title = title or PurePosixPath(folder).name.replace("-", " ").capitalize()
     return title, " ".join(str(spec.get("description", "")).split())
 
 
@@ -68,7 +72,9 @@ def _sorted_docs(bundle: Bundle, folder: str, docs: list[Document]) -> list[Docu
     return sorted(docs, key=lambda d: (d.title.casefold(), d.rel.name))
 
 
-def render_index(bundle: Bundle, folder: str, all_folders: list[str]) -> str:
+def render_index(
+    bundle: Bundle, folder: str, all_folders: list[str], by_folder: dict[str, list[Document]] | None = None
+) -> str:
     config = bundle.config
     sections: list[tuple[str, list[str]]] = []
 
@@ -89,11 +95,7 @@ def render_index(bundle: Bundle, folder: str, all_folders: list[str]) -> str:
             children = sorted(children, key=lambda c: _folder_meta(bundle, c)[0].casefold())
         sections.append((FOLDERS_HEADING, [_entry(*_child_entry(bundle, c)) for c in children]))
 
-    docs = [
-        d
-        for d in bundle.documents
-        if not d.is_reserved and d.folder == folder and not d.frontmatter_error
-    ]
+    docs = (by_folder or _by_folder(bundle)).get(folder, [])
     by_type: dict[str, list[Document]] = {}
     for doc in docs:
         by_type.setdefault(doc.type or "Untyped", []).append(doc)
@@ -123,31 +125,51 @@ def _child_entry(bundle: Bundle, child: str) -> tuple[str, str, str]:
 def generate(bundle: Bundle) -> dict[Path, str]:
     """Map of index.md path -> expected content for every indexed folder."""
     all_folders = folders_to_index(bundle)
+    by_folder = _by_folder(bundle)
     return {
         (bundle.root / folder / "index.md") if folder else bundle.root / "index.md": render_index(
-            bundle, folder, all_folders
+            bundle, folder, all_folders, by_folder
         )
         for folder in all_folders
     }
 
 
-def _stale_index_files(bundle: Bundle, expected: dict[Path, str]) -> list[Path]:
-    """Generated index.md files left behind in folders that no longer hold pages."""
-    stale = []
-    for path in bundle.root.rglob("index.md"):
-        rel = path.relative_to(bundle.root)
-        if path in expected or any(part.startswith(".") for part in rel.parts):
-            continue
-        siblings = [p for p in path.parent.rglob("*.md") if p.name not in ("index.md", "log.md")]
-        if not siblings:
-            stale.append(path)
-    return stale
+def _by_folder(bundle: Bundle) -> dict[str, list[Document]]:
+    """The pages an index lists, by folder: every non-reserved file with parseable frontmatter."""
+    out: dict[str, list[Document]] = {}
+    for doc in bundle.documents:
+        if not doc.is_reserved and not doc.frontmatter_error:
+            out.setdefault(doc.folder, []).append(doc)
+    return out
+
+
+def orphans(bundle: Bundle, expected: dict[Path, str] | None = None) -> list[Path]:
+    """index.md files left behind in folders that no longer hold pages (`write` deletes them)."""
+    expected = generate(bundle) if expected is None else expected
+    holding = set()  # folders with a page anywhere below them
+    for rel in bundle.files:
+        if rel.endswith(".md") and posixpath.basename(rel) not in RESERVED:
+            folder = posixpath.dirname(rel)
+            while folder and folder not in holding:
+                holding.add(folder)
+                folder = posixpath.dirname(folder)
+    return [
+        bundle.root / rel
+        for rel in sorted(bundle.files)
+        if posixpath.basename(rel) == "index.md"
+        and bundle.root / rel not in expected
+        and posixpath.dirname(rel) not in holding
+    ]
 
 
 def write(bundle: Bundle) -> list[Path]:
+    """Regenerate every index.md and delete orphaned ones; returns the paths written or deleted.
+
+    A returned path that no longer exists was deleted.
+    """
     changed = []
     expected = generate(bundle)
-    for path in _stale_index_files(bundle, expected):
+    for path in orphans(bundle, expected):
         path.unlink()
         changed.append(path)
     for path, content in expected.items():
@@ -158,9 +180,8 @@ def write(bundle: Bundle) -> list[Path]:
     return changed
 
 
-def stale(bundle: Bundle) -> list[Path]:
-    return [
-        path
-        for path, content in generate(bundle).items()
-        if not path.exists() or path.read_text(encoding="utf-8") != content
-    ]
+def stale(bundle: Bundle, expected: dict[Path, str] | None = None) -> list[Path]:
+    """index.md files that `write` would change: missing, out of date, or orphaned."""
+    expected = generate(bundle) if expected is None else expected
+    outdated = [path for path, content in expected.items() if not path.exists() or path.read_text(encoding="utf-8") != content]
+    return sorted(outdated + orphans(bundle, expected))

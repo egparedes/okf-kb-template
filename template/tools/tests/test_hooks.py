@@ -262,6 +262,25 @@ def test_gemini_success_prints_json(repo: Path, monkeypatch, capsys) -> None:
     assert capsys.readouterr().out.split() == ["{}", "{}"]
 
 
+def test_files_outside_the_bundle_listing_are_not_pages(repo: Path, monkeypatch, capsys) -> None:
+    git(repo, "init", "-q")
+    (repo / ".gitignore").write_text("kb/private/\n")
+    indexgen.write(fresh(repo))
+    ignored = repo / "kb" / "private" / "draft.md"
+    ignored.parent.mkdir(parents=True)
+    ignored.write_text("no frontmatter\n")
+    trash = repo / "kb" / ".trash" / "old.md"
+    trash.parent.mkdir(parents=True)
+    trash.write_text("no frontmatter\n")
+    for path in (ignored, trash):  # a file tool writes them: not checked, not recorded
+        assert hook(monkeypatch, repo, "post-edit", session_id="s", tool_input={"file_path": str(path)}) == 0
+    assert hook(monkeypatch, repo, "pre-tool", session_id="s", tool_use_id="t") == 0
+    ignored.write_text("changed, still no frontmatter\n")  # a shell command changes it
+    assert hook(monkeypatch, repo, "post-tool", session_id="s", tool_use_id="t") == 0
+    assert hook(monkeypatch, repo, "stop", session_id="s") == 0  # nothing to check, nothing to log
+    assert capsys.readouterr().err == ""
+
+
 def test_relative_file_path_and_log_edit_first(repo: Path, monkeypatch) -> None:
     page = write(repo, "systems/a.md", "A")
     indexgen.write(fresh(repo))
