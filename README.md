@@ -47,6 +47,19 @@ uv run poe docs                # build it into site/ (strict)
 `uv run poe` lists these tasks; they are defined in `[tool.poe.tasks]` of
 `pyproject.toml`.
 
+CI (`.github/workflows/template.yml`) runs `uv run poe test` from the
+locked environment (`uv sync --locked`) on Linux, macOS and Windows, with
+Python 3.11 and 3.14; the Linux job with Python 3.11 runs in the C locale
+without UTF-8 mode, which catches file access that relies on the platform's
+default encoding. `docs.yml` builds the documentation site; `links.yml`
+checks its external links on demand. The actions are pinned by commit SHA
+and `.github/dependabot.yml` proposes updates weekly. Dependabot reads only
+`.github/workflows/`, not the knowledge base's `kb.yml` inside `template/`:
+`tests/test_workflows.py` fails until `kb.yml` uses the same pins, so update
+it in the Dependabot pull request.
+`.gitattributes` keeps LF line endings in every checkout: Copier renders
+files byte for byte, so a CRLF checkout would produce CRLF knowledge bases.
+
 Tag releases (`v0.1.0`, …) and push the tags with the commits
 (`git push origin main --tags`). Generated knowledge bases record the tag
 in `.copier-answers.yml`, and `copier update` moves between tags.

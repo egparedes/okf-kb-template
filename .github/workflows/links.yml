@@ -1,0 +1,21 @@
+name: links
+
+# Checks the external URLs of the documentation with lychee, on demand.
+# It also keeps lychee-action in a workflow Dependabot scans: the template's
+# kb.yml uses the same pin, and tests/test_workflows.py holds the two equal.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: --no-progress --scheme https --scheme http --accept '200..=299,403,429' 'docs/**/*.md' README.md
+          fail: true

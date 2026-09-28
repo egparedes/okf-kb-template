@@ -1,7 +1,15 @@
 name: kb
 
+# Actions are pinned by commit (the comment names the release); Dependabot
+# (.github/dependabot.yml) proposes updates, and `copier update` brings the
+# template's current pins.
+
 permissions:
   contents: read
+
+defaults:
+  run:
+    shell: bash # the same shell on every runner, Windows included
 
 on:
   push:
@@ -15,21 +23,26 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v7
-      - run: uv sync
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: Install the tooling
+        # uv.lock is written by the first `uv run` and committed with the knowledge
+        # base; --locked fails when it no longer matches pyproject.toml. A knowledge
+        # base pushed before its first `uv run` has no uv.lock yet: resolve then.
+        run: |
+          if [ -f uv.lock ]; then uv sync --locked; else uv sync; fi
       - run: uv run poe ci
 
   links:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Find the knowledge-base folder
         run: |
           n=$(sed -n '/^\[tool\.kb\]/,/^\[/s/^bundle = "\(.*\)"$/\1/p' pyproject.toml)
           echo "BUNDLE=${n:-kb}" >> "$GITHUB_ENV"
-      - uses: lycheeverse/lychee-action@v2
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: --no-progress --scheme https --scheme http --accept '200..=299,403,429' --root-dir ${{ github.workspace }}/${{ env.BUNDLE }} --exclude-path ${{ env.BUNDLE }}/.obsidian '${{ env.BUNDLE }}/**/*.md'
           fail: true

@@ -114,7 +114,12 @@ Gemini CLI runs the hooks in the project directory, so its commands have no
 `cd`, and they work in PowerShell on Windows. As with the pre-tool hook
 everywhere, the Gemini hooks around tools end in `; exit 0` and the Codex
 post-tool hook in `|| true`: their problems come back as JSON with exit 0,
-so a failing `uv` must not turn into a blocked tool. The stop hooks keep
+so a failing `uv` must not turn into a blocked tool. The Python side of
+these hooks exits 0 whatever goes wrong in it. Codex does not document the
+shell it runs hooks with on Windows, so there it runs each hook's
+`commandWindows`, the same command without `|| true`. The one gap left: if
+`uv` itself cannot start on Windows, it exits 2 and Codex blocks the
+command until `uv sync` repairs the environment. The stop hooks keep
 exit 2, which is how they send the agent back. Its payload has no tool-call
 id, so commands that overlap share one "before" listing: the one taken
 before the first of them is kept until a later hook uses it.

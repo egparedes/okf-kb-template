@@ -23,11 +23,11 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import time
 from pathlib import Path
 
 from .bundle import TOUCHED
+from .fsutil import remove_tree
 
 STATE = ".cache/kb-hooks"
 HASHES = "hashes.json"  # content hashes of the bundle's pages, shared by all sessions
@@ -234,7 +234,7 @@ class Session:
     # -- lifecycle ---------------------------------------------------------------
 
     def clear(self) -> None:
-        shutil.rmtree(self.dir, ignore_errors=True)
+        remove_tree(self.dir, ignore_errors=True)
         cutoff = time.time() - KEEP_DAYS * 86400
         try:
             others = list((self.repo_root / STATE).iterdir())
@@ -244,7 +244,7 @@ class Session:
         for other in others:
             try:
                 if other.is_dir() and other.stat().st_mtime < cutoff:
-                    shutil.rmtree(other, ignore_errors=True)
+                    remove_tree(other, ignore_errors=True)
                 elif other.name.endswith(".tmp") and other.is_file() and other.stat().st_mtime < tmp_cutoff:
                     other.unlink()  # left by a hook that was killed while writing the hash cache
             except OSError:

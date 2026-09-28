@@ -170,9 +170,13 @@ def filters_ranking(bundle: Bundle, filters: dict[str, Any]) -> list[str]:
 def qmd_ranking(collection: str, query: str, limit: int) -> list[str]:
     """`qmd query --json` results as bundle-absolute paths."""
     try:
+        argv = search.qmd_argv("query", "-c", collection, "--json", "-n", str(limit), "--", query)
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from None
+    try:
         result = subprocess.run(
-            ["qmd", "query", "-c", collection, "--json", "-n", str(limit), "--", query],
-            capture_output=True, text=True, check=False, timeout=QMD_TIMEOUT,
+            argv,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, timeout=QMD_TIMEOUT,
         )
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"`qmd query` timed out after {QMD_TIMEOUT} s") from None

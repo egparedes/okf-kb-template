@@ -8,6 +8,7 @@
           {
             "type": "command",
             "command": "uv run --quiet python -m kbtools.hooks pre-tool --agent codex || true",
+            "commandWindows": "uv run --quiet python -m kbtools.hooks pre-tool --agent codex",
             "timeout": 30
           }
         ]
@@ -20,6 +21,7 @@
           {
             "type": "command",
             "command": "uv run --quiet python -m kbtools.hooks post-tool --agent codex || true",
+            "commandWindows": "uv run --quiet python -m kbtools.hooks post-tool --agent codex",
             "timeout": 60
           }
         ]

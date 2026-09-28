@@ -18,6 +18,12 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REAL_RUN = subprocess.run
 
 
+@pytest.fixture(autouse=True)
+def _plain_qmd_command(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The faked qmd is called `qmd`, even where a real one is installed (a full path, or node + script)."""
+    monkeypatch.setattr(search, "qmd_argv", lambda *args: ["qmd", *args])
+
+
 def _fake_qmd(fake):
     """A subprocess.run stand-in that fakes `qmd` only; other commands (the bundle's git listing) really run."""
     return lambda cmd, **kwargs: fake(cmd, **kwargs) if cmd[0] == "qmd" else REAL_RUN(cmd, **kwargs)

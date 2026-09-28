@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import time
 from pathlib import Path
@@ -161,7 +162,8 @@ def test_import_converts_links_and_frontmatter(repo, vault, monkeypatch) -> None
     assert "# not a heading [[not a link]]" in body  # code is untouched
     assert "dataview" not in body
     assert (kb / "systems/old/assets/diagram.png").read_text() == "PNG"
-    assert (kb / "systems/old/scripts/run-me.sh").stat().st_mode & 0o111
+    if os.name != "nt":  # Windows has no executable bit
+        assert (kb / "systems/old/scripts/run-me.sh").stat().st_mode & 0o111
     assert not (kb / "systems/old/assets/unused.pdf").exists()
 
     setup = parse_document(kb / "systems/old/guides/setup.md", kb)

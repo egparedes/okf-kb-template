@@ -95,7 +95,7 @@ def new_page(
     fm += generated_line(generated)
     sections = "\n".join(f"# {s}\n" for s in spec.get("sections", []))
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"---\n{fm}---\n\n{body_intro}{sections}", encoding="utf-8")
+    path.write_text(f"---\n{fm}---\n\n{body_intro}{sections}", encoding="utf-8", newline="\n")
     record_touched(bundle.repo_root, [path])
     return path
 
@@ -125,5 +125,5 @@ def add_log_entry(bundle: Bundle, op: str, message: str, day: date | None = None
             text = text[: first.start()] + section + text[first.start() :]
         else:
             text = text.rstrip("\n") + "\n\n" + section
-    path.write_text(text.rstrip("\n") + "\n", encoding="utf-8")
+    path.write_text(text.rstrip("\n") + "\n", encoding="utf-8", newline="\n")
     return path

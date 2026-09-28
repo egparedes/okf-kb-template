@@ -30,6 +30,7 @@ import sys
 from pathlib import Path
 
 from .bundle import bundle_dir, find_repo_root
+from .fsutil import remove_tree
 from .session import Session
 
 EVENTS = ("pre-tool", "post-tool", "post-edit", "stop")
@@ -230,7 +231,7 @@ def repair_skills_link(repo_root: Path) -> str | None:
     if link.is_dir():
         if not (link / _COPY_MARKER).is_file():
             return None  # a real folder someone made: leave it alone
-        shutil.rmtree(link)
+        remove_tree(link)
         _copy_skills(target, link)
         return f"refreshed the copy of .agents/skills in {SKILLS_LINK.as_posix()}"
     if not link.is_file() or link.stat().st_size > 256:
@@ -270,7 +271,8 @@ def _copy_skills(target: Path, link: Path) -> None:
 def _hide_from_git(repo_root: Path) -> None:
     """Keep the replaced `.claude/skills` out of `git status` (it is tracked as a symlink)."""
     def git(*args: str) -> subprocess.CompletedProcess:
-        return subprocess.run(["git", *args], cwd=repo_root, capture_output=True, text=True, check=False)
+        return subprocess.run(["git", *args], cwd=repo_root, capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", check=False)
 
     if git("ls-files", "--error-unmatch", "--", SKILLS_LINK.as_posix()).returncode != 0:
         return
@@ -303,19 +305,24 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m kbtools.hooks", description="agent hook entry points")
     parser.add_argument("event", choices=EVENTS)
     parser.add_argument("--agent", choices=AGENTS, default="claude", help="the CLI that runs the hook")
-    if "pre-tool" not in argv:
+    # A pre-tool hook that exits 2 blocks the shell command, and every later one; Codex and
+    # Gemini CLI get the problems of the other tool hooks as JSON with exit 0. Whatever goes
+    # wrong in those (arguments, a missing repository), they exit 0, so their commands need
+    # no shell-specific `|| true` for errors raised here (Codex's commandWindows has none).
+    agents = {a.split("=", 1)[1] for a in argv if a.startswith("--agent=")}
+    agents |= {value for flag, value in zip(argv, argv[1:]) if flag == "--agent"}
+    never_fail = "pre-tool" in argv or ("stop" not in argv and bool(agents & {"codex", "gemini"}))
+    if not never_fail:
         args = parser.parse_args(argv)
         return run(args.event, args.agent)
-    # A pre-tool hook that exits 2 blocks the shell command, and every later one:
-    # whatever goes wrong (arguments, a missing repository), it exits 0.
     try:
         args = parser.parse_args(argv)
         return run(args.event, args.agent)
     except BaseException as exc:  # noqa: BLE001 - includes argparse's SystemExit
         if isinstance(exc, KeyboardInterrupt):
             raise
-        print(f"kb hook pre-tool: {exc}", file=sys.stderr)
-        if "gemini" in argv:
+        print(f"kb hook {' '.join(argv[:1])}: {exc}", file=sys.stderr)
+        if "gemini" in agents:
             print("{}")
         return 0
 

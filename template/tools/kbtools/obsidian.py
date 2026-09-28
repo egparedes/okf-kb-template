@@ -14,17 +14,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
-import subprocess
-import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 from urllib.parse import quote
 
 from .bundle import Bundle
-from .resources import child_env
+from .resources import open_with_default_app
 
 PINS = Path("tools") / "obsidian-plugins.json"
 RELEASE_URL = "https://github.com/{repo}/releases/download/{version}/{file}"
@@ -98,11 +95,7 @@ def _read_listing(listing: Path) -> list[str]:
 
 def _open(uri: str) -> None:
     try:
-        if sys.platform == "win32":
-            os.startfile(uri)  # noqa: S606 - opening a URI with the default handler
-        else:
-            opener = "open" if sys.platform == "darwin" else "xdg-open"
-            subprocess.Popen([opener, uri], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=child_env())
+        open_with_default_app(uri)
     except OSError as exc:
         print(f"could not open {uri}: {exc}")
 

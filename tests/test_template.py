@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -35,9 +37,61 @@ def render(tmp_path: Path, answers: dict) -> Path:
 
 
 def run(cmd: list[str], cwd: Path) -> str:
-    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert result.returncode == 0, f"{' '.join(cmd)} failed:\n{result.stdout}\n{result.stderr}"
     return result.stdout + result.stderr
+
+
+def read(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def write(path: Path, text: str) -> None:
+    path.write_text(text, encoding="utf-8", newline="\n")  # LF on Windows too, like a checkout
+
+
+def venv_command(project: Path, name: str) -> str:
+    """A console script of the project's virtual environment (bin/ on POSIX, Scripts/*.exe on Windows)."""
+    if os.name == "nt":
+        return str(project / ".venv" / "Scripts" / f"{name}.exe")
+    return str(project / ".venv" / "bin" / name)
+
+
+def fake_command(tmp_path: Path, name: str, body: str) -> dict[str, str]:
+    """An environment whose PATH starts with a stand-in `name` that runs the Python `body`:
+    a shell script on POSIX, a .bat wrapper on Windows (found through PATHEXT)."""
+    bin_dir, scripts = tmp_path / "fake-bin", tmp_path / "fake-scripts"
+    bin_dir.mkdir(exist_ok=True)
+    scripts.mkdir(exist_ok=True)
+    script = scripts / f"{name}.py"
+    write(script, body)
+    if os.name == "nt":
+        (bin_dir / f"{name}.bat").write_text(f'@"{sys.executable}" "{script}" %*\r\n', encoding="utf-8", newline="")
+    else:
+        write(bin_dir / name, f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n')
+        (bin_dir / name).chmod(0o755)
+    return dict(os.environ, PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+
+
+def posix_shell() -> list[str] | None:
+    """The shell that runs a hook command: /bin/sh on POSIX, Git Bash on Windows (Claude Code
+    runs its hooks with Git Bash there); None when Git Bash is not found."""
+    if os.name != "nt":
+        return ["/bin/sh", "-c"]
+    git = shutil.which("git")
+    candidates = [Path(git).resolve().parents[i] / "bin" / "bash.exe" for i in (1, 2)] if git else []
+    bash = next((str(c) for c in candidates if c.is_file()), None)
+    return [bash, "-c"] if bash else None
+
+
+def hook_shell(agent: str) -> list[str] | None:
+    """The shell each agent runs hook commands with. Gemini CLI uses PowerShell on Windows
+    (Windows PowerShell 5.1 is the strictest about `;` and `||`) and bash elsewhere; Claude Code
+    uses Git Bash on Windows; Codex's Windows shell is not documented (hence commandWindows)."""
+    if os.name == "nt" and agent == "gemini":
+        powershell = shutil.which("powershell") or shutil.which("pwsh")
+        return [powershell, "-NoProfile", "-NonInteractive", "-Command"] if powershell else None
+    return posix_shell()
 
 
 @pytest.mark.skipif(shutil.which("uv") is None, reason="uv is required to run the rendered tooling")
@@ -48,11 +102,16 @@ def test_rendered_knowledge_base_is_conformant(tmp_path: Path, variant: str) -> 
     dst = render(tmp_path, answers)
     assert (dst / ".copier-answers.yml").is_file()
     assert not (dst / "kb").exists()
-    assert "okf_version" in (dst / bundle / "index.md").read_text()
-    assert f'bundle = "{bundle}"' in (dst / "pyproject.toml").read_text()
-    assert f"{bundle}/.obsidian/plugins/*/*" in (dst / ".gitignore").read_text()
-    assert f"^{bundle}/" in (dst / ".pre-commit-config.yaml").read_text()
-    assert f"`{bundle}/`" in (dst / "AGENTS.md").read_text()
+    assert "okf_version" in read(dst / bundle / "index.md")
+    assert f'bundle = "{bundle}"' in read(dst / "pyproject.toml")
+    assert f"{bundle}/.obsidian/plugins/*/*" in read(dst / ".gitignore")
+    assert f"^{bundle}/" in read(dst / ".pre-commit-config.yaml")
+    assert f"`{bundle}/`" in read(dst / "AGENTS.md")
+    assert "* text=auto eol=lf" in read(dst / ".gitattributes")
+    skills = dst / ".claude" / "skills"
+    if answers.get("claude_code", True):  # a symlink, or the placeholder of a checkout without symlinks (kb setup repairs it)
+        assert (skills / "kb-ingest" / "SKILL.md").is_file() or read(skills).strip() == "../.agents/skills"
+    assert b"\r\n" not in (dst / "AGENTS.md").read_bytes()  # a CRLF checkout of the template would show here
     assert "0 error(s), 0 warning(s)" in run(["uv", "run", "--quiet", "kb", "check"], dst)
     run(["uv", "run", "--quiet", "kb", "index", "--check"], dst)
     run(["uv", "run", "--quiet", "pytest", "-q"], dst)
@@ -61,15 +120,12 @@ def test_rendered_knowledge_base_is_conformant(tmp_path: Path, variant: str) -> 
     name = VARIANTS[variant].get("kb_name", "my-kb")
     probe = "from kbtools.bundle import Bundle; from kbtools import search; b = Bundle.discover(); print(b.prefix, search.qmd_collection(b))"
     assert run(["uv", "run", "--quiet", "python", "-c", probe], dst).split() == [bundle, name]
-    listing = subprocess.run(["uv", "run", "--quiet", "poe"], cwd=dst, capture_output=True, text=True).stdout  # lists, exits 1
+    listing = subprocess.run(["uv", "run", "--quiet", "poe"], cwd=dst, capture_output=True, text=True,
+                             encoding="utf-8", errors="replace").stdout  # lists, exits 1
     assert all(task in listing for task in ("setup", "check", "ci", "rename-bundle", "obsidian-setup", "search"))
-    fake = tmp_path / "fake-bin"  # a stand-in uv that prints its arguments (no network)
-    fake.mkdir(exist_ok=True)
-    (fake / "uv").write_text('#!/bin/sh\necho "uv $*"\n')
-    (fake / "uv").chmod(0o755)
-    env = dict(os.environ, PATH=f"{fake}{os.pathsep}{os.environ['PATH']}")
-    poe = str(dst / ".venv" / "bin" / "poe")
-    out = subprocess.run([poe, "validate-okf"], cwd=dst, env=env, capture_output=True, text=True).stdout
+    env = fake_command(tmp_path, "uv", 'import sys\nprint("uv", *sys.argv[1:])\n')  # prints its arguments (no network)
+    out = subprocess.run([venv_command(dst, "poe"), "validate-okf"], cwd=dst, env=env, capture_output=True, text=True,
+                         encoding="utf-8", errors="replace").stdout
     assert out.rstrip().endswith(f"okf_validate.py {bundle}"), out
     assert not (dst / "justfile").exists() and (dst / "tasks.toml").is_file()
     _check_agent_hooks(dst, answers)
@@ -88,7 +144,7 @@ def _check_agent_hooks(dst: Path, answers: dict) -> None:
         assert path.is_file() == wanted, path
         if not wanted:
             continue
-        config = json.loads(path.read_text())
+        config = json.loads(read(path))
         commands = [h["command"] for groups in config["hooks"].values() for group in groups for h in group["hooks"]]
         assert commands and all("python -m kbtools.hooks" in c for c in commands)
         # Hooks that must never block the tool end in a shell-neutral "succeed anyway";
@@ -104,14 +160,22 @@ def _check_agent_hooks(dst: Path, answers: dict) -> None:
             assert [g["matcher"] for g in config["hooks"]["PostToolUseFailure"]] == ["Bash"]
         if agent == "gemini":  # Gemini runs hooks in the project dir and quotes $GEMINI_PROJECT_DIR itself
             assert not any("$GEMINI_PROJECT_DIR" in c or "&&" in c or "||" in c for c in commands)
-        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(dst))
-        for command in commands:
+        if agent == "codex":  # the shell Codex uses on Windows is not documented: no shell syntax there
+            hooks = [h for groups in config["hooks"].values() for group in groups for h in group["hooks"]]
+            for h in hooks:
+                windows = h.get("commandWindows", h["command"])
+                assert not re.search(r"\|\||&&|;|\$", windows) and windows in h["command"], h
+            if os.name == "nt":
+                commands = [h.get("commandWindows", h["command"]) for h in hooks]
+        env, shell = dict(os.environ, CLAUDE_PROJECT_DIR=str(dst)), hook_shell(agent)
+        for command in commands if shell else ():  # Windows without Git Bash or PowerShell: not run
             payload = '{"session_id": "template-test", "tool_input": {}}'
-            result = subprocess.run(command, shell=True, cwd=dst, env=env, input=payload, capture_output=True, text=True)
+            result = subprocess.run([*shell, command], cwd=dst, env=env, input=payload, capture_output=True,
+                                    text=True, encoding="utf-8", errors="replace")
             assert result.returncode == 0, (agent, command, result.stderr)
             assert result.stdout.strip() == ("{}" if agent == "gemini" else ""), (agent, command, result.stdout)
     if answers.get("gemini_cli"):
-        assert json.loads(configs["gemini"][0].read_text())["context"]["fileName"][0] == "AGENTS.md"
+        assert json.loads(read(configs["gemini"][0]))["context"]["fileName"][0] == "AGENTS.md"
     shutil.rmtree(dst / ".cache" / "kb-hooks", ignore_errors=True)
 
 
@@ -137,16 +201,16 @@ def test_update_keeps_owned_files_and_updates_managed_ones(tmp_path: Path) -> No
     run_copy(str(src), dst, defaults=True, unsafe=True, quiet=True, vcs_ref="v0.0.1")
     git("init", "-q", cwd=dst), git("add", "-A", cwd=dst), git("commit", "-qm", "init", cwd=dst)
     owned = dst / "schema" / "vocabulary.yaml"
-    owned.write_text(owned.read_text() + "# local edit\n")
+    write(owned, read(owned) + "# local edit\n")
     git("commit", "-qam", "local", cwd=dst)
     managed = src / "template" / "AGENTS.md.jinja"
-    managed.write_text(managed.read_text() + "\n<!-- upstream change -->\n")
-    (src / "template" / "schema" / "vocabulary.yaml").write_text("# upstream would clobber\n")
+    write(managed, read(managed) + "\n<!-- upstream change -->\n")
+    write(src / "template" / "schema" / "vocabulary.yaml", "# upstream would clobber\n")
     git("commit", "-qam", "v2"), git("tag", "v0.0.2")
     run_update(dst, defaults=True, unsafe=True, quiet=True, overwrite=True, vcs_ref="v0.0.2")
-    assert "# local edit" in owned.read_text()
-    assert "<!-- upstream change -->" in (dst / "AGENTS.md").read_text()
-    assert "_commit: v0.0.2" in (dst / ".copier-answers.yml").read_text()
+    assert "# local edit" in read(owned)
+    assert "<!-- upstream change -->" in read(dst / "AGENTS.md")
+    assert "_commit: v0.0.2" in read(dst / ".copier-answers.yml")
 
 
 def test_optional_parts_are_omitted(tmp_path: Path) -> None:
@@ -154,7 +218,7 @@ def test_optional_parts_are_omitted(tmp_path: Path) -> None:
     for path in (".claude", "CLAUDE.md", ".codex", ".gemini", ".github", "cookbook/.obsidian", "cookbook/_templates",
                  "docs/obsidian-setup.md"):
         assert not (dst / path).exists(), path
-    assert "Obsidian vault" not in (dst / "AGENTS.md").read_text()
+    assert "Obsidian vault" not in read(dst / "AGENTS.md")
 
 
 def _template_repo(tmp_path: Path):
@@ -167,16 +231,14 @@ def _template_repo(tmp_path: Path):
 
 def _as_pre_v05(src: Path) -> None:
     """Turn a template checkout into the v0.4 layout: no bundle_dir question, the folder is always kb/."""
-    import re
-
     copier_yml = src / "copier.yml"
-    text = copier_yml.read_text()
+    text = read(copier_yml)
     text = re.sub(r"\nbundle_dir:\n(?:  .*\n|    .*\n)+", "\n", text)
-    copier_yml.write_text(text.replace("{{ bundle_dir }}", "kb"))
+    write(copier_yml, text.replace("{{ bundle_dir }}", "kb"))
     (src / "template" / "{{ bundle_dir }}").rename(src / "template" / "kb")
     for path in (src / "template").rglob("*.jinja"):
-        path.write_text(path.read_text().replace("{{ bundle_dir }}", "kb").replace("(bundle_dir ~ '/')", "'kb/'"))
-    (src / "template" / "justfile").write_text("# the v0.4 task runner\ncheck:\n    uv run kb check\n")
+        write(path, read(path).replace("{{ bundle_dir }}", "kb").replace("(bundle_dir ~ '/')", "'kb/'"))
+    write(src / "template" / "justfile", "# the v0.4 task runner\ncheck:\n    uv run kb check\n")
 
 
 @pytest.mark.skipif(shutil.which("uv") is None or shutil.which("git") is None, reason="needs uv and git")
@@ -192,9 +254,9 @@ def test_update_of_a_pre_v05_knowledge_base_keeps_kb(tmp_path: Path) -> None:
     git("init", "-q"), git("add", "-A"), git("commit", "-qm", "v0.4-like"), git("tag", "v0.0.1")
     dst = tmp_path / "old-instance"
     run_copy(str(src), dst, data={"kb_name": "legacy", "run_setup": False}, defaults=True, unsafe=True, quiet=True, vcs_ref="v0.0.1")
-    assert (dst / "kb" / "log.md").is_file() and "bundle_dir" not in (dst / ".copier-answers.yml").read_text()
+    assert (dst / "kb" / "log.md").is_file() and "bundle_dir" not in read(dst / ".copier-answers.yml")
     git("init", "-q", cwd=dst), git("add", "-A", cwd=dst), git("commit", "-qm", "init", cwd=dst)
-    (dst / "justfile").write_text((dst / "justfile").read_text() + "mine:\n    echo local\n")
+    write(dst / "justfile", read(dst / "justfile") + "mine:\n    echo local\n")
     git("commit", "-qam", "a local recipe", cwd=dst)
     for item in src.iterdir():  # v0.0.2 = the current template
         if item.name != ".git":
@@ -203,8 +265,8 @@ def test_update_of_a_pre_v05_knowledge_base_keeps_kb(tmp_path: Path) -> None:
     git("add", "-A"), git("commit", "-qm", "v0.5-like"), git("tag", "v0.0.2")
     run_update(dst, defaults=True, unsafe=True, quiet=True, overwrite=True, vcs_ref="v0.0.2")
     assert (dst / "kb" / "log.md").is_file() and not (dst / "legacy").exists()
-    assert 'bundle = "kb"' in (dst / "pyproject.toml").read_text()
-    assert "kb/.obsidian/plugins/*/*" in (dst / ".gitignore").read_text()
+    assert 'bundle = "kb"' in read(dst / "pyproject.toml")
+    assert "kb/.obsidian/plugins/*/*" in read(dst / ".gitignore")
     assert not (dst / "justfile").exists()  # removed upstream in v0.6: deleted even though edited
     assert "mine:" in run(["git", "show", "HEAD:justfile"], dst)  # recoverable from git, as the docs say
     assert (dst / "tasks.toml").is_file()
@@ -217,17 +279,19 @@ def test_rename_bundle_moves_everything_and_rerenders(tmp_path: Path) -> None:
     run_copy(str(src), dst, data={"kb_name": "demo"}, defaults=True, unsafe=True, quiet=True, vcs_ref="v0.0.1")
     git("init", "-q", cwd=dst), git("add", "-A", cwd=dst), git("commit", "-qm", "init", cwd=dst)
     (dst / "demo" / "general" / "draft-note.md").parent.mkdir(parents=True, exist_ok=True)
-    (dst / "demo" / "general" / "draft-note.md").write_text("untracked, not committed")
+    write(dst / "demo" / "general" / "draft-note.md", "untracked, not committed")
     template_page = dst / "demo" / "_templates" / "knowledge-page.md"
-    template_page.write_text(template_page.read_text() + "\n<!-- local edit -->\n")
-    refused = subprocess.run(["uv", "run", "--quiet", "poe", "rename-bundle", "field-notes"], cwd=dst, capture_output=True, text=True)
+    write(template_page, read(template_page) + "\n<!-- local edit -->\n")
+    refused = subprocess.run(["uv", "run", "--quiet", "poe", "rename-bundle", "field-notes"], cwd=dst, capture_output=True,
+                             text=True, encoding="utf-8", errors="replace")
     assert refused.returncode != 0 and "_templates/knowledge-page.md" in refused.stderr and (dst / "demo").is_dir()
     git("checkout", "--", "demo/_templates", cwd=dst)
     agents = dst / "AGENTS.md"
-    agents.write_text(agents.read_text() + "\nA committed local note.\n")
+    write(agents, read(agents) + "\nA committed local note.\n")
     git("commit", "-qam", "local edit to a managed file", cwd=dst)
     (dst / "demo" / "field-notes").mkdir()
-    blocked = subprocess.run(["uv", "run", "--quiet", "poe", "rename-bundle", "field-notes"], cwd=dst, capture_output=True, text=True)
+    blocked = subprocess.run(["uv", "run", "--quiet", "poe", "rename-bundle", "field-notes"], cwd=dst, capture_output=True,
+                             text=True, encoding="utf-8", errors="replace")
     assert blocked.returncode != 0 and "already has a folder named field-notes" in blocked.stderr
     (dst / "demo" / "field-notes").rmdir()
     out = run(["uv", "run", "--quiet", "poe", "rename-bundle", "field-notes"], dst)
@@ -236,16 +300,17 @@ def test_rename_bundle_moves_everything_and_rerenders(tmp_path: Path) -> None:
     assert "R100\tdemo/log.md\tfield-notes/log.md" in staged and "M\tpyproject.toml" in staged
     assert "draft-note.md" in run(["git", "status", "--porcelain"], dst).split("??", 1)[-1]  # still untracked
     assert not (dst / "demo").exists()
-    assert (dst / "field-notes" / "general" / "draft-note.md").read_text() == "untracked, not committed"
+    assert read(dst / "field-notes" / "general" / "draft-note.md") == "untracked, not committed"
     assert (dst / "field-notes" / "log.md").is_file()
-    assert 'bundle = "field-notes"' in (dst / "pyproject.toml").read_text()
-    assert "bundle_dir: field-notes" in (dst / ".copier-answers.yml").read_text()
-    assert "field-notes/.obsidian/plugins/*/*" in (dst / ".gitignore").read_text()
-    assert "`field-notes/`" in (dst / "AGENTS.md").read_text()
+    assert 'bundle = "field-notes"' in read(dst / "pyproject.toml")
+    assert "bundle_dir: field-notes" in read(dst / ".copier-answers.yml")
+    assert "field-notes/.obsidian/plugins/*/*" in read(dst / ".gitignore")
+    assert "`field-notes/`" in read(dst / "AGENTS.md")
     (dst / "field-notes" / "general" / "draft-note.md").unlink()
     run(["uv", "run", "--quiet", "kb", "index"], dst)
     assert "0 error(s)" in run(["uv", "run", "--quiet", "kb", "check"], dst)
-    bad = subprocess.run(["uv", "run", "--quiet", "poe", "rename-bundle", "schema"], cwd=dst, capture_output=True, text=True)
+    bad = subprocess.run(["uv", "run", "--quiet", "poe", "rename-bundle", "schema"], cwd=dst, capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
     assert bad.returncode != 0 and "already a folder" in bad.stderr
 
 
@@ -261,17 +326,18 @@ def test_rename_bundle_rolls_back_when_the_template_is_unreachable(tmp_path: Pat
     dst = tmp_path / "instance"
     run_copy(str(src), dst, data={"kb_name": "demo"}, defaults=True, unsafe=True, quiet=True, vcs_ref="v0.0.1")
     answers = dst / ".copier-answers.yml"
-    answers.write_text(answers.read_text().replace(f"_src_path: {src}", "_src_path: /nonexistent/template"))
+    text, found = re.subn(r"(?m)^_src_path: .*$", "_src_path: /nonexistent/template", read(answers))
+    assert found == 1
+    write(answers, text)
     git("init", "-q", cwd=dst), git("add", "-A", cwd=dst), git("commit", "-qm", "init", cwd=dst)
-    failed = subprocess.run(["uv", "run", "--quiet", "poe", "rename-bundle", "field-notes"], cwd=dst, capture_output=True, text=True)
+    failed = subprocess.run(["uv", "run", "--quiet", "poe", "rename-bundle", "field-notes"], cwd=dst, capture_output=True,
+                            text=True, encoding="utf-8", errors="replace")
     assert failed.returncode != 0 and "put back" in failed.stderr
     assert (dst / "demo" / "log.md").is_file() and not (dst / "field-notes").exists()
     assert run(["git", "status", "--porcelain"], dst).strip() == ""
 
 
 def test_custom_folder_leaves_no_stray_kb_paths(tmp_path: Path) -> None:
-    import re
-
     dst = render(tmp_path, {"kb_name": "team-notes", "bundle_dir": "notes-vault", "run_setup": False})
     stray = []
     for path in dst.rglob("*"):
@@ -303,13 +369,12 @@ def test_rename_bundle_warns_only_about_real_edits(tmp_path: Path) -> None:
 @pytest.mark.skipif(shutil.which("uv") is None, reason="needs uv")
 def test_local_tasks_and_paths_with_spaces(tmp_path: Path) -> None:
     dst = render(tmp_path / "with space", {"kb_name": "demo", "run_setup": False})
-    (dst / "tasks.toml").write_text((dst / "tasks.toml").read_text() + 'hello = { cmd = "echo local task", help = "A local task" }\n')
-    listing = subprocess.run(["uv", "run", "--quiet", "poe"], cwd=dst, capture_output=True, text=True).stdout
+    write(dst / "tasks.toml", read(dst / "tasks.toml") + 'hello = { cmd = "echo local task", help = "A local task" }\n')
+    listing = subprocess.run(["uv", "run", "--quiet", "poe"], cwd=dst, capture_output=True, text=True,
+                             encoding="utf-8", errors="replace").stdout
     assert "hello" in listing and "A local task" in listing
-    fake = tmp_path / "fake-bin"
-    fake.mkdir()
-    (fake / "lychee").write_text('#!/bin/sh\nfor a in "$@"; do echo "ARG[$a]"; done\n')
-    (fake / "lychee").chmod(0o755)
-    env = dict(os.environ, PATH=f"{fake}{os.pathsep}{os.environ['PATH']}")
-    out = subprocess.run([str(dst / ".venv" / "bin" / "poe"), "links-online"], cwd=dst, env=env, capture_output=True, text=True).stdout
-    assert f"ARG[{dst}/demo]" in out and "ARG[demo/**/*.md]" in out, out
+    env = fake_command(tmp_path, "lychee", 'import sys\nfor a in sys.argv[1:]:\n    print(f"ARG[{a}]")\n')
+    out = subprocess.run([venv_command(dst, "poe"), "links-online"], cwd=dst, env=env, capture_output=True, text=True,
+                         encoding="utf-8", errors="replace").stdout
+    root_dir = next((a for a in re.findall(r"ARG\[(.*)\]", out) if a.endswith("/demo")), "")
+    assert Path(root_dir.removesuffix("/demo")).resolve() == dst.resolve() and "ARG[demo/**/*.md]" in out, out

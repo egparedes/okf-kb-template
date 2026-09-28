@@ -17,7 +17,7 @@ offers them as defaults.
 | `claude_code` | yes/no | yes | | Adds `CLAUDE.md` and `.claude/` (settings, hooks, the `skills` symlink). |
 | `codex` | yes/no | no | | *New in v0.7.0.* Adds `.codex/hooks.json`: the knowledge-base hooks for Codex. Codex reads `AGENTS.md` and `.agents/skills/` without it. |
 | `gemini_cli` | yes/no | no | | *New in v0.7.0.* Adds `.gemini/settings.json`: Gemini CLI reads `AGENTS.md` (`context.fileName`), and runs the knowledge-base hooks. |
-| `github_ci` | yes/no | yes | | Adds `.github/workflows/kb.yml`. |
+| `github_ci` | yes/no | yes | | Adds `.github/workflows/kb.yml` and `.github/dependabot.yml`. |
 | `run_setup` | yes/no | yes | | Runs the post-copy tasks (below). Needs uv. |
 
 ## `domains`

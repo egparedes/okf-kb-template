@@ -222,14 +222,21 @@ def test_overlapping_commands_without_ids_share_the_first_snapshot(repo: Path, m
     assert set((repo / session.STATE / "g" / "touched").read_text().split()) == {"systems/a.md", "systems/b.md"}
 
 
-@pytest.mark.parametrize("argv", [["pre-tool", "--agent", "nobody"], ["pre-tool", "--bogus"], ["pre-tool"]])
-def test_pre_tool_never_blocks(tmp_path: Path, monkeypatch, capsys, argv: list[str]) -> None:
+@pytest.mark.parametrize("argv", [
+    ["pre-tool", "--agent", "nobody"], ["pre-tool", "--bogus"], ["pre-tool"],
+    # Codex and Gemini CLI tool hooks report through JSON: no shell `|| true` needed (Codex on Windows)
+    ["post-tool", "--agent", "codex", "--bogus"], ["post-edit", "--agent", "gemini", "--bogus"],
+    ["post-tool", "--agent=codex", "--bogus"], ["post-edit", "--agent=gemini", "--bogus"],
+])
+def test_tool_hooks_never_block(tmp_path: Path, monkeypatch, capsys, argv: list[str]) -> None:
     monkeypatch.delenv("KB_REPO_ROOT", raising=False)
     monkeypatch.chdir(tmp_path)  # not inside a knowledge base
     monkeypatch.setattr("sys.stdin", io.StringIO("not json"))
     assert hooks.main(argv) == 0
-    with pytest.raises(SystemExit):
-        hooks.main(["stop", "--bogus"])  # other events report usage errors as usual
+    assert capsys.readouterr().out.strip() == ("{}" if any("gemini" in a for a in argv) else "")
+    for blocking in (["stop", "--bogus"], ["stop", "--agent", "codex", "--bogus"], ["post-tool", "--bogus"]):
+        with pytest.raises(SystemExit):
+            hooks.main(blocking)  # the stop hooks and Claude Code's report usage errors as usual
 
 
 def test_pre_tool_survives_unwritable_state(repo: Path, monkeypatch) -> None:
@@ -382,7 +389,8 @@ def test_skills_placeholder_becomes_a_link(repo: Path) -> None:
                               capture_output=True, text=True).stdout
 
     assert status() == ""
-    assert "symlink" in (hooks.repair_skills_link(repo) or "")
+    how = hooks.repair_skills_link(repo) or ""
+    assert "symlink" in how or "junction" in how  # a junction on Windows without the symlink privilege
     assert (link / "kb-ingest" / "SKILL.md").is_file()
     assert status() == ""
     assert hooks.repair_skills_link(repo) is None  # nothing left to do
@@ -395,7 +403,8 @@ def test_skills_placeholder_falls_back_to_a_copy(repo: Path, monkeypatch) -> Non
         raise OSError("symbolic links are not available")
 
     monkeypatch.setattr(os, "symlink", no_symlinks)
-    monkeypatch.setattr(os, "name", "posix")
+    # no junction either (Windows): `mklink /J` fails; git is not needed here (no repository)
+    monkeypatch.setattr(hooks.subprocess, "run", lambda args, **kw: subprocess.CompletedProcess(args, 1, "", ""))
     assert "copy" in (hooks.repair_skills_link(repo) or "")
     assert (link / "kb-ingest" / "SKILL.md").is_file() and not link.is_symlink()
     (repo / ".agents" / "skills" / "kb-query").mkdir()
@@ -407,7 +416,10 @@ def test_skills_placeholder_falls_back_to_a_copy(repo: Path, monkeypatch) -> Non
 def test_dangling_skills_link_is_replaced(repo: Path, tmp_path: Path) -> None:
     link = _placeholder(repo)
     link.unlink()
-    link.symlink_to(tmp_path / "moved-away" / "skills", target_is_directory=True)  # like a junction after a move
+    try:
+        link.symlink_to(tmp_path / "moved-away" / "skills", target_is_directory=True)  # like a junction after a move
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symbolic links unavailable: {exc}")
     assert "broken" in (hooks.repair_skills_link(repo) or "")
     assert link.is_symlink() and (link / "kb-ingest" / "SKILL.md").is_file()
 

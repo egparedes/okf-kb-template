@@ -314,7 +314,10 @@ def _roots(repo: Path, tmp_path: Path, monkeypatch, deny: str) -> Path:
     (base / "Personal" / "secret.md").write_text("secret")
     (base / "pub" / "ok.md").write_text("public")
     (base / "[Zotero]" / "z.md").write_text("zotero")
-    (base / "pub" / "link").symlink_to(base / "Personal")
+    try:
+        (base / "pub" / "link").symlink_to(base / "Personal", target_is_directory=True)
+    except (OSError, NotImplementedError):  # Windows without the symlink privilege: the link case skips
+        pass
     (repo / "schema" / "resources.yaml").write_text(f"roots:\n  docs: Docs.\ndeny: {deny}\n")
     monkeypatch.setenv("KB_ROOT_DOCS", str(base))
     return base
@@ -325,7 +328,9 @@ def _roots(repo: Path, tmp_path: Path, monkeypatch, deny: str) -> Path:
     "file:docs/pub/link/secret.md", "file:docs/[Zotero]/z.md",
 ])
 def test_deny_cannot_be_bypassed(repo: Path, tmp_path: Path, monkeypatch, ref: str) -> None:
-    _roots(repo, tmp_path, monkeypatch, "['docs/Personal', 'docs/[Zotero]/**']")
+    base = _roots(repo, tmp_path, monkeypatch, "['docs/Personal', 'docs/[Zotero]/**']")
+    if "/link/" in ref and not (base / "pub" / "link").is_symlink():
+        pytest.skip("symbolic links are not available")
     with pytest.raises(SystemExit, match="deny"):
         resources.fetch(bundle(repo), ref, repo / ".cache")
     assert "public" in resources.fetch(bundle(repo), "file:docs/pub/ok.md", repo / ".cache").read_text()

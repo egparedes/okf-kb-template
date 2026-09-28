@@ -732,7 +732,10 @@ hook configurations use it because the shell hooks run on every command.
 
 Codex and Gemini CLI replace the output of a tool with the stderr of a
 hook that exits 2, so the post-tool problems come as added context there
-instead, and the agent still sees what its command printed.
+instead, and the agent still sees what its command printed. For the same
+reason, with `--agent codex` or `--agent gemini` the `post-tool` and
+`post-edit` events exit 0 even on errors (bad arguments, no knowledge
+base), like `pre-tool`.
 
 The session state lives in `.cache/kb-hooks/<session id>/`, keyed by the
 payload's `session_id` (`default` without one). A clean stop deletes it;

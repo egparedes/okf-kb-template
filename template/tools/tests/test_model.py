@@ -354,3 +354,30 @@ def test_unlinked_plural_and_separator_forms(repo: Path) -> None:
     write(repo, "programming/b.md", "B", "A domain, specific language.\n")  # punctuation between: no match
     found = unlinked.find(bundle(repo))
     assert [(m.page, m.text) for m in found] == [("/programming/a.md", "domain_specific languages")]
+
+
+def test_remove_tree_deletes_read_only_files(tmp_path: Path, monkeypatch) -> None:
+    """Windows refuses to delete read-only files (git objects, copies of read-only pages)."""
+    import os
+    import stat
+
+    from kbtools import fsutil
+
+    tree = tmp_path / "backup"
+    (tree / "objects").mkdir(parents=True)
+    for path in (tree / "objects" / "ab12", tree / "0"):
+        path.write_text("x", encoding="utf-8")
+        path.chmod(stat.S_IREAD)
+    real_unlink = os.unlink
+
+    def windows_unlink(path, *, dir_fd=None):
+        if not os.stat(path, dir_fd=dir_fd).st_mode & stat.S_IWRITE:
+            raise PermissionError(f"read-only: {path}")
+        real_unlink(path, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "unlink", windows_unlink)
+    fsutil.remove_tree(tree)
+    assert not tree.exists()
+    with pytest.raises(FileNotFoundError):
+        fsutil.remove_tree(tree)
+    fsutil.remove_tree(tree, ignore_errors=True)

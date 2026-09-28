@@ -31,7 +31,8 @@ _WORD = re.compile(r"([\w-]+)")
 
 
 def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=check, errors="replace")
+    return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=check, encoding="utf-8",
+                          errors="replace")  # `git show` prints the UTF-8 files as stored, whatever the locale
 
 
 def _fail(message: str) -> SystemExit:
@@ -93,7 +94,8 @@ def _rewrite_touched(repo: Path, old: str, new: str) -> None:
     root = repo.resolve()
     before, after = str(root / old) + os.sep, str(root / new) + os.sep  # record_touched writes resolved OS paths
     lines = touched.read_text(encoding="utf-8").splitlines()
-    touched.write_text("".join((after + l[len(before):] if l.startswith(before) else l) + "\n" for l in lines), encoding="utf-8")
+    text = "".join((after + l[len(before):] if l.startswith(before) else l) + "\n" for l in lines)
+    touched.write_text(text, encoding="utf-8", newline="\n")
 
 
 def rename(bundle: Bundle, new: str, recopy_command: list[str] | None = None) -> int:

@@ -106,6 +106,27 @@ def child_env() -> dict[str, str]:
             if k not in drop and (k.upper().startswith("UV_") or not _SECRET_NAME.search(k))}
 
 
+_PLATFORM = sys.platform  # a seam for tests
+
+
+def open_with_default_app(target: str) -> None:
+    """Hand a URL or file path to the desktop's default handler (`open`, `xdg-open`, or the Windows shell).
+
+    Raises OSError when there is no opener. On Windows os.startfile passes the
+    target to the shell directly (no cmd.exe to reinterpret `&` in a URL); it
+    takes no environment, so kb's own is first reduced to child_env() (kb
+    exits right after, so nothing needs it back).
+    """
+    if _PLATFORM == "win32":
+        keep = child_env()
+        for name in [n for n in os.environ if n not in keep]:
+            del os.environ[name]
+        os.startfile(target)  # noqa: S606 - opening a URI with the default handler
+        return
+    opener = "open" if _PLATFORM == "darwin" else "xdg-open"
+    subprocess.Popen([opener, target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=child_env())
+
+
 def read_config(repo_root: Path) -> tuple[dict, list[str]]:
     """schema/resources.yaml as a dict, plus shape errors (reported by `kb check`)."""
     path = repo_root / "schema" / "resources.yaml"
@@ -281,7 +302,10 @@ class ZoteroDB:
         source = data_dir / "zotero.sqlite"
         if not source.is_file():
             raise ResourceError(f"kb: no zotero.sqlite in ZOTERO_DATA_DIR ({data_dir})")
-        self._tmp = tempfile.TemporaryDirectory(prefix="kb-zotero-")
+        # close() removes the snapshot; ignore_cleanup_errors is the fallback when an owner forgets
+        # (Windows cannot delete the database file while a connection is open)
+        self._tmp = tempfile.TemporaryDirectory(prefix="kb-zotero-", ignore_cleanup_errors=True)
+        self.db: sqlite3.Connection | None = None
         target = Path(self._tmp.name) / "zotero.sqlite"
         try:
             shutil.copy2(source, target)
@@ -292,7 +316,21 @@ class ZoteroDB:
             self.db.row_factory = sqlite3.Row
             self.library = self._library(group_id)
         except (OSError, sqlite3.DatabaseError) as exc:
+            self.close()
             raise ResourceError(f"kb: cannot read the Zotero database snapshot ({exc}); retry, or close Zotero") from None
+
+    def close(self) -> None:
+        """Close the connection, then delete the snapshot (in this order, for Windows)."""
+        if self.db is not None:
+            self.db.close()
+            self.db = None
+        self._tmp.cleanup()
+
+    def __enter__(self) -> ZoteroDB:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
 
     def _library(self, group_id: str | None) -> int | None:
         """libraryID of the configured group, else of the user library (None: a schema without libraries)."""
@@ -408,10 +446,22 @@ class Zotero:
     def _offline(self) -> ZoteroDB | None:
         if self.data_dir is None:
             return None
-        if not hasattr(self, "_db"):
+        if getattr(self, "_db", None) is None:
             self._db = ZoteroDB(self.data_dir, self.settings.zotero_group_id)
             self.used = "database snapshot"
         return self._db
+
+    def close(self) -> None:
+        """Release the database snapshot, if one was opened."""
+        db, self._db = getattr(self, "_db", None), None
+        if db is not None:
+            db.close()
+
+    def __enter__(self) -> Zotero:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
 
     def _api_or_offline(self, call, offline):
         try:
@@ -709,10 +759,10 @@ def fetch(bundle: Bundle, ref: str, out_dir: Path) -> Path:
     settings = Settings.load(bundle)
     scheme, rest = split_ref(ref)
     if scheme == "zotero":
-        zotero = Zotero(settings)
-        item = zotero.item(rest)
-        text, name = zotero.fulltext(item["key"]), zotero_citekey_slug(item)
-        header = f"<!-- zotero:{item['key']} via {zotero.used or 'storage cache'} -->\n# {item.get('title', '')}\n\n"
+        with Zotero(settings) as zotero:
+            item = zotero.item(rest)
+            text, name = zotero.fulltext(item["key"]), zotero_citekey_slug(item)
+            header = f"<!-- zotero:{item['key']} via {zotero.used or 'storage cache'} -->\n# {item.get('title', '')}\n\n"
     elif scheme == "karakeep":
         keep = KaraKeep()
         bookmark = keep.find(rest) or keep.save(rest)
@@ -734,16 +784,38 @@ def fetch(bundle: Bundle, ref: str, out_dir: Path) -> Path:
     return target
 
 
+# File types the desktop runs instead of showing (Windows PATHEXT and shell types, macOS, Linux desktops).
+RUN_ON_OPEN = frozenset({
+    ".exe", ".com", ".bat", ".cmd", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh", ".msc", ".msi", ".msp",
+    ".scr", ".cpl", ".pif", ".lnk", ".url", ".ps1", ".psm1", ".reg", ".hta", ".jar", ".appref-ms",
+    ".app", ".command", ".tool", ".scpt", ".workflow", ".pkg", ".desktop", ".appimage",
+})
+
+
+def _runs_when_opened(path: Path) -> bool:
+    pathext = {e.lower() for e in os.environ.get("PATHEXT", "").split(os.pathsep) if e}
+    return path.suffix.lower() in RUN_ON_OPEN | pathext
+
+
 def open_target(bundle: Bundle, ref: str) -> str:
     """What `kb open` hands to the desktop: a zotero:// URL, a file path or a web URL."""
     settings = Settings.load(bundle)
     scheme, rest = split_ref(ref)
     if scheme == "zotero":
-        key = rest if ZOTERO_KEY.match(rest) else str(Zotero(settings).item(rest).get("key"))
+        if ZOTERO_KEY.match(rest):
+            key = rest
+        else:
+            with Zotero(settings) as zotero:
+                key = str(zotero.item(rest).get("key"))
         if not ZOTERO_KEY.match(key):
             raise ResourceError(f"kb: `{key}` is not a Zotero item key")
         library = f"groups/{settings.zotero_group_id}" if settings.zotero_group_id else "library"
         return f"zotero://select/{library}/items/{key}"
     if scheme == "file":
-        return str(resolve_file(settings, rest))  # absolute, so never read as an option
+        path = resolve_file(settings, rest)
+        if _runs_when_opened(path):
+            folder = rest.rsplit("/", 1)[0] if "/" in rest else rest
+            raise ResourceError(f"kb: {path.name} is a program or a shortcut, which the desktop would run rather "
+                                f"than show; `kb open file:{folder}` opens its folder")
+        return str(path)  # absolute, so never read as an option
     return web_url(rest)

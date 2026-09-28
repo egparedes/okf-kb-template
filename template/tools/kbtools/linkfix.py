@@ -42,6 +42,7 @@ from urllib.parse import unquote
 import yaml
 
 from .bundle import RESERVED, Bundle, Document, record_touched
+from .fsutil import remove_tree
 from .mdlinks import Relation, encode_path, parse_relation, resolve
 
 BACKUPS = ".cache/kb-backup"
@@ -533,7 +534,7 @@ def _commit(bundle: Bundle, writes: dict[Path, str], move: tuple[Path, Path] | N
                 manifest.append(f"{len(saved) - 1}\t{path}")
         (backup / "MANIFEST").write_text("\n".join(manifest) + "\n", encoding="utf-8")
     except BaseException:  # nothing was changed yet
-        shutil.rmtree(backup, ignore_errors=True)
+        remove_tree(backup, ignore_errors=True)
         raise
     undo: list[Callable[[], None]] = []
     try:
@@ -563,8 +564,8 @@ def _commit(bundle: Bundle, writes: dict[Path, str], move: tuple[Path, Path] | N
         if failed:
             raise SystemExit(f"{what}: failed ({exc}), and could not undo every step ({'; '.join(failed)}); "
                              f"the original files are in {backup} (see its MANIFEST)") from exc
-        shutil.rmtree(backup, ignore_errors=True)
+        remove_tree(backup, ignore_errors=True)
         if isinstance(exc, Exception):
             raise SystemExit(f"{what}: failed ({exc}); nothing was changed") from exc
         raise
-    shutil.rmtree(backup, ignore_errors=True)
+    remove_tree(backup, ignore_errors=True)

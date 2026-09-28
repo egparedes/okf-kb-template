@@ -1070,7 +1070,7 @@ def _write(bundle: Bundle, plan: Plan) -> list[Path]:
             staged = staging / (item.dest or "")
             staged.parent.mkdir(parents=True, exist_ok=True)
             if item.note:
-                staged.write_text(plan.outputs[item.dest or ""], encoding="utf-8")
+                staged.write_text(plan.outputs[item.dest or ""], encoding="utf-8", newline="\n")
             else:
                 with _open_source(plan, item) as handle, staged.open("wb") as out:
                     shutil.copyfileobj(handle, out)

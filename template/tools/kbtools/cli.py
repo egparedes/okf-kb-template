@@ -40,7 +40,7 @@ def _cmd_check(bundle: Bundle, args: argparse.Namespace) -> int:
 
 def _write_indexes(bundle: Bundle) -> None:
     for path in indexgen.write(bundle):
-        print(f"{'wrote' if path.exists() else 'deleted'} {path.relative_to(bundle.repo_root)}")
+        print(f"{'wrote' if path.exists() else 'deleted'} {path.relative_to(bundle.repo_root).as_posix()}")
 
 
 def _cmd_index(bundle: Bundle, args: argparse.Namespace) -> int:
@@ -49,7 +49,7 @@ def _cmd_index(bundle: Bundle, args: argparse.Namespace) -> int:
         stale = indexgen.stale(bundle, expected)
         orphans = set(indexgen.orphans(bundle, expected))
         for path in stale:
-            print(f"{'orphaned' if path in orphans else 'out of date'}: {path.relative_to(bundle.repo_root)}")
+            print(f"{'orphaned' if path in orphans else 'out of date'}: {path.relative_to(bundle.repo_root).as_posix()}")
         return 1 if stale else 0
     _write_indexes(bundle)
     return 0
@@ -71,7 +71,7 @@ def _cmd_mv(bundle: Bundle, args: argparse.Namespace) -> int:
 
 def _cmd_log(bundle: Bundle, args: argparse.Namespace) -> int:
     path = pages.add_log_entry(bundle, args.op, " ".join(args.message))
-    print(f"logged in {path.relative_to(bundle.repo_root)}")
+    print(f"logged in {path.relative_to(bundle.repo_root).as_posix()}")
     return 0
 
 
@@ -80,7 +80,7 @@ def _cmd_new(bundle: Bundle, args: argparse.Namespace) -> int:
     path = pages.new_page(
         bundle, args.type, args.path, args.title, args.description, tags, args.by, args.status, args.resource
     )
-    print(path.relative_to(bundle.repo_root))
+    print(path.relative_to(bundle.repo_root).as_posix())
     return 0
 
 
@@ -144,7 +144,11 @@ def _cmd_merge(bundle: Bundle, args: argparse.Namespace) -> int:
 
 def _cmd_zotero(bundle: Bundle, args: argparse.Namespace) -> int:
     settings = resources.Settings.load(bundle)
-    zotero = resources.Zotero(settings)
+    with resources.Zotero(settings) as zotero:
+        return _zotero_action(bundle, args, settings, zotero)
+
+
+def _zotero_action(bundle: Bundle, args: argparse.Namespace, settings, zotero) -> int:
     if args.action == "search":
         for item in zotero.search(" ".join(args.query), limit=args.limit):
             year = (item.get("date") or "")[:4]
@@ -163,7 +167,7 @@ def _cmd_zotero(bundle: Bundle, args: argparse.Namespace) -> int:
         status="draft", resource=fm.pop("resource"), extra=fm,
         body_intro=f"Open in Zotero: [{item['key']}]({link})\n\n",
     )
-    print(path.relative_to(bundle.repo_root))
+    print(path.relative_to(bundle.repo_root).as_posix())
     return 0
 
 
@@ -180,7 +184,7 @@ def _cmd_karakeep(bundle: Bundle, args: argparse.Namespace) -> int:
 
 def _cmd_fetch(bundle: Bundle, args: argparse.Namespace) -> int:
     out = resources.fetch(bundle, args.ref, bundle.repo_root / ".cache" / "sources")
-    print(out.relative_to(bundle.repo_root))
+    print(out.relative_to(bundle.repo_root).as_posix())
     return 0
 
 
@@ -189,8 +193,10 @@ def _cmd_open(bundle: Bundle, args: argparse.Namespace) -> int:
     if args.print:
         print(target)
         return 0
-    opener = "open" if sys.platform == "darwin" else "xdg-open"
-    subprocess.Popen([opener, target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=resources.child_env())
+    try:
+        resources.open_with_default_app(target)
+    except OSError as exc:
+        raise SystemExit(f"kb open: cannot open {target}: {exc}") from None
     print(target)
     return 0
 

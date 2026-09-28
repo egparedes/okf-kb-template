@@ -15,9 +15,12 @@ my-kb/
 │   └── skills -> ../.agents/skills                                                   [claude_code]
 ├── .codex/hooks.json            hooks for Codex (new in v0.7.0)                      [codex]
 ├── .gemini/settings.json        Gemini CLI reads AGENTS.md; hooks (new in v0.7.0)    [gemini_cli]
-├── .github/workflows/kb.yml     validation on push, weekly link check                [github_ci]
+├── .github/
+│   ├── workflows/kb.yml         validation on push, weekly link check                [github_ci]
+│   └── dependabot.yml           weekly updates of the pinned actions (new in v0.7.0) [github_ci]
 ├── .pre-commit-config.yaml      fix-links, index, check before each commit
 ├── .env.example                 template for the gitignored .env
+├── .gitattributes               LF line endings on every platform (new in v0.7.0)
 ├── .gitignore
 ├── pyproject.toml, uv.lock      the tooling package <kb_name>-tools; [tool.kb] bundle; the tasks
 ├── tasks.toml                   this knowledge base's own tasks (new in v0.6.0)
@@ -108,8 +111,8 @@ template, or in your fork of it, rather than locally.
   `tools/obsidian-plugins.json`;
 - the agent layer: `AGENTS.md`, `CLAUDE.md`, `.agents/skills/`,
   `.claude/settings.json`, `.codex/hooks.json`, `.gemini/settings.json`;
-- `.pre-commit-config.yaml`, `.github/workflows/kb.yml`,
-  `.gitignore`, `.env.example`;
+- `.pre-commit-config.yaml`, `.github/workflows/kb.yml`, `.github/dependabot.yml`,
+  `.gitattributes`, `.gitignore`, `.env.example`;
 - `schema/frontmatter.schema.json`;
 - `docs/`;
 - the Templater templates in `<folder>/_templates/`.

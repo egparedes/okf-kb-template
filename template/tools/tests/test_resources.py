@@ -6,6 +6,8 @@ import os
 import socket
 import sqlite3
 import subprocess
+import sys
+import tempfile
 import threading
 import unicodedata
 from pathlib import Path
@@ -32,6 +34,52 @@ def test_open_accepts_web_urls_and_zotero_keys(repo: Path) -> None:
     assert resources.open_target(b, "https://example.org/a?b=c") == "https://example.org/a?b=c"
     assert resources.open_target(b, "karakeep:http://example.org/x") == "http://example.org/x"
     assert resources.open_target(b, "zotero:ABCD2345") == "zotero://select/library/items/ABCD2345"
+
+
+@pytest.mark.parametrize(("platform", "opened"), [
+    ("win32", ["startfile"]), ("darwin", ["open"]), ("linux", ["xdg-open"]),
+])
+def test_open_uses_the_platform_opener(repo: Path, monkeypatch, capsys, platform: str, opened: list[str]) -> None:
+    from kbtools.cli import main
+
+    calls = []
+
+    def startfile(target):  # the program it starts inherits kb's environment: the secrets are gone by then
+        assert "ZOTERO_API_KEY" not in os.environ and os.environ.get("KEEP_ME") == "yes"
+        calls.append(["startfile", target])
+
+    monkeypatch.setattr(os, "environ", dict(os.environ))  # the scrub below must not leak into other tests
+    monkeypatch.setattr(resources, "_PLATFORM", platform)
+    monkeypatch.setattr(resources.os, "startfile", startfile, raising=False)
+    monkeypatch.setenv("ZOTERO_API_KEY", "secret")
+    monkeypatch.setenv("KEEP_ME", "yes")
+    monkeypatch.setattr(resources.subprocess, "Popen", lambda args, **kw: calls.append(list(args)))
+    monkeypatch.setenv("KB_REPO_ROOT", str(repo))
+    monkeypatch.chdir(repo)
+    assert main(["open", "https://example.org/a?b=c&d=e"]) == 0
+    assert calls == [[*opened, "https://example.org/a?b=c&d=e"]]
+    assert capsys.readouterr().out.strip() == "https://example.org/a?b=c&d=e"
+
+    def missing(*args, **kwargs):
+        raise FileNotFoundError("no opener")
+
+    monkeypatch.setattr(resources.subprocess, "Popen", missing)
+    monkeypatch.setattr(resources.os, "startfile", missing, raising=False)
+    with pytest.raises(SystemExit, match="cannot open https://example.org"):
+        main(["open", "https://example.org/"])
+
+
+@pytest.mark.parametrize("name", ["setup.exe", "run.BAT", "Shortcut.lnk", "tool.ps1", "Calculator.app", "go.command"])
+def test_open_refuses_programs(repo: Path, tmp_path: Path, monkeypatch, name: str) -> None:
+    base = tmp_path / "docs"
+    (base / "sub").mkdir(parents=True)
+    (base / "sub" / name).write_bytes(b"MZ")
+    (base / "sub" / "paper.pdf").write_bytes(b"%PDF")
+    (repo / "schema" / "resources.yaml").write_text("roots:\n  docs: Docs.\n", encoding="utf-8")
+    monkeypatch.setenv("KB_ROOT_DOCS", str(base))
+    with pytest.raises(SystemExit, match="program or a shortcut.*kb open file:docs/sub"):
+        resources.open_target(bundle(repo), f"file:docs/sub/{name}")
+    assert resources.open_target(bundle(repo), "file:docs/sub/paper.pdf").endswith("paper.pdf")
 
 
 # -- markitdown ----------------------------------------------------------------------
@@ -106,11 +154,15 @@ def test_cleartext_api_keys_are_warned_about(repo: Path, monkeypatch, capsys) ->
 
 
 def test_deny_matches_either_unicode_normalization(repo: Path, monkeypatch, tmp_path: Path) -> None:
+    try:
+        "\u0301".encode(sys.getfilesystemencoding())
+    except UnicodeEncodeError:
+        pytest.skip("the file system encoding cannot name non-ASCII files (C locale without UTF-8 mode)")
     base = tmp_path / "docs"
     folder = base / unicodedata.normalize("NFD", "Café")  # as macOS stores it
     folder.mkdir(parents=True)
-    (folder / "x.md").write_text("secret")
-    (repo / "schema" / "resources.yaml").write_text("roots:\n  docs: Docs.\ndeny: ['docs/café']\n")
+    (folder / "x.md").write_text("secret", encoding="utf-8")
+    (repo / "schema" / "resources.yaml").write_text("roots:\n  docs: Docs.\ndeny: ['docs/café']\n", encoding="utf-8")
     monkeypatch.setenv("KB_ROOT_DOCS", str(base))
     with pytest.raises(SystemExit, match="deny"):
         resources.fetch(bundle(repo), "file:docs/" + unicodedata.normalize("NFD", "Café") + "/x.md", repo / ".cache")
@@ -276,8 +328,11 @@ def test_zotero_snapshot_reads_only_the_configured_library(repo: Path, monkeypat
     (repo / "schema" / "resources.yaml").write_text(config)
     monkeypatch.setenv("ZOTERO_LOCAL_API", "http://127.0.0.1:9/api")  # Zotero closed
     monkeypatch.setenv("ZOTERO_DATA_DIR", str(tmp_path / "zotero"))
-    zotero = resources.Zotero(resources.Settings.load(bundle(repo)))
-    assert [i["key"] for i in zotero.search("Roofline")] == [key]
+    with resources.Zotero(resources.Settings.load(bundle(repo))) as zotero:
+        assert [i["key"] for i in zotero.search("Roofline")] == [key]
+        snapshot = Path(zotero._db._tmp.name)
+        assert (snapshot / "zotero.sqlite").is_file()
+    assert not snapshot.exists()  # closed first, then deleted (Windows cannot delete an open database)
 
 
 def test_torn_database_snapshot_is_a_message(repo: Path, monkeypatch, tmp_path: Path) -> None:
@@ -286,5 +341,7 @@ def test_torn_database_snapshot_is_a_message(repo: Path, monkeypatch, tmp_path: 
     monkeypatch.setenv("ZOTERO_LOCAL_API", "http://127.0.0.1:9/api")
     monkeypatch.setenv("ZOTERO_DATA_DIR", str(tmp_path / "zotero"))
     zotero = resources.Zotero(resources.Settings.load(bundle(repo)))
+    made = set(Path(tempfile.gettempdir()).glob("kb-zotero-*"))
     with pytest.raises(SystemExit, match="cannot read the Zotero database snapshot"):
         zotero.search("x")
+    assert set(Path(tempfile.gettempdir()).glob("kb-zotero-*")) <= made  # the failed snapshot is removed

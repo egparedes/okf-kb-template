@@ -72,6 +72,15 @@ def test_mv_of_an_image_rewrites_links_to_it(repo: Path) -> None:
     assert text.count("/attachments/diagrams/network.png") == 3 and "net.png" not in text
 
 
+def test_mv_changes_only_the_case(repo: Path) -> None:
+    """On macOS and Windows `foo.md` "exists" as soon as `Foo.md` does: the rename must still work."""
+    write(repo, "systems/Foo.md", "Foo")
+    write(repo, "systems/b.md", "B", "See [F](/systems/Foo.md).")
+    linkfix.move(bundle(repo), "systems/Foo.md", "systems/foo.md")
+    assert [p.name for p in (repo / "kb" / "systems").iterdir() if p.stem.lower() == "foo"] == ["foo.md"]
+    assert "[F](/systems/foo.md)" in (repo / "kb" / "systems" / "b.md").read_text(encoding="utf-8")
+
+
 @pytest.mark.parametrize("new", ["data", "data/", "new/"])
 def test_mv_into_a_folder_keeps_the_name(repo: Path, new: str) -> None:
     write(repo, "systems/a.md", "A")

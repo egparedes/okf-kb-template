@@ -1,0 +1,8 @@
+# LF line endings in every checkout, Windows included (Git for Windows would
+# otherwise check out CRLF), so pages, indexes and the log have the same bytes
+# on every machine. Binary files (images, PDFs) are detected and left alone.
+* text=auto eol=lf
+# Windows scripts keep CRLF, which cmd.exe and PowerShell expect.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
