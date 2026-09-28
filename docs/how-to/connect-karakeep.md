@@ -15,7 +15,10 @@ The hosted service and a self-hosted instance work the same way.
     KARAKEEP_API_KEY=…
     ```
 
-    A trailing `/api` or `/api/v1` in the address is accepted too.
+    A trailing `/api` or `/api/v1` in the address is accepted too. The
+    address needs its `https://` (or `http://`). With `http://`, `kb` sends
+    the key unencrypted and warns about it, unless the server runs on this
+    machine (`localhost`).
 
 ## 2. Use it
 

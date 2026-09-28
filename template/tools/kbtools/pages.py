@@ -4,29 +4,56 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import yaml
 
-from .bundle import Bundle, record_touched
+from .bundle import Bundle, load_yaml, record_touched
 
 LOG_HEADER = "# Update Log\n"
 LOG_OPS = ("Ingest", "Query", "Lint", "Update", "Creation", "Deprecation", "Refactor", "Initialization")
 _DATE_HEADING = re.compile(r"^## (\d{4}-\d{2}-\d{2})\s*$", re.M)
+# The `actor` pattern of schema/frontmatter.schema.json (a test keeps them equal).
+ACTOR = re.compile(r"^(human:[a-z0-9._-]+|process:[a-z0-9._-]+|[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+)$")
+CONTEXT_SUFFIX = re.compile(r"(?<=[^/\s])\[[0-9A-Za-z]+\]$")  # claude-opus-5-5[1m] -> claude-opus-5-5
+_LOG_OP = re.compile(r"[A-Za-z][A-Za-z-]*")
 
 
 def now_utc() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def validate_actor(actor: str, source: str = "--by") -> str:
+    """`actor` if it matches the OKF actor pattern of the frontmatter schema.
+
+    A bracketed suffix on the model, as in Claude Code's `claude-opus-5-5[1m]`
+    (the context window), is not part of the model's name: it is dropped.
+    """
+    actor = actor.strip()
+    if "/" in actor:
+        actor = CONTEXT_SUFFIX.sub("", actor)
+    if not ACTOR.fullmatch(actor):
+        raise SystemExit(
+            f"kb: {source}: {actor!r} is not an actor; use <tool>/<model> "
+            "(e.g. claude-code/claude-opus-5-5), human:<id> or process:<id>"
+        )
+    return actor
 
 
 def resolve_actor(by: str | None) -> str:
     actor = by or os.environ.get("KB_ACTOR")
     if not actor:
-        raise SystemExit(
-            "kb: pass --by or set KB_ACTOR (e.g. claude-code/<model> or human:<id>)"
-        )
-    return actor
+        raise SystemExit("kb: pass --by or set KB_ACTOR (e.g. claude-code/<model> or human:<id>)")
+    return validate_actor(actor, "--by" if by else "KB_ACTOR")
+
+
+def generated_line(generated: dict[str, str]) -> str:
+    """`generated: { by: …, at: … }` in the house flow style, or YAML's own quoting when that is not safe."""
+    line = f"generated: {{ by: {generated['by']}, at: {generated['at']} }}\n"
+    if load_yaml(line) == {"generated": generated}:
+        return line
+    return yaml.safe_dump({"generated": generated}, sort_keys=False, allow_unicode=True, width=1000)
 
 
 def new_page(
@@ -60,22 +87,30 @@ def new_page(
         frontmatter.setdefault(key, value)
     frontmatter["tags"] = tags
     frontmatter["status"] = status
+    frontmatter.pop("generated", None)
+    generated = {"by": resolve_actor(by), "at": now_utc()}
     fm = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=True, width=1000)
-    fm += f"generated: {{ by: {resolve_actor(by)}, at: {now_utc()} }}\n"
+    fm += generated_line(generated)
     sections = "\n".join(f"# {s}\n" for s in spec.get("sections", []))
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"---\n{fm}---\n\n{body_intro}{sections}", encoding="utf-8")
+    path.write_text(f"---\n{fm}---\n\n{body_intro}{sections}", encoding="utf-8", newline="\n")
     record_touched(bundle.repo_root, [path])
     return path
 
 
 def add_log_entry(bundle: Bundle, op: str, message: str, day: date | None = None) -> Path:
     """Add `* **Op**: message` under today's `## YYYY-MM-DD` heading (newest first, OKF §9)."""
+    if not _LOG_OP.fullmatch(op):
+        raise SystemExit(f"kb log: the operation must be one word, e.g. {', '.join(LOG_OPS)}")
     op = op.capitalize()
-    day_str = (day or datetime.now(timezone.utc).date()).isoformat()
+    # One entry is one line: line breaks would let a message start a heading or a new entry.
+    message = " ".join(part.strip() for part in message.splitlines() if part.strip())
+    if not message:
+        raise SystemExit("kb log: the message is empty")
+    day_str = (day or datetime.now(UTC).date()).isoformat()
     path = bundle.root / "log.md"
     text = path.read_text(encoding="utf-8") if path.exists() else LOG_HEADER
-    entry = f"* **{op}**: {message.strip()}\n"
+    entry = f"* **{op}**: {message}\n"
     first = _DATE_HEADING.search(text)
     if first and first.group(1) >= day_str:  # never create a section below a newer one
         insert_at = first.end() + 1
@@ -88,5 +123,5 @@ def add_log_entry(bundle: Bundle, op: str, message: str, day: date | None = None
             text = text[: first.start()] + section + text[first.start() :]
         else:
             text = text.rstrip("\n") + "\n\n" + section
-    path.write_text(text.rstrip("\n") + "\n", encoding="utf-8")
+    path.write_text(text.rstrip("\n") + "\n", encoding="utf-8", newline="\n")
     return path

@@ -67,7 +67,7 @@ Renamed kb/ to my-notes/ and staged the move and the re-rendered template files.
 WARNING: these template-managed files had local edits that the re-render reverted (see git diff --cached):
   .claude/settings.json
 Next: review git diff --cached, then commit. Your unstaged edits and untracked notes are untouched;
-note that the pre-commit hook also checks untracked pages: one without valid frontmatter blocks the commit.
+the pre-commit hook checks only what the commit contains (tracked and staged files).
 By hand: mentions of kb/ in README.md and in schema/*.yaml comments (not re-rendered).
 Obsidian: open my-notes/ with Open folder as vault.
 qmd: qmd collection remove my-kb && uv run poe search-setup (the folder path changed)
@@ -99,9 +99,11 @@ The command:
    committed local edits that the re-render reverted;
 5. stages the re-rendered files (`git add -u` on tracked files outside the
    folder and in `my-notes/_templates/`). It never stages untracked files;
-6. updates the folder name in `.cache/kb-touched.txt`, so that the Claude
-   Code Stop hook of a running agent session still finds the pages it
-   changed;
+6. updates the folder name in `.cache/kb-touched.txt`, where `kb` commands
+   run by an agent record the pages they change until the session's next
+   hook collects them, so that the Stop hook of a running agent session
+   still finds those pages. The hooks' session state in `.cache/kb-hooks/`
+   holds paths relative to the folder and needs no change;
 7. regenerates the indexes, and prints the summary. The next `uv run`
    syncs the tooling with the re-rendered `pyproject.toml`.
 
@@ -145,10 +147,9 @@ that everything was put back as it was, and exits with an error.
     git commit -m "Rename the knowledge-base folder to my-notes"
     ```
 
-    Your unstaged edits and untracked notes are not part of this commit.
-    The pre-commit hook, however, checks the whole knowledge-base folder in
-    the working tree, not only the staged files: an untracked page without
-    valid frontmatter blocks the commit until you fix it.
+    Your unstaged edits and untracked notes are not part of this commit,
+    and the pre-commit hook does not check them: it runs `kb --tracked`,
+    which reads only tracked and staged files.
 
 ## Afterwards
 

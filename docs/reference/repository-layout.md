@@ -11,11 +11,16 @@ my-kb/
 ├── .copier-answers.yml          template source, version and answers (written by Copier)
 ├── .agents/skills/              kb-ingest, kb-query, kb-maintain (SKILL.md each)
 ├── .claude/
-│   ├── settings.json            hooks, KB_ACTOR, Read(.env) denied                   [claude_code]
+│   ├── settings.json            hooks, KB_ACTOR, access to .env denied               [claude_code]
 │   └── skills -> ../.agents/skills                                                   [claude_code]
-├── .github/workflows/kb.yml     validation on push, weekly link check                [github_ci]
+├── .codex/hooks.json            hooks for Codex (new in v0.7.0)                      [codex]
+├── .gemini/settings.json        Gemini CLI reads AGENTS.md; hooks (new in v0.7.0)    [gemini_cli]
+├── .github/
+│   ├── workflows/kb.yml         validation on push, weekly link check                [github_ci]
+│   └── dependabot.yml           weekly updates of the pinned actions (new in v0.7.0) [github_ci]
 ├── .pre-commit-config.yaml      fix-links, index, check before each commit
 ├── .env.example                 template for the gitignored .env
+├── .gitattributes               LF line endings on every platform (new in v0.7.0)
 ├── .gitignore
 ├── pyproject.toml, uv.lock      the tooling package <kb_name>-tools; [tool.kb] bundle; the tasks
 ├── tasks.toml                   this knowledge base's own tasks (new in v0.6.0)
@@ -32,7 +37,7 @@ my-kb/
 │   ├── kbtools/                 the kb command line (Python)
 │   ├── tests/                   its tests
 │   ├── obsidian-plugins.json    pinned Obsidian plugins (new in v0.4.0)
-│   └── retrieval-eval/questions.yaml   questions for judging search tiers
+│   └── retrieval-eval/questions.yaml   questions for kb eval, which judges the search tiers
 ├── my-kb/                       the knowledge-base folder: OKF bundle and Obsidian vault
 │   ├── index.md                 generated
 │   ├── log.md                   newest-first update log
@@ -46,8 +51,9 @@ my-kb/
 └── .venv/                       gitignored Python environment
 ```
 
-Items marked `[claude_code]`, `[github_ci]` or `[obsidian]` exist only when
-that [Copier question](copier-questions.md) was answered *Yes*.
+Items marked `[claude_code]`, `[codex]`, `[gemini_cli]`, `[github_ci]` or
+`[obsidian]` exist only when that [Copier question](copier-questions.md) was
+answered *Yes*.
 
 ## The knowledge-base folder
 
@@ -104,9 +110,9 @@ template, or in your fork of it, rather than locally.
 - the tooling: `tools/kbtools/`, `tools/tests/`, `pyproject.toml` with its tasks,
   `tools/obsidian-plugins.json`;
 - the agent layer: `AGENTS.md`, `CLAUDE.md`, `.agents/skills/`,
-  `.claude/settings.json`;
-- `.pre-commit-config.yaml`, `.github/workflows/kb.yml`,
-  `.gitignore`, `.env.example`;
+  `.claude/settings.json`, `.codex/hooks.json`, `.gemini/settings.json`;
+- `.pre-commit-config.yaml`, `.github/workflows/kb.yml`, `.github/dependabot.yml`,
+  `.gitattributes`, `.gitignore`, `.env.example`;
 - `schema/frontmatter.schema.json`;
 - `docs/`;
 - the Templater templates in `<folder>/_templates/`.
@@ -122,7 +128,7 @@ template's `copier.yml`, so `copier update` never overwrites them:
 | `schema/vocabulary.yaml` | page types, relations, `fields` |
 | `schema/taxonomy.yaml` | the folder tree |
 | `schema/resources.yaml` | file roots, deny patterns, Zotero ids |
-| `tools/retrieval-eval/questions.yaml` | retrieval evaluation questions |
+| `tools/retrieval-eval/questions.yaml` | retrieval evaluation questions for [`kb eval`](cli.md#kb-eval) |
 | `tasks.toml` | the knowledge base's own [tasks](tasks.md#local-tasks-taskstoml) (new in v0.6.0) |
 | `{{ bundle_dir }}/log.md` | the update log |
 | `{{ bundle_dir }}/.obsidian/*.json` | Obsidian settings, including `community-plugins.json` |
@@ -144,11 +150,11 @@ editing a managed file.
 | Path | Why |
 |---|---|
 | `.env`, `.env.*` (except `.env.example`) | secrets and machine paths |
-| `.cache/` | fetched sources, drafts, import redirect tables, the hook's list of touched files |
+| `.cache/` | fetched sources, drafts, import redirect tables, the hooks' session state (`.cache/kb-hooks/`, `.cache/kb-touched.txt`), backups while `kb mv`, `kb merge` or `kb fix-links` write (`.cache/kb-backup/`) |
 | `.venv/`, `__pycache__/`, `.pytest_cache/` | Python environment |
 | `<folder>/.obsidian/plugins/*/*` except Templater's `data.json` | plugin code (downloaded, never redistributed) and plugin settings that may hold keys |
 | `<folder>/.obsidian/workspace*.json`, `<folder>/.obsidian/graph.json.bak`, `<folder>/.obsidian/themes/` | per-device state |
-| `<folder>/.trash/` | deleted notes; `.md` files there would break the bundle |
+| `<folder>/.trash/` | deleted notes; `kb` skips dot-folders, but other OKF readers of the folder would count them |
 | `<folder>/.smart-env/` | a plugin's local cache |
 | `.qmd/`, `.ck/` | local search indexes |
 | `.claude/settings.local.json` | personal Claude Code overrides |

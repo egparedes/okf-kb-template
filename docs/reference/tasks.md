@@ -23,7 +23,7 @@ uv run poe <task> [ARGS…]
 - Arguments after the task name are passed on to the command of a
   single-command task, options included: `uv run poe check my-kb/ai/llm.md`
   runs `kb check my-kb/ai/llm.md`, and `uv run poe find --type Tool` runs
-  `kb find --type Tool`. The sequences, `fix`, `health` and `ci`, take no
+  `kb find --type Tool`. The sequences, `fix`, `health`, `lint` and `ci`, take no
   arguments and ignore any you give.
 - `uv run poe -d <task> [ARGS…]` prints what a task would run without
   running it.
@@ -50,10 +50,12 @@ given. `uv run poe --help <task>` shows the usage of one task.
 | `search QUERY…` | [`kb search QUERY…`](cli.md#kb-search) | Hybrid search with qmd when the knowledge base's collection exists; otherwise a built-in text search over the words of the query. |
 | `search-setup` | `kb search --setup` | One-time qmd setup for this knowledge base: the collection, a context per folder, the embeddings. The collection records the folder's path: after a rename, remove the collection and run this again. |
 | `search-reindex` | `kb search --reindex` | Refresh the qmd index after changes (`qmd update`, `qmd embed`). |
+| `eval [ARGS…]` | [`kb eval [ARGS…]`](cli.md#kb-eval) | Retrieval evaluation: recall@k of each search tier on `tools/retrieval-eval/questions.yaml`; `--k`, `--json`, `--min-recall`, `--no-qmd` as in `kb eval`. |
 | `obsidian-setup [ARGS…]` | `kb obsidian setup [ARGS…]` | Install the pinned Obsidian plugins; `--add`, `--force`, `--open` as in [`kb obsidian setup`](cli.md#kb-obsidian-setup). |
 | `rename-bundle NEW` | [`kb rename-bundle NEW`](cli.md#kb-rename-bundle) | Rename the knowledge-base folder to `NEW`, re-render the template-managed files that name it, and stage the result. Close Obsidian first. See [Rename the knowledge-base folder](../how-to/rename-the-knowledge-base-folder.md). |
+| `lint` | `ruff check tools`, `ruff format --check tools`, `mypy` | Lint, format check and type check of the tooling in `tools/`. `uv run ruff format tools` fixes the formatting; the rules are in `[tool.ruff]` and `[tool.mypy]` of `pyproject.toml`. |
 | `test` | `pytest -q` | Run the tooling's own tests. |
-| `ci` | `check`, `validate-okf`, `test`, then `kb index --check` | Everything the CI `validate` job runs. |
+| `ci` | `check`, `validate-okf`, `lint`, `test`, then `kb index --check` | Everything the CI `validate` job runs. |
 
 The folder name is written into `validate-okf` and `links-online` when
 Copier renders `pyproject.toml`; `rename-bundle` renders it again with the

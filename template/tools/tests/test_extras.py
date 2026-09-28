@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import shutil
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from typing import ClassVar
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -24,7 +26,14 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     shutil.copytree(FIXTURES / "schema", tmp_path / "schema")
     shutil.copy(REPO / "schema" / "frontmatter.schema.json", tmp_path / "schema")
     (tmp_path / "kb").mkdir()
-    for var in ("ZOTERO_API_KEY", "ZOTERO_DATA_DIR", "ZOTERO_USER_ID", "KARAKEEP_URL", "KARAKEEP_API_KEY", "KB_ROOT_NOTES"):
+    for var in (
+        "ZOTERO_API_KEY",
+        "ZOTERO_DATA_DIR",
+        "ZOTERO_USER_ID",
+        "KARAKEEP_URL",
+        "KARAKEEP_API_KEY",
+        "KB_ROOT_NOTES",
+    ):
         monkeypatch.delenv(var, raising=False)
     return tmp_path
 
@@ -36,6 +45,7 @@ def write(repo: Path, rel: str, title: str, body: str = "", extra: str = "", typ
         f"---\ntype: {type_}\ntitle: {title}\ndescription: {title} in one sentence.\ntags: [test]\n"
         f"status: stable\ngenerated: {{ by: test/0, at: 2026-09-25T12:00:00Z }}\n{extra}---\n\n{body}",
         encoding="utf-8",
+        newline="\n",
     )
     return path
 
@@ -50,7 +60,13 @@ def bundle(repo: Path) -> Bundle:
 def test_graph_excludes_generated_hubs_and_separates_citations(repo: Path) -> None:
     write(repo, "systems/a.md", "A", "[B](/systems/b.md) [B again](/systems/b.md) [C](/data/c.md)")
     write(repo, "systems/b.md", "B", "[C](/data/c.md)")
-    write(repo, "data/c.md", "C", "Cites.[^s]\n\n[^s]: [S](/sources/s.md)", "sources:\n  - id: s\n    resource: /sources/s.md\n")
+    write(
+        repo,
+        "data/c.md",
+        "C",
+        "Cites.[^s]\n\n[^s]: [S](/sources/s.md)",
+        "sources:\n  - id: s\n    resource: /sources/s.md\n",
+    )
     write(repo, "data/lonely.md", "Lonely")
     write(repo, "sources/s.md", "S", "Pages updated: [A](/systems/a.md)", "resource: https://example.org\n", "Source")
     indexgen.write(bundle(repo))
@@ -96,7 +112,7 @@ def test_distinct_file_suppresses_pairs(repo: Path) -> None:
     write(repo, "systems/a.md", "Stencil computation")
     write(repo, "data/b.md", "Stencil computations")
     assert dupes.find(bundle(repo))
-    (repo / "schema" / "distinct.yaml").write_text("distinct:\n  - [/systems/a.md, /data/b.md]\n")
+    (repo / "schema" / "distinct.yaml").write_text("distinct:\n  - [/systems/a.md, /data/b.md]\n", newline="\n")
     assert dupes.find(bundle(repo)) == []
 
 
@@ -105,8 +121,12 @@ def test_distinct_file_suppresses_pairs(repo: Path) -> None:
 
 def test_unlinked_mentions(repo: Path) -> None:
     write(repo, "programming/dsl.md", "Domain-specific language", extra="aliases: [DSL]\n")
-    write(repo, "programming/halide.md", "Halide",
-          "Halide is a domain specific languages family.\n\n# Domain-specific language\n\n`DSL` in code.\n")
+    write(
+        repo,
+        "programming/halide.md",
+        "Halide",
+        "Halide is a domain specific languages family.\n\n# Domain-specific language\n\n`DSL` in code.\n",
+    )
     write(repo, "programming/other.md", "Other", "Uses a DSL, see [DSL](/programming/dsl.md).")
     write(repo, "programming/case.md", "Case", "a dsl in lower case is not the acronym.")
     found = unlinked.find(bundle(repo))
@@ -126,10 +146,14 @@ def test_unlinked_reports_ambiguous_names(repo: Path) -> None:
 
 
 def test_merge_unions_metadata_and_retargets(repo: Path) -> None:
-    write(repo, "systems/old.md", "Old name", extra="aliases: [Legacy]\nsources:\n  - id: s1\n    resource: https://a.org\n")
+    write(
+        repo,
+        "systems/old.md",
+        "Old name",
+        extra="aliases: [Legacy]\nsources:\n  - id: s1\n    resource: https://a.org\n",
+    )
     write(repo, "systems/new.md", "New name", extra="sources:\n  - id: s2\n    resource: https://b.org\n")
-    ref = write(repo, "data/ref.md", "Ref", "See [old](/systems/old.md#x).",
-                'related: ["[Old](/systems/old.md)"]\n')
+    ref = write(repo, "data/ref.md", "Ref", "See [old](/systems/old.md#x).", 'related: ["[Old](/systems/old.md)"]\n')
     linkfix.merge(bundle(repo), "systems/old.md", "systems/new.md", "test/0")
     assert not (repo / "kb/systems/old.md").exists()
     merged = bundle(repo).by_rel["systems/new.md"].frontmatter
@@ -143,7 +167,7 @@ def test_merge_unions_metadata_and_retargets(repo: Path) -> None:
 
 
 class _Fake(BaseHTTPRequestHandler):
-    routes: dict = {}
+    routes: ClassVar[dict] = {}
 
     def _reply(self, status: int, body) -> None:
         payload = json.dumps(body).encode()
@@ -178,16 +202,24 @@ def server():
     httpd.shutdown()
 
 
-ITEM = {"key": "ABCD2345", "itemType": "journalArticle", "title": "Roofline: an insightful model",
-        "creators": [{"creatorType": "author", "lastName": "Williams"}], "date": "2009-04",
-        "DOI": "10.1145/1498765.1498785", "citationKey": "williams2009roofline"}
+ITEM = {
+    "key": "ABCD2345",
+    "itemType": "journalArticle",
+    "title": "Roofline: an insightful model",
+    "creators": [{"creatorType": "author", "lastName": "Williams"}],
+    "date": "2009-04",
+    "DOI": "10.1145/1498765.1498785",
+    "citationKey": "williams2009roofline",
+}
 
 
 def zotero_routes(routes: dict, base: str) -> None:
     routes[("GET", "/api/users/0/items/ABCD2345")] = lambda q, h: (200, {"key": "ABCD2345", "data": ITEM})
     routes[("GET", "/api/users/0/items/top")] = lambda q, h: (200, [{"data": ITEM}])
     routes[("GET", "/api/users/0/items/ABCD2345/children")] = lambda q, h: (
-        200, [{"data": {"key": "PDF23456", "itemType": "attachment"}}, {"data": {"key": "NOTE2345", "itemType": "note"}}])
+        200,
+        [{"data": {"key": "PDF23456", "itemType": "attachment"}}, {"data": {"key": "NOTE2345", "itemType": "note"}}],
+    )
     routes[("GET", "/api/users/0/items/PDF23456/fulltext")] = lambda q, h: (200, {"content": "The roofline model ..."})
 
 
@@ -199,8 +231,18 @@ def test_zotero_local_api_fetch_and_new_source(repo: Path, server, monkeypatch) 
     out = resources.fetch(b, "zotero:williams2009roofline", repo / ".cache" / "sources")
     assert out.name == "williams-2009-roofline.md" and "roofline model" in out.read_text()
     fm = resources.zotero_source_frontmatter(ITEM, resources.Settings.load(b))
-    path = pages.new_page(b, "Source", "sources/williams2009roofline.md", fm.pop("title"), fm.pop("description"),
-                          [], "test/0", status="draft", resource=fm.pop("resource"), extra=fm)
+    path = pages.new_page(
+        b,
+        "Source",
+        "sources/williams2009roofline.md",
+        fm.pop("title"),
+        fm.pop("description"),
+        [],
+        "test/0",
+        status="draft",
+        resource=fm.pop("resource"),
+        extra=fm,
+    )
     text = path.read_text()
     assert "resource: https://doi.org/10.1145/1498765.1498785" in text and "citekey: williams2009roofline" in text
     indexgen.write(bundle(repo))
@@ -213,7 +255,7 @@ def test_zotero_falls_back_to_storage_cache(repo: Path, server, monkeypatch, tmp
     del routes[("GET", "/api/users/0/items/PDF23456/fulltext")]
     cache = tmp_path / "zotero" / "storage" / "PDF23456" / ".zotero-ft-cache"
     cache.parent.mkdir(parents=True)
-    cache.write_text("text from the storage cache")
+    cache.write_text("text from the storage cache", newline="\n")
     monkeypatch.setenv("ZOTERO_LOCAL_API", f"{base}/api/users/0")
     monkeypatch.setenv("ZOTERO_DATA_DIR", str(tmp_path / "zotero"))
     out = resources.fetch(bundle(repo), "zotero:ABCD2345", repo / ".cache")
@@ -241,9 +283,11 @@ def test_karakeep_by_url_on_any_instance(repo: Path, server, monkeypatch) -> Non
     routes[("GET", "/api/v1/bookmarks/check-url")] = check
     routes[("POST", "/api/v1/bookmarks")] = create
     routes[("GET", "/api/v1/bookmarks/bm1/content")] = lambda q, h: (
-        (200, {"content": "part two", "nextCursor": None}) if q.get("cursor")
-        else (200, {"content": "part one, ", "nextCursor": "c2"}))
-    (repo / ".env").write_text(f"KARAKEEP_URL={base}\nKARAKEEP_API_KEY=secret\n")
+        (200, {"content": "part two", "nextCursor": None})
+        if q.get("cursor")
+        else (200, {"content": "part one, ", "nextCursor": "c2"})
+    )
+    (repo / ".env").write_text(f"KARAKEEP_URL={base}\nKARAKEEP_API_KEY=secret\n", newline="\n")
     out = resources.fetch(bundle(repo), "https://example.org/post", repo / ".cache")
     assert out.read_text().endswith("part one, part two") and saved == {"https://example.org/post": "bm1"}
 
@@ -251,9 +295,11 @@ def test_karakeep_by_url_on_any_instance(repo: Path, server, monkeypatch) -> Non
 def test_file_roots_and_deny(repo: Path, monkeypatch, tmp_path: Path) -> None:
     notes = tmp_path / "notes"
     (notes / "private").mkdir(parents=True)
-    (notes / "talk.md").write_text("slides text")
-    (notes / "private" / "x.md").write_text("secret")
-    (repo / "schema" / "resources.yaml").write_text("roots:\n  notes: Notes.\ndeny: ['notes/private/**']\n")
+    (notes / "talk.md").write_text("slides text", newline="\n")
+    (notes / "private" / "x.md").write_text("secret", newline="\n")
+    (repo / "schema" / "resources.yaml").write_text(
+        "roots:\n  notes: Notes.\ndeny: ['notes/private/**']\n", newline="\n"
+    )
     monkeypatch.setenv("KB_ROOT_NOTES", str(notes))
     assert "slides text" in resources.fetch(bundle(repo), "file:notes/talk.md", repo / ".cache").read_text()
     with pytest.raises(SystemExit, match="deny"):
@@ -269,7 +315,7 @@ def test_zotero_offline_database_snapshot(repo: Path, monkeypatch, tmp_path: Pat
 
     data = tmp_path / "zotero"
     (data / "storage" / "PDF23456").mkdir(parents=True)
-    (data / "storage" / "PDF23456" / ".zotero-ft-cache").write_text("offline full text")
+    (data / "storage" / "PDF23456" / ".zotero-ft-cache").write_text("offline full text", newline="\n")
     db = sqlite3.connect(data / "zotero.sqlite")
     db.executescript("""
         CREATE TABLE itemTypes (itemTypeID INTEGER PRIMARY KEY, typeName TEXT);
@@ -311,21 +357,32 @@ def _roots(repo: Path, tmp_path: Path, monkeypatch, deny: str) -> Path:
     (base / "Personal").mkdir(parents=True)
     (base / "pub").mkdir()
     (base / "[Zotero]").mkdir()
-    (base / "Personal" / "secret.md").write_text("secret")
-    (base / "pub" / "ok.md").write_text("public")
-    (base / "[Zotero]" / "z.md").write_text("zotero")
-    (base / "pub" / "link").symlink_to(base / "Personal")
-    (repo / "schema" / "resources.yaml").write_text(f"roots:\n  docs: Docs.\ndeny: {deny}\n")
+    (base / "Personal" / "secret.md").write_text("secret", newline="\n")
+    (base / "pub" / "ok.md").write_text("public", newline="\n")
+    (base / "[Zotero]" / "z.md").write_text("zotero", newline="\n")
+    with contextlib.suppress(
+        OSError, NotImplementedError
+    ):  # Windows without the symlink privilege: the link case skips
+        (base / "pub" / "link").symlink_to(base / "Personal", target_is_directory=True)
+    (repo / "schema" / "resources.yaml").write_text(f"roots:\n  docs: Docs.\ndeny: {deny}\n", newline="\n")
     monkeypatch.setenv("KB_ROOT_DOCS", str(base))
     return base
 
 
-@pytest.mark.parametrize("ref", [
-    "file:docs/Personal/secret.md", "file:docs/pub/../Personal/secret.md", "file:docs/./Personal/secret.md",
-    "file:docs/pub/link/secret.md", "file:docs/[Zotero]/z.md",
-])
+@pytest.mark.parametrize(
+    "ref",
+    [
+        "file:docs/Personal/secret.md",
+        "file:docs/pub/../Personal/secret.md",
+        "file:docs/./Personal/secret.md",
+        "file:docs/pub/link/secret.md",
+        "file:docs/[Zotero]/z.md",
+    ],
+)
 def test_deny_cannot_be_bypassed(repo: Path, tmp_path: Path, monkeypatch, ref: str) -> None:
-    _roots(repo, tmp_path, monkeypatch, "['docs/Personal', 'docs/[Zotero]/**']")
+    base = _roots(repo, tmp_path, monkeypatch, "['docs/Personal', 'docs/[Zotero]/**']")
+    if "/link/" in ref and not (base / "pub" / "link").is_symlink():
+        pytest.skip("symbolic links are not available")
     with pytest.raises(SystemExit, match="deny"):
         resources.fetch(bundle(repo), ref, repo / ".cache")
     assert "public" in resources.fetch(bundle(repo), "file:docs/pub/ok.md", repo / ".cache").read_text()
@@ -333,7 +390,7 @@ def test_deny_cannot_be_bypassed(repo: Path, tmp_path: Path, monkeypatch, ref: s
 
 def test_local_deny_patterns_and_denied_locators(repo: Path, tmp_path: Path, monkeypatch) -> None:
     _roots(repo, tmp_path, monkeypatch, "[]")
-    (repo / ".env").write_text("KB_DENY=docs/pub/ok.md ; docs/Personal\n")
+    (repo / ".env").write_text("KB_DENY=docs/pub/ok.md ; docs/Personal\n", newline="\n")
     monkeypatch.delenv("KB_DENY", raising=False)
     with pytest.raises(SystemExit, match="deny"):
         resources.fetch(bundle(repo), "file:docs/pub/ok.md", repo / ".cache")
@@ -344,22 +401,32 @@ def test_local_deny_patterns_and_denied_locators(repo: Path, tmp_path: Path, mon
 def test_env_parsing(repo: Path, monkeypatch) -> None:
     for var in ("A_ONE", "A_TWO", "A_THREE", "A_FOUR"):
         monkeypatch.delenv(var, raising=False)
-    (repo / ".env").write_text("A_ONE=/x/y   # comment\nexport A_TWO=two\nA_THREE=\"quoted # kept\"\nA_FOUR='x\n")
+    (repo / ".env").write_text(
+        'A_ONE=/x/y   # comment\nexport A_TWO=two\nA_THREE="quoted # kept"\nA_FOUR=\'x\n', newline="\n"
+    )
     resources.load_env(repo)
     import os
-    assert (os.environ["A_ONE"], os.environ["A_TWO"], os.environ["A_THREE"], os.environ["A_FOUR"]) == ("/x/y", "two", "quoted # kept", "'x")
+
+    assert (os.environ["A_ONE"], os.environ["A_TWO"], os.environ["A_THREE"], os.environ["A_FOUR"]) == (
+        "/x/y",
+        "two",
+        "quoted # kept",
+        "'x",
+    )
 
 
 def test_malformed_resources_config_is_a_diagnostic(repo: Path) -> None:
-    (repo / "schema" / "resources.yaml").write_text("roots: [a, b]\ndeny: nope\n")
+    (repo / "schema" / "resources.yaml").write_text("roots: [a, b]\ndeny: nope\n", newline="\n")
     assert [d.code for d in Checker(bundle(repo)).check_all()].count("H061") == 2
 
 
-@pytest.mark.parametrize("args", [("systems/a.md", "systems/a.md"), ("log.md", "systems/a.md"), ("../outside.md", "systems/a.md")])
+@pytest.mark.parametrize(
+    "args", [("systems/a.md", "systems/a.md"), ("log.md", "systems/a.md"), ("../outside.md", "systems/a.md")]
+)
 def test_merge_refuses_unsafe_targets(repo: Path, args) -> None:
     write(repo, "systems/a.md", "A")
-    (repo / "kb" / "log.md").write_text("# Log\n")
-    (repo / "outside.md").write_text("---\ntype: Concept\n---\n")
+    (repo / "kb" / "log.md").write_text("# Log\n", newline="\n")
+    (repo / "outside.md").write_text("---\ntype: Concept\n---\n", newline="\n")
     with pytest.raises(SystemExit):
         linkfix.merge(bundle(repo), *args, "test/0")
     assert (repo / "kb/systems/a.md").exists() and (repo / "kb/log.md").exists() and (repo / "outside.md").exists()
@@ -394,7 +461,9 @@ def test_unlinked_folds_accents_and_scales(repo: Path) -> None:
     found = unlinked.find(bundle(repo))
     assert [(m.page, m.target) for m in found] == [("/systems/ref.md", "/systems/ecoles.md")]
     for i in range(400):
-        write(repo, f"data/p{i}.md", f"Topic number {i} alpha", f"Mentions topic number {i + 1} alpha and more text. " * 3)
+        write(
+            repo, f"data/p{i}.md", f"Topic number {i} alpha", f"Mentions topic number {i + 1} alpha and more text. " * 3
+        )
     start = time.perf_counter()
     unlinked.find(bundle(repo))
     assert time.perf_counter() - start < 5
@@ -403,8 +472,13 @@ def test_unlinked_folds_accents_and_scales(repo: Path) -> None:
 
 
 def test_wikilinks_and_future_timestamps_are_flagged(repo: Path) -> None:
-    write(repo, "systems/a.md", "A", "See [[B]] and ![[img.png]] but not `[[code]]`.",
-          extra="verified: { by: human:me, at: 2999-01-01T00:00:00Z }\n")
+    write(
+        repo,
+        "systems/a.md",
+        "A",
+        "See [[B]] and ![[img.png]] but not `[[code]]`.",
+        extra="verified: { by: human:me, at: 2999-01-01T00:00:00Z }\n",
+    )
     diagnostics = [d.code for d in Checker(bundle(repo)).check_all()]
     assert diagnostics.count("H032") == 2 and "W041" in diagnostics
 
@@ -417,9 +491,7 @@ def test_zotero_helpers() -> None:
     assert resources._published("1996-00-00 1996") == "1996"
 
 
-def test_http_errors_become_messages(repo: Path, server, monkeypatch) -> None:
-    base, routes = server
-
+def test_http_errors_become_messages(repo: Path, monkeypatch) -> None:
     class Redirect(_Fake):
         def do_GET(self):  # noqa: N802
             self.send_response(301)
@@ -447,10 +519,13 @@ def test_post_approval_fixes(repo: Path, tmp_path: Path, monkeypatch) -> None:
     with pytest.raises(SystemExit, match="root itself"):
         resources.open_target(bundle(repo), "file:docs")
     monkeypatch.delenv("Q_ONE", raising=False)
-    (repo / ".env").write_text('Q_ONE="a b" # comment\n')
+    (repo / ".env").write_text('Q_ONE="a b" # comment\n', newline="\n")
     resources.load_env(repo)
     assert os.environ["Q_ONE"] == "a b"
-    assert resources.zotero_citekey_slug({"key": "ABCD2345", "creators": [{"lastName": "李"}], "date": "2020"}) == "zotero-abcd2345"
+    assert (
+        resources.zotero_citekey_slug({"key": "ABCD2345", "creators": [{"lastName": "李"}], "date": "2020"})
+        == "zotero-abcd2345"
+    )
 
 
 def test_zotero_lookup_by_slug(repo: Path, server, monkeypatch) -> None:
@@ -479,9 +554,13 @@ def test_karakeep_address_forms_and_user_agent(repo: Path, server, monkeypatch, 
 
 def test_dupes_never_pairs_journal_entries(repo: Path) -> None:
     (repo / "schema" / "vocabulary.yaml").write_text(
-        (repo / "schema" / "vocabulary.yaml").read_text().replace(
-            "relations:", '  Journal Entry: { plural: Journal Entries, description: A day., folders: ["journal"] }\nrelations:'
-        )
+        (repo / "schema" / "vocabulary.yaml")
+        .read_text()
+        .replace(
+            "relations:",
+            '  Journal Entry: { plural: Journal Entries, description: A day., folders: ["journal"] }\nrelations:',
+        ),
+        newline="\n",
     )
     write(repo, "journal/2024/2024-10-22.md", "Journal 2024-10-22", type_="Journal Entry")
     write(repo, "journal/2024/2024-10-28.md", "Journal 2024-10-28", type_="Journal Entry")
@@ -494,7 +573,7 @@ def test_cli_karakeep_save_and_env_actor(repo: Path, server, monkeypatch, capsys
     base, routes = server
     routes[("GET", "/api/v1/bookmarks/check-url")] = lambda q, h: (200, {"bookmarkId": None})
     routes[("POST", "/api/v1/bookmarks")] = lambda body, h: (201, {"id": "bm9"})
-    (repo / ".env").write_text(f"KARAKEEP_URL={base}\nKARAKEEP_API_KEY=secret\nKB_ACTOR=human:from-env\n")
+    (repo / ".env").write_text(f"KARAKEEP_URL={base}\nKARAKEEP_API_KEY=secret\nKB_ACTOR=human:from-env\n", newline="\n")
     monkeypatch.setenv("KB_REPO_ROOT", str(repo))
     monkeypatch.setenv("KB_ACTOR", "unset-below")  # recorded, so the value .env loads is undone afterwards
     monkeypatch.delenv("KB_ACTOR")
@@ -515,7 +594,7 @@ def test_text_search_and_qmd_collection_name(repo: Path, monkeypatch) -> None:
     assert search.text_search(b, "tcp")[0][0] == "kb/systems/tcp.md"
     monkeypatch.delenv("KB_QMD_COLLECTION", raising=False)
     assert search.qmd_collection(b) == "kb"  # no pyproject.toml in the fixture
-    (repo / "pyproject.toml").write_text('[project]\nname = "notes-tools"\n')
+    (repo / "pyproject.toml").write_text('[project]\nname = "notes-tools"\n', newline="\n")
     assert search.qmd_collection(b) == "notes"
     monkeypatch.setenv("KB_QMD_COLLECTION", "custom")
     assert search.qmd_collection(b) == "custom"

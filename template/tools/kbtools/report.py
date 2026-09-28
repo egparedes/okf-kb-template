@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .bundle import Bundle, Document
-from .mdlinks import find_links, resolve
 
 
 def trust_tier(doc: Document) -> str:
@@ -28,19 +27,17 @@ def _is_stale(doc: Document, now: datetime) -> bool:
 
 
 def build(bundle: Bundle) -> str:
-    now = datetime.now(timezone.utc)
-    concepts = [d for d in bundle.concepts() if not d.frontmatter_error and d.type]
-    knowledge = [d for d in concepts if d.rel.parts[0] not in bundle.config.personal_folders]
+    now = datetime.now(UTC)
+    concepts = list(bundle.pages("all").values())
+    knowledge = list(bundle.pages("knowledge").values())
 
     inbound: Counter[str] = Counter()
     broken: list[tuple[str, str]] = []
     for doc in bundle.documents:
-        if doc.rel.name == "index.md":
+        if doc.rel.name == "index.md" or doc.in_tooling_folder or doc.type == "Template":
             continue
-        for link in find_links(doc.body):
-            if link.is_external or link.is_anchor_only or not link.path:
-                continue
-            target = resolve(link.path, doc.folder)
+        for link in doc.links:
+            target = doc.resolve(link)
             if target is None:
                 continue
             if bundle.exists(target):
@@ -67,7 +64,11 @@ def build(bundle: Bundle) -> str:
     section("Stale pages", [str(d.rel) for d in concepts if _is_stale(d, now)])
     section(
         "Uncited knowledge pages (no `sources`)",
-        [str(d.rel) for d in knowledge if d.type not in ("Source", "Person", "Organization") and not d.frontmatter.get("sources")],
+        [
+            str(d.rel)
+            for d in knowledge
+            if d.type not in ("Source", "Person", "Organization") and not d.frontmatter.get("sources")
+        ],
     )
     section(
         "Unused sources (Source pages nothing cites)",

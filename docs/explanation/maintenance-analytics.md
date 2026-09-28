@@ -6,23 +6,31 @@ its own page without linking it; a central page is never reviewed. Three
 read-only commands find candidates for these problems. The agent, and for
 merges you, decide what to do with them.
 
-## The link graph: `kb graph`
+## Which pages
 
-`kb graph` builds a directed graph of knowledge pages and their links, and
-reports what a reviewer should look at.
-
-What is **excluded** matters as much as what is included:
+`kb graph`, `kb dupes`, `kb unlinked` and `kb report` look at the same
+pages. What is **excluded** matters as much as what is included:
 
 - **Every `index.md` and `log.md`.** Generated indexes link to every page
   in their folder. Counted as pages, they would be the most central nodes of
   the graph, and no page would ever be an orphan. Excluding them
   structurally is what makes the metrics mean something. The committed
   Obsidian graph filter excludes them for the same reason.
-- **Folders starting with `_`**, such as `_templates/`: vault tooling, not
-  knowledge.
-- **Personal areas** (`projects/`, `journal/`), unless `--scope all`.
-- **Source pages as nodes.** Links to and from Source pages are counted as
-  citations, a separate layer, not as topical links.
+- **Templates and folders starting with `_` or `.`**, such as
+  `_templates/`: vault tooling, not knowledge. Dot-folders such as
+  `.trash/`, and gitignored files, are not part of the bundle at all.
+- **Pages whose frontmatter does not parse or has no `type`.** `kb check`
+  reports them.
+- **Personal areas** (`projects/`, `journal/`), unless `--scope all`
+  (`kb unlinked --all`). `kb report` counts personal pages in its type and
+  status totals, and leaves them out of the trust and citation sections.
+
+## The link graph: `kb graph`
+
+`kb graph` builds a directed graph of the knowledge pages and their links
+(body links and relations), and reports what a reviewer should look at.
+Source pages are not nodes: links to and from them are counted as
+citations, a separate layer, not as topical links.
 
 From the graph it reports:
 
@@ -53,7 +61,10 @@ compares names (titles, aliases and file names) and, optionally, text:
 | similar description, same folder, 2 or more shared tags | small bonuses on top |
 
 To stay fast on thousands of pages, only pages that share a name word, a
-4-letter word prefix, an acronym or a resource are compared.
+4-letter word prefix, an acronym, a whole name or a resource are compared.
+A word or prefix shared by more than 200 pages is too common to compare
+every pair; pages with the same whole name or the same resource are always
+compared.
 
 Some pairs are never proposed:
 
@@ -73,9 +84,13 @@ alias without linking to it.
   reported as "consensus".
 - Matching ignores case and accents, except for all-caps names (acronyms),
   which match case-sensitively, so "API" is not found in "rapid".
+- A name matches with spaces, `-` or `_` between its words, and with a
+  plural ending (`s`, `es`) on the last word.
 - Names shorter than 4 characters are ignored, except acronyms.
-- Headings, code, URLs and footnote definitions are not scanned.
-- Targets the page already links, in the body or in a relation, are
+- Headings, code, links, URLs, footnote definitions and reference
+  definitions are not scanned.
+- Targets the page already links, in the body, a reference definition or a
+  relation, are
   skipped, so repeated runs converge to nothing.
 - A name used by several pages is reported as ambiguous instead of guessed.
 

@@ -102,6 +102,16 @@ claude_code:
   help: Add Claude Code settings, hooks and CLAUDE.md?
   default: true
 
+codex:
+  type: bool
+  help: Add Codex hooks (.codex/hooks.json)? Codex reads AGENTS.md and the skills without them
+  default: false
+
+gemini_cli:
+  type: bool
+  help: Add Gemini CLI settings (.gemini/settings.json) that make it read AGENTS.md, with hooks?
+  default: false
+
 github_ci:
   type: bool
   help: Add a GitHub Actions workflow (validation on push, weekly URL check)?

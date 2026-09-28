@@ -1,4 +1,4 @@
-"""Name normalization shared by `kb dupes` and `kb unlinked`."""
+"""Name normalization: slugs for file names, and the tokens `kb dupes` and `kb unlinked` compare."""
 
 from __future__ import annotations
 
@@ -7,10 +7,9 @@ import unicodedata
 
 from .bundle import Document
 
-STOPWORDS = frozenset(
-    "a an and at by for from in into of on or the to vs with without".split()
-)
+STOPWORDS = frozenset("a an and at by for from in into of on or the to vs with without".split())
 _NON_WORD = re.compile(r"[^\w]+")
+KEBAB = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")  # a file or folder name, a tag, a bundle folder
 
 
 def fold(text: str) -> str:
@@ -19,13 +18,23 @@ def fold(text: str) -> str:
     return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
+def _spell_symbols(name: str) -> str:
+    """`C++` -> `Cpp`, `C#` -> `Csharp`, so they stay distinct from `C`."""
+    name = re.sub(r"(\w)\+\+", r"\1pp", name)
+    return re.sub(r"(\w)#", r"\1sharp", name)
+
+
+def slug(name: str) -> str:
+    """Kebab-case file-name slug: 'C++ & Écoles' -> 'cpp-ecoles'; empty when nothing is left."""
+    return re.sub(r"[^a-z0-9]+", "-", fold(_spell_symbols(name))).strip("-")
+
+
 def tokens(name: str) -> tuple[str, ...]:
     """Normalized content words; a naive plural strip keeps 'stencils' == 'stencil'.
 
     `C++` and `C#` stay distinct from `C` (-> 'cpp', 'csharp').
     """
-    name = re.sub(r"(\w)\+\+", r"\1pp", name)
-    name = re.sub(r"(\w)#", r"\1sharp", name)
+    name = _spell_symbols(name)
     words = [w for w in _NON_WORD.split(fold(name).replace("_", " ")) if w]
     out = []
     for word in words:

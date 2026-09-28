@@ -20,15 +20,16 @@ to pull template changes. Full documentation:
 AGENTS.md{% if claude_code %} / CLAUDE.md{% endif %}   conventions and workflows for agents
 .agents/skills/         kb-ingest, kb-query, kb-maintain
 schema/                 vocabulary (types, relations, extra fields), taxonomy (folders), resources, core frontmatter schema
-tools/kbtools/          the `kb` CLI: check, index, fix-links, mv, merge, new, log, find, report,
-                        graph, dupes, unlinked, zotero, karakeep, fetch, open
+tools/kbtools/          the `kb` CLI: check, index, fix-links, mv, merge, new, log, find, search,
+                        eval, report, graph, dupes, unlinked, zotero, karakeep, fetch, open, import
 pyproject.toml          the tools' package, and the tasks (`uv run poe` lists them)
 {{ (bundle_dir ~ '/').ljust(23) }} OKF bundle root{% if obsidian %} == Obsidian vault root{% endif %}
 ```
 
 **Owned by this knowledge base:** `schema/vocabulary.yaml`,
-`schema/taxonomy.yaml`, `schema/resources.yaml`, this README and everything
-in `{{ bundle_dir }}/`.
+`schema/taxonomy.yaml`, `schema/resources.yaml`, `tasks.toml`,
+`tools/retrieval-eval/questions.yaml`, this README and everything in
+`{{ bundle_dir }}/`.
 Copier never overwrites these files.
 
 **Managed by the template:** the rest (tooling, skills, AGENTS.md, CI).
@@ -44,7 +45,7 @@ Requirements: [uv](https://docs.astral.sh/uv/), git
 ```sh
 cp .env.example .env   # then fill in paths and keys for this machine
 uv run poe setup       # git init if needed, pre-commit hooks, indexes (uv syncs the tools)
-uv run poe ci          # kb check, independent OKF validator, tests, index freshness
+uv run poe ci          # kb check, independent OKF validator, lint, tests, index freshness
 ```
 
 `uv run poe` lists every task. Tip: `uv tool install poethepoet` once, and
@@ -85,7 +86,8 @@ Talk to your agent from the repository root:
 | `uv run poe report` | Trust tiers, stale pages, uncited pages and wanted pages |
 | `uv run poe find --type Concept --tag x` | Frontmatter queries |
 | `uv run poe search "question"` | qmd hybrid search, falling back to a text search |
+| `uv run poe eval` | Do the search tiers reach the expected pages of `tools/retrieval-eval/questions.yaml`? |
 | `uv run poe health` | Link graph (index hubs excluded), duplicate candidates, unlinked mentions |
-| `uv run kb mv old.md new.md` | Move a page and rewrite every inbound link |
+| `uv run kb mv old.md new.md` | Move a page (or an image) and rewrite every inbound link |
 | `uv run kb merge old.md into.md` | Fold a duplicate into another page (after merging the text) |
 | `uv run kb zotero search …` / `kb fetch <ref>` | Zotero, KaraKeep and file roots: see [docs/external-resources.md](docs/external-resources.md) |

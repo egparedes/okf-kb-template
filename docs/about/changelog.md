@@ -5,6 +5,84 @@ Releases are git tags. A knowledge base records its tag in
 Entries before v0.6.0 name tasks as just recipes (`just X`); today, run
 them as `uv run poe X`.
 
+## v0.7.0
+
+- **Faster and more correct checking.** Pages are parsed once and shared by
+  every command: `kb check` is about twice as fast, `kb check FILE` reads
+  only the given files, so the agent hooks take a fraction of a second even
+  with thousands of pages, and `kb unlinked` takes seconds instead of
+  minutes. The bundle is the set of files git would commit, without
+  dot-folders such as `.trash/`
+  ([which files are checked](../reference/check-codes.md#which-files-are-checked));
+  the new global option `kb --tracked`, used by the pre-commit hooks, reads
+  only what a commit contains. Link targets must match the case of the
+  file on every platform, and link parsing follows CommonMark more closely
+  (wrapped link text, indented fences and code blocks, code spans).
+  `kb graph`, `kb dupes`, `kb unlinked` and `kb report` look at the
+  [same pages](../explanation/maintenance-analytics.md#which-pages);
+  orphaned `index.md` files are reported.
+- **Agent guardrails: hooks, Codex, Gemini CLI.** The
+  [hooks](../explanation/agents-and-hooks.md#the-hooks) also check pages
+  that shell commands change, keep their state per session in
+  `.cache/kb-hooks/`, and check the log against `log.md` at the start of
+  the session instead of asking git. New Copier questions
+  [`codex` and `gemini_cli`](../reference/copier-questions.md) add the same
+  hooks for [Codex and Gemini CLI](../explanation/agents-and-hooks.md#codex-and-gemini-cli);
+  Gemini CLI then reads `AGENTS.md`. Claude Code is denied shell commands
+  that name `.env`. `kb new` checks the actor and always writes valid
+  frontmatter; `kb log` keeps entries on one line. `kb setup` repairs
+  [`.claude/skills` on Windows](../reference/cli.md#claudeskills-on-windows),
+  and the launcher tolerates a broken configuration file when a knowledge
+  base is named.
+- **Safer import and external resources.**
+  [`kb import`](../reference/cli.md#kb-import) never follows symlinks,
+  rolls back on failure, and refuses destinations that clash by case or
+  with a folder; `exclude` ignores case, the
+  [mapping](../reference/import-mapping.md) is validated as a whole, and
+  many conversions are fixed. [`kb open`](../reference/cli.md#kb-open)
+  opens only web URLs, Zotero items and files under a declared root, never
+  programs. `kb fetch` runs markitdown (when it is not installed, a pinned
+  version through uvx, overridable with `KB_MARKITDOWN`) and stops it after
+  5 minutes; neither it nor the desktop opener gets your API keys
+  ([details](../explanation/external-resources.md#what-the-tool-hands-to-other-programs)).
+  Zotero [group libraries](../how-to/connect-zotero.md#group-libraries)
+  work with the local API, and bad settings or responses give clear errors
+  instead of tracebacks.
+- **`kb mv`, `kb merge` and `kb fix-links`.** [`kb mv`](../reference/cli.md#kb-mv)
+  and [`kb merge`](../reference/cli.md#kb-merge) change files all or
+  nothing, with backups in `.cache/kb-backup/`. `kb mv` refuses reserved
+  files, hidden or ignored places and a change of extension; it moves
+  images and other files, and moves into existing folders. All three
+  rewrite reference definitions and frontmatter in block or flow style,
+  keeping comments and quoting; `kb mv` and `kb merge` also update
+  `tools/retrieval-eval/questions.yaml`.
+- **`kb eval`.** [`kb eval`](../reference/cli.md#kb-eval) (`uv run poe eval`)
+  reports, for the questions in `tools/retrieval-eval/questions.yaml`,
+  whether each search tier (index and text search, `kb find` filters, qmd)
+  reaches the expected pages (recall@k). It is deterministic, and
+  `--min-recall` makes it a CI gate. See
+  [Is qmd worth it?](../how-to/enable-search.md#is-qmd-worth-it)
+- **Cross-platform and CI.** The template's CI runs on Linux, macOS and
+  Windows. Knowledge-base CI installs from
+  [`uv.lock`](../how-to/ci-and-github.md#the-lockfile) with
+  `uv sync --locked`; actions are pinned to commit SHAs and kept current by
+  [Dependabot](../how-to/ci-and-github.md#pinned-actions-and-dependabot);
+  [`.gitattributes`](../how-to/ci-and-github.md#line-endings) keeps LF
+  line endings. `kb` runs git, qmd and other programs only from absolute
+  `PATH` entries, never from the current directory.
+- **Lint and types.** `uv run poe lint` runs ruff over `tools/` and mypy
+  over `tools/kbtools/`, and [`uv run poe ci`](../reference/tasks.md) runs
+  it. The tooling is formatted with ruff.
+
+**Upgrading.** `copier update` asks the two new questions (`codex`,
+`gemini_cli`, default *No*), rewrites `.claude/settings.json`, adds
+`.gitattributes` and, with GitHub CI, `.github/dependabot.yml`, and
+reformats about 30 tooling files. Then run `uv lock` and commit `uv.lock`:
+CI now fails when it is stale. Some behaviour changed: import mappings are
+stricter, `kb mv` no longer adds `.md` to a name with another extension,
+and links into dot-folders or ignored files are now wanted pages (W030).
+See [Updating to v0.7.0](../how-to/update-from-the-template.md#updating-to-v070).
+
 ## v0.6.0
 
 - **poethepoet tasks instead of just.** The `justfile` is gone, from

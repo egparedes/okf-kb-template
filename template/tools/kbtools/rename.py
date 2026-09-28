@@ -22,8 +22,9 @@ import yaml
 
 from . import indexgen, search
 from .bundle import TOUCHED, Bundle
+from .fsutil import program, which_on_path
+from .names import KEBAB
 
-KEBAB = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 REPOSITORY_FOLDERS = {"schema", "tools", "docs", "imports", "template", "launcher", "site"}
 STANDARD_FOLDERS = {"sources", "syntheses", "entities", "projects", "journal"}
 ANSWERS = ".copier-answers.yml"
@@ -31,7 +32,19 @@ _WORD = re.compile(r"([\w-]+)")
 
 
 def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=check, errors="replace")
+    try:
+        git = program("git")
+    except FileNotFoundError as exc:
+        raise _fail(str(exc)) from None
+    return subprocess.run(
+        [git, *args],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=check,
+        encoding="utf-8",
+        errors="replace",
+    )  # `git show` prints the UTF-8 files as stored, whatever the locale
 
 
 def _fail(message: str) -> SystemExit:
@@ -81,7 +94,11 @@ def reverted_files(repo: Path, old: str, new: str) -> list[str]:
         except OSError:
             current = ""
         a, b = _WORD.split(head.stdout), _WORD.split(current)
-        if head.returncode != 0 or len(a) != len(b) or any(x != y and (x, y) != (old, new) for x, y in zip(a, b)):
+        if (
+            head.returncode != 0
+            or len(a) != len(b)
+            or any(x != y and (x, y) != (old, new) for x, y in zip(a, b, strict=True))
+        ):
             reverted.append(path)
     return reverted
 
@@ -93,7 +110,8 @@ def _rewrite_touched(repo: Path, old: str, new: str) -> None:
     root = repo.resolve()
     before, after = str(root / old) + os.sep, str(root / new) + os.sep  # record_touched writes resolved OS paths
     lines = touched.read_text(encoding="utf-8").splitlines()
-    touched.write_text("".join((after + l[len(before):] if l.startswith(before) else l) + "\n" for l in lines), encoding="utf-8")
+    text = "".join((after + line[len(before) :] if line.startswith(before) else line) + "\n" for line in lines)
+    touched.write_text(text, encoding="utf-8", newline="\n")
 
 
 def rename(bundle: Bundle, new: str, recopy_command: list[str] | None = None) -> int:
@@ -116,14 +134,27 @@ def rename(bundle: Bundle, new: str, recopy_command: list[str] | None = None) ->
 
     move(old, new)  # git mv stages the renames; untracked notes and installed plugins move with the folder
     command = recopy_command or [
-        "uvx", "--quiet", "copier", "recopy", "--quiet", "--trust", "--defaults", "--overwrite", "--skip-tasks",
-        f"--vcs-ref={ref}", "--data", f"bundle_dir={new}", ".",
+        "uvx",
+        "--quiet",
+        "copier",
+        "recopy",
+        "--quiet",
+        "--trust",
+        "--defaults",
+        "--overwrite",
+        "--skip-tasks",
+        f"--vcs-ref={ref}",
+        "--data",
+        f"bundle_dir={new}",
+        ".",
     ]
     if subprocess.run(command, cwd=repo, check=False).returncode != 0:
         try:
             move(new, old)
         except (OSError, subprocess.CalledProcessError) as exc:
-            raise _fail(f"copier recopy failed, and moving {new}/ back to {old}/ failed too ({exc}); do it by hand") from None
+            raise _fail(
+                f"copier recopy failed, and moving {new}/ back to {old}/ failed too ({exc}); do it by hand"
+            ) from None
         _git(repo, "restore", "--source=HEAD", "--staged", "--worktree", "--", ".", f":(exclude){old}", check=False)
         _git(repo, "restore", "--source=HEAD", "--staged", "--worktree", "--", f"{old}/_templates", check=False)
         raise _fail("copier recopy failed (see above); everything was put back as it was")
@@ -139,18 +170,23 @@ def rename(bundle: Bundle, new: str, recopy_command: list[str] | None = None) ->
         _rewrite_touched(repo, old, new)
         indexgen.write(Bundle(repo / new, repo))  # the next `uv run` syncs the re-rendered pyproject
     except (OSError, subprocess.CalledProcessError) as exc:
-        raise _fail(f"stopped after moving {old}/ to {new}/ and re-rendering ({exc}); "
-                    "run uv run kb index, then review git diff --cached") from None
+        raise _fail(
+            f"stopped after moving {old}/ to {new}/ and re-rendering ({exc}); "
+            "run uv run kb index, then review git diff --cached"
+        ) from None
     print(f"Renamed {old}/ to {new}/ and staged the move and the re-rendered template files.")
     if reverted:
-        print("WARNING: these template-managed files had local edits that the re-render reverted (see git diff --cached):")
+        print(
+            "WARNING: these template-managed files had local edits that the re-render reverted (see git diff --cached):"
+        )
         print("".join(f"  {path}\n" for path in reverted), end="")
     print("Next: review git diff --cached, then commit. Your unstaged edits and untracked notes are untouched;")
-    print("note that the pre-commit hook also checks untracked pages: one without valid frontmatter blocks the commit.")
+    print("the pre-commit hook checks only what the commit contains (tracked and staged files).")
     print(f"By hand: mentions of {old}/ in README.md and in schema/*.yaml comments (not re-rendered).")
     if (repo / new / ".obsidian").is_dir():
         print(f"Obsidian: open {new}/ with Open folder as vault.")
-    if shutil.which("qmd"):
-        print(f"qmd: qmd collection remove {search.qmd_collection(bundle)} && uv run poe search-setup (the folder path changed)")
+    if which_on_path("qmd"):
+        print(
+            f"qmd: qmd collection remove {search.qmd_collection(bundle)} && uv run poe search-setup (the folder path changed)"
+        )
     return 0
-

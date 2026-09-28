@@ -15,7 +15,9 @@ offers them as defaults.
 | `bundle_dir` | text | `kb_name` for a new knowledge base; `kb` on update of one created before v0.5.0 | lowercase kebab-case; not a folder of the repository, a standard folder or a domain | *New in v0.5.0.* The knowledge-base folder, which holds the bundle and is the Obsidian vault. See [below](#bundle_dir). |
 | `obsidian` | yes/no | yes | | Adds `.obsidian/` settings, `_templates/` (Templater) and `_views/` (Bases) to the knowledge-base folder, and `docs/obsidian-setup.md`. |
 | `claude_code` | yes/no | yes | | Adds `CLAUDE.md` and `.claude/` (settings, hooks, the `skills` symlink). |
-| `github_ci` | yes/no | yes | | Adds `.github/workflows/kb.yml`. |
+| `codex` | yes/no | no | | *New in v0.7.0.* Adds `.codex/hooks.json`: the knowledge-base hooks for Codex. Codex reads `AGENTS.md` and `.agents/skills/` without it. |
+| `gemini_cli` | yes/no | no | | *New in v0.7.0.* Adds `.gemini/settings.json`: Gemini CLI reads `AGENTS.md` (`context.fileName`), and runs the knowledge-base hooks. |
+| `github_ci` | yes/no | yes | | Adds `.github/workflows/kb.yml` and `.github/dependabot.yml`. |
 | `run_setup` | yes/no | yes | | Runs the post-copy tasks (below). Needs uv. |
 
 ## `domains`

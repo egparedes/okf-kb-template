@@ -2,11 +2,15 @@
 
 ## Claude Code specifics
 
-- Skills live in `.agents/skills/`; `.claude/skills` is a symlink to it.
+- Skills live in `.agents/skills/`; `.claude/skills` is a symlink to it
+  (`uv run poe setup` repairs it on Windows checkouts without symlinks).
 - `KB_ACTOR` is set in `.claude/settings.json`, so `uv run kb new` fills
   `generated.by`. Update it there when the model changes.
-- Hooks: after each Write/Edit in `{{ bundle_dir }}/`, the edited file is validated. On
-  stop, every page this session changed (via Write/Edit or `kb` commands)
-  must pass `kb check`, the indexes above them must be fresh, and knowledge
-  edits need a `log.md` entry. Hook output tells you exactly what to fix;
-  run `uv run poe check` for the whole bundle.
+- Hooks: after each Write/Edit in `{{ bundle_dir }}/`, the edited file is
+  validated; after each Bash command, so are the pages it created or
+  changed. On stop, every page this session changed must pass `kb check`,
+  the indexes above them must be fresh, and knowledge edits need a new
+  `log.md` entry. Hook output tells you exactly what to fix; run
+  `uv run poe check` for the whole bundle.
+- `.env` holds secrets: reading it, with a file tool or a shell command, is
+  denied. `kb` loads it when it needs a key.

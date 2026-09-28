@@ -39,6 +39,7 @@ pull later template changes into a knowledge base, run
 ```sh
 uv sync
 uv run poe test                # renders several configurations and runs each result's checks
+uv run poe lint                # ruff (lint, format check) and mypy; `uv run ruff format` fixes the formatting
 uv run poe render [DEST]       # renders the working tree with defaults into DEST (default /tmp/okf-kb-preview)
 uv run poe docs-serve          # preview the documentation site on http://localhost:8000
 uv run poe docs                # build it into site/ (strict)
@@ -46,6 +47,22 @@ uv run poe docs                # build it into site/ (strict)
 
 `uv run poe` lists these tasks; they are defined in `[tool.poe.tasks]` of
 `pyproject.toml`.
+
+CI (`.github/workflows/template.yml`) runs `uv run poe test` from the
+locked environment (`uv sync --locked`) on Linux, macOS and Windows, with
+Python 3.11 and 3.14; the Linux job with Python 3.11 runs in the C locale
+without UTF-8 mode, which catches file access that relies on the platform's
+default encoding. The Linux job with Python 3.14 also runs `uv run poe lint`:
+ruff over `tests/`, `launcher/` and the template's tooling, mypy over
+`tests/` and `launcher/`. The tooling is type-checked in a rendered knowledge
+base (its own `poe lint`, which `tests/test_template.py` runs). `docs.yml` builds the documentation site; `links.yml`
+checks its external links on demand. The actions are pinned by commit SHA
+and `.github/dependabot.yml` proposes updates weekly. Dependabot reads only
+`.github/workflows/`, not the knowledge base's `kb.yml` inside `template/`:
+`tests/test_workflows.py` fails until `kb.yml` uses the same pins, so update
+it in the Dependabot pull request.
+`.gitattributes` keeps LF line endings in every checkout: Copier renders
+files byte for byte, so a CRLF checkout would produce CRLF knowledge bases.
 
 Tag releases (`v0.1.0`, …) and push the tags with the commits
 (`git push origin main --tags`). Generated knowledge bases record the tag
@@ -67,5 +84,5 @@ own licences.
 - The maintenance analytics (`kb graph`, `kb dupes`, `kb unlinked`) are
   inspired by Ar9av/obsidian-wiki and reimplemented deterministically.
 - `tools/retrieval-eval/questions.yaml` is a hand-maintained set of
-  questions for judging whether a heavier search tier is worth enabling. No
-  tool reads it yet.
+  questions for judging whether a heavier search tier is worth enabling.
+  `kb eval` measures, deterministically, which tiers reach the expected pages.

@@ -80,8 +80,9 @@ Consequences:
 
 - every `.md` file in the knowledge-base folder needs frontmatter, including Obsidian
   templates, which have `type: Template`;
-- Obsidian must delete to the system trash, because a `.trash/` folder
-  would put non-conforming files into the bundle;
+- Obsidian must delete to the system trash: `kb` skips dot-folders such as
+  `.trash/`, but other OKF readers of the folder would count their files as
+  pages;
 - Obsidian plugins that only understand wikilinks cannot be used.
 
 ## Generated indexes
@@ -117,6 +118,12 @@ the lighter ones fail:
 2. filter by frontmatter with `kb find` (type, tags, status, folder, trust);
 3. hybrid search with qmd (keywords, local embeddings, reranking), with its
    index outside git.
+
+`kb eval` measures the tiers against questions kept in
+`tools/retrieval-eval/questions.yaml`, so enabling a heavier tier is a
+decision based on recall, not on taste. The measure is deterministic: no
+language model judges the answers; each tier either ranks an expected page
+in its top results or does not.
 
 The markdown files are always the source of truth; search indexes are
 rebuildable caches. A vector database from the start was rejected as

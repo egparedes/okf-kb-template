@@ -1,22 +1,24 @@
 # Install with `uv run poe setup` (runs `pre-commit install`).
+# `kb --tracked` reads only the files git tracks or has staged, so the hooks see
+# what the commit contains (untracked notes neither block it nor enter an index).
 repos:
   - repo: local
     hooks:
       - id: kb-fix-links
         name: kb fix-links (bundle-absolute links)
-        entry: uv run --quiet kb fix-links
+        entry: uv run --quiet kb --tracked fix-links
         language: system
         files: ^{{ bundle_dir }}/.*\.md$
         pass_filenames: false
       - id: kb-index
         name: kb index (regenerate index.md files)
-        entry: uv run --quiet kb index
+        entry: uv run --quiet kb --tracked index
         language: system
         files: ^({{ bundle_dir }}/.*\.md|schema/.*)$
         pass_filenames: false
       - id: kb-check
         name: kb check (OKF v0.2 + house rules)
-        entry: uv run --quiet kb check
+        entry: uv run --quiet kb --tracked check
         language: system
         files: ^({{ bundle_dir }}/.*|schema/.*)$
         pass_filenames: false

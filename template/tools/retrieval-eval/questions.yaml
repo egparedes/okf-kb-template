@@ -1,10 +1,30 @@
-# Retrieval evaluation set (tiered retrieval: index.md + ripgrep, then
-# frontmatter filters, then qmd hybrid search).
+# Retrieval evaluation set, read by `uv run poe eval` (`kb eval`).
 #
 # Add real questions you ask the knowledge base, with the pages a good answer
-# must use. Before enabling a heavier retrieval tier (qmd vectors, cloud
-# rerankers), check that the lighter tiers miss these pages.
+# must use. `kb eval` ranks the pages for each question with each retrieval
+# tier and reports recall@k (default k = 10) of the expected pages:
+#   index+text  index navigation (whole words of the question in a page's
+#               title or description), then the built-in text search of `kb search`;
+#   filters     the question's `filters`, as `kb find` applies them (only
+#               when the question has `filters`);
+#   qmd         `qmd query`, only when qmd is set up (`uv run poe search-setup`).
+# Keep both questions answered routinely and questions that were hard to answer.
+# Before enabling a heavier tier (qmd vectors, cloud rerankers), check that the
+# lighter tiers miss the pages of the hard ones. `uv run poe eval --min-recall R`
+# fails when index+text recall drops below R: set R for the set you keep (hard
+# questions lower it on purpose), e.g. just below today's recall.
+#
+# Format:
+#   question  the question, as you would ask it (required);
+#   expected  bundle-absolute paths of existing pages, each once, e.g.
+#             /systems/dns.md (required; generated index.md files are not allowed);
+#   filters   optional `kb find` filters: type, tag (a tag or a list of tags,
+#             all must match), status, folder, trust.
+# `kb mv` and `kb merge` rename the entries of the pages they move or merge;
+# after deleting a page, remove its entries here.
 questions: []
 #  - question: How does X relate to Y?
 #    expected:
 #      - /domain/x.md
+#      - /domain/y.md
+#    filters: {type: Concept, tag: [domain-tag]}

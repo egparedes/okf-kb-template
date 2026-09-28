@@ -62,11 +62,21 @@ Zotero.
       # group_id: 7654321   # to read a group library instead
     ```
 
+    Both ids are numbers; `kb check` reports anything else (H061).
+
 The web API serves full text only for items whose full-text index was
 synced (Zotero's "Sync full-text content" setting).
 
 `kb` tries the local API first, then the web API, then the database
-snapshot.
+snapshot. The web API is also asked when the local API does not know an
+item, for example one that has not synced to this computer yet.
+
+## Group libraries
+
+Set `group_id` in `schema/resources.yaml` to read a group library. All three
+ways then read that group: the local API at `/api/groups/<id>`, the web API
+at `/groups/<id>`, and, in the database snapshot, only the group's items.
+Without `group_id`, the snapshot reads only your own library.
 
 ## 5. Use it
 
@@ -95,6 +105,11 @@ zotero: { key: ABCD2345, citekey: williams2009roofline }
   API key and `user_id`.
 - **`kb check` reports H010 on `zotero.key`:** the key must be the
   8-character item key, in capitals.
+- **"cannot read the Zotero database snapshot":** the copy was taken while
+  Zotero was writing. Run the command again, or close Zotero first.
+- **`published` dates:** `kb zotero new-source` takes the date from the
+  API's parsed date when there is one. It keeps only the known parts: a
+  date with an unknown month (`2009-00-15`) becomes `2009`.
 
 See also: [External resources](../explanation/external-resources.md),
 [environment variables](../reference/environment-variables.md).

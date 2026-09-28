@@ -1,0 +1,8 @@
+# LF line endings in every checkout, Windows included. Copier renders files
+# byte for byte, so a CRLF checkout of the template would produce knowledge
+# bases with CRLF files; the tests compare text across platforms.
+* text=auto eol=lf
+# Windows scripts keep CRLF, which cmd.exe and PowerShell expect.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

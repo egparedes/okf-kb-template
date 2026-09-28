@@ -1,0 +1,14 @@
+# Weekly pull requests that move the pinned GitHub Actions (commit SHA plus
+# version comment) to their latest releases, grouped into one pull request.
+# A release is proposed once it is a week old.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

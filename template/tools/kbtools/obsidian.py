@@ -14,17 +14,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
-import subprocess
-import sys
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import quote
 
 from .bundle import Bundle
-from .resources import child_env
+from .resources import open_with_default_app
 
 PINS = Path("tools") / "obsidian-plugins.json"
 RELEASE_URL = "https://github.com/{repo}/releases/download/{version}/{file}"
@@ -58,7 +56,7 @@ def _installed_version(folder: Path) -> str | None:
         return None
 
 
-def install(folder: Path, pin: dict, force: bool = False, fetch=_download) -> str:
+def install(folder: Path, pin: dict, force: bool = False, fetch: Callable[[str], bytes] = _download) -> str:
     """Install one plugin; returns what happened. Nothing is written unless every file verifies."""
     installed = _installed_version(folder)
     if installed and not force:
@@ -98,20 +96,24 @@ def _read_listing(listing: Path) -> list[str]:
 
 def _open(uri: str) -> None:
     try:
-        if sys.platform == "win32":
-            os.startfile(uri)  # noqa: S606 - opening a URI with the default handler
-        else:
-            opener = "open" if sys.platform == "darwin" else "xdg-open"
-            subprocess.Popen([opener, uri], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=child_env())
+        open_with_default_app(uri)
     except OSError as exc:
         print(f"could not open {uri}: {exc}")
 
 
-def setup(bundle: Bundle, add: list[str], force: bool = False, open_vault: bool = False, fetch=_download) -> int:
+def setup(
+    bundle: Bundle,
+    add: list[str],
+    force: bool = False,
+    open_vault: bool = False,
+    fetch: Callable[[str], bytes] = _download,
+) -> int:
     config = bundle.root / ".obsidian"
     listing = config / "community-plugins.json"
     if not listing.is_file():
-        raise SystemExit(f"kb: {bundle.show('.obsidian/community-plugins.json')} not found; this knowledge base has no Obsidian configuration")
+        raise SystemExit(
+            f"kb: {bundle.show('.obsidian/community-plugins.json')} not found; this knowledge base has no Obsidian configuration"
+        )
     pins = load_pins(bundle)
     original = _read_listing(listing)
     unknown_add = [p for p in add if p not in pins]
@@ -126,14 +128,16 @@ def setup(bundle: Bundle, add: list[str], force: bool = False, open_vault: bool 
             shown = re.sub(r"[^\w.-]", "?", plugin)
             print(f"{shown}: no pin; install it from Obsidian (Settings → Community plugins)")
             continue
-        print(f"{plugin}: {install(config / 'plugins' / plugin, spec, force=force, fetch=fetch)} ({spec['name']}, {spec['license']})")
+        print(
+            f"{plugin}: {install(config / 'plugins' / plugin, spec, force=force, fetch=fetch)} ({spec['name']}, {spec['license']})"
+        )
     if enabled != original:  # only after every download verified
-        listing.write_text(json.dumps(enabled, indent=2) + "\n", encoding="utf-8")
+        listing.write_text(json.dumps(enabled, indent=2) + "\n", encoding="utf-8", newline="\n")
         print(f"updated {bundle.show('.obsidian/community-plugins.json')}")
     print(
         "\nTwo steps are left in Obsidian (they are not stored in the vault):\n"
-        "  1. On first open, choose \"Trust author and enable plugins\".\n"
-        "  2. Settings → Templater → turn on \"Trigger Templater on new file creation\".\n"
+        '  1. On first open, choose "Trust author and enable plugins".\n'
+        '  2. Settings → Templater → turn on "Trigger Templater on new file creation".\n'
         f"Open {bundle.prefix}/ as the vault (Open folder as vault), not the repository root."
     )
     if open_vault:

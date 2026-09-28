@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import os
 import re
-import shutil
 import subprocess
 import tomllib
 
 from .bundle import Bundle
+from .fsutil import which_on_path
 
 
 def qmd_collection(bundle: Bundle) -> str:
@@ -26,17 +26,68 @@ def qmd_collection(bundle: Bundle) -> str:
     return name.removesuffix("-tools") if isinstance(name, str) and name.endswith("-tools") else "kb"
 
 
+# What cmd.exe reinterprets in the arguments of a .cmd/.bat file, quoted or not; Python cannot escape it.
+_BATCH_UNSAFE = re.compile(r'["%!^&|<>\r\n]')
+# npm's cmd-shim: `"%_prog%"  "%dp0%\node_modules\...\qmd.js" %*` (older shims: `%~dp0\`).
+_NPM_SHIM_SCRIPT = re.compile(r'"%~?dp0%?\\([^"%]+\.[cm]?js)"')
+
+
+def qmd_argv(*args: str) -> list[str]:
+    """The command line that runs qmd with `args`.
+
+    On Windows, npm installs qmd as a `qmd.cmd` shim, which only a PATH lookup
+    with PATHEXT finds and which runs through cmd.exe: a query such as
+    `a&calc` would start another program. The shim's script is then run with
+    node directly; if that fails, arguments cmd.exe would reinterpret are
+    refused (ValueError).
+    """
+    exe = which_on_path("qmd")
+    if exe is None:
+        raise FileNotFoundError("`qmd` is not installed (not found on PATH)")
+    if os.path.splitext(exe)[1].lower() not in (".cmd", ".bat"):
+        return [exe, *args]
+    node = which_on_path("node")
+    try:
+        with open(exe, encoding="utf-8", errors="replace") as fh:
+            found = _NPM_SHIM_SCRIPT.search(fh.read())
+    except OSError:
+        found = None
+    script = os.path.join(os.path.dirname(exe), found.group(1).replace("\\", os.sep)) if found else None
+    if node and script and os.path.isfile(script) and os.path.splitext(node)[1].lower() not in (".cmd", ".bat"):
+        return [node, script, *args]
+    unsafe = next((a for a in args if _BATCH_UNSAFE.search(a)), None)
+    if unsafe is not None:
+        raise ValueError(
+            f"qmd is the batch file {exe}, and cmd.exe would reinterpret a character of {unsafe!r} "
+            '(one of " % ! ^ & | < > or a line break); leave it out, or install qmd so that '
+            "`node` can run its script directly"
+        )
+    return [exe, *args]
+
+
 def _qmd(*args: str, check: bool = True) -> subprocess.CompletedProcess:
-    result = subprocess.run(["qmd", *args], text=True, check=False)
+    try:
+        argv = qmd_argv(*args)
+        result = subprocess.run(argv, check=False)
+    except (ValueError, OSError) as exc:
+        raise SystemExit(f"kb search: {exc}") from None
     if check and result.returncode != 0:
         raise SystemExit(f"kb search: `qmd {' '.join(args)}` failed (exit {result.returncode})")
     return result
 
 
 def qmd_ready(collection: str) -> bool:
-    if shutil.which("qmd") is None:
+    try:
+        listing = subprocess.run(
+            qmd_argv("collection", "list"),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        ).stdout
+    except (ValueError, OSError):  # not installed, or a batch file refusing the name
         return False
-    listing = subprocess.run(["qmd", "collection", "list"], capture_output=True, text=True, check=False).stdout
     return f"(qmd://{collection}/)" in listing
 
 
@@ -69,7 +120,7 @@ def search(bundle: Bundle, query: str) -> int:
 
 def setup(bundle: Bundle, folders: list[tuple[str, str]]) -> int:
     """One-time qmd setup: the collection, a context per indexed folder, embeddings."""
-    if shutil.which("qmd") is None:
+    if which_on_path("qmd") is None:
         raise SystemExit("kb: qmd is not installed (https://github.com/tobi/qmd)")
     collection = qmd_collection(bundle)
     _qmd("collection", "add", str(bundle.root), "--name", collection, "--mask", "**/*.md")
@@ -81,7 +132,7 @@ def setup(bundle: Bundle, folders: list[tuple[str, str]]) -> int:
 
 
 def reindex() -> int:
-    if shutil.which("qmd") is None:
+    if which_on_path("qmd") is None:
         raise SystemExit("kb: qmd is not installed (https://github.com/tobi/qmd)")
     _qmd("update")
     _qmd("embed")

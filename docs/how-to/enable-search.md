@@ -85,6 +85,48 @@ removing it, because it keeps the embeddings and the folder contexts.
 
 ## Is qmd worth it?
 
-`tools/retrieval-eval/questions.yaml` is a place to keep questions with the
-pages that should answer them. Use it to judge by hand whether the first two
-tiers miss answers before you enable a heavier tier. No tool reads it yet.
+Measure before you install anything. `tools/retrieval-eval/questions.yaml`
+keeps real questions with the pages that should answer them, and
+[`kb eval`](../reference/cli.md#kb-eval) reports which tiers reach those
+pages.
+
+1. Add questions with the pages a good answer uses. Two kinds are useful:
+    - questions the knowledge base answers routinely: they show that the
+      first tiers keep working;
+    - questions that were hard to answer (the first searches missed the
+      pages): they show whether qmd would help.
+
+    ```yaml
+    questions:
+      - question: Why do DNS changes take hours to show up?
+        expected: [/systems/dns.md, /systems/ttl.md]
+      - question: Which Concept pages cover networking?
+        expected: [/systems/dns.md]
+        filters: {type: Concept, tag: networking}
+    ```
+
+    `filters` is optional; it runs the question through `kb find`.
+
+2. Run the evaluation:
+
+    ```sh
+    uv run poe eval
+    ```
+
+    Each line shows, per tier, how many expected pages are in the top 10
+    and the rank of the first one, e.g. `1/2 @3`. The last line gives the
+    mean recall@10 of each tier.
+
+3. Decide:
+    - index+text reaches the pages of the hard questions too: the first two
+      tiers are enough; improve the titles and descriptions of the pages
+      that rank low instead of adding a tier.
+    - index+text misses pages that are there under other words: install qmd
+      as above, then run `uv run poe eval` again. The qmd column now runs
+      `qmd query`; keep qmd if it reaches the pages the first tiers miss.
+
+A CI gate such as `uv run poe eval --min-recall 0.8` (in CI or in
+`tasks.toml`) exits 1 when index+text recall@10 drops below 0.8. Set the
+threshold for the set you keep: hard questions lower the mean on purpose,
+so gate on a representative set, or set the threshold just below today's
+recall. Pass `--no-qmd` where qmd is not installed consistently.

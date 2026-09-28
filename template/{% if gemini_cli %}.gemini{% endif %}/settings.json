@@ -1,0 +1,56 @@
+{
+  "context": {
+    "fileName": ["AGENTS.md", "GEMINI.md"]
+  },
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "run_shell_command",
+        "hooks": [
+          {
+            "name": "kb-pre-tool",
+            "type": "command",
+            "command": "uv run --quiet python -m kbtools.hooks pre-tool --agent gemini; exit 0",
+            "timeout": 30000
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "matcher": "write_file|replace",
+        "hooks": [
+          {
+            "name": "kb-post-edit",
+            "type": "command",
+            "command": "uv run --quiet python -m kbtools.hooks post-edit --agent gemini; exit 0",
+            "timeout": 60000
+          }
+        ]
+      },
+      {
+        "matcher": "run_shell_command",
+        "hooks": [
+          {
+            "name": "kb-post-tool",
+            "type": "command",
+            "command": "uv run --quiet python -m kbtools.hooks post-tool --agent gemini; exit 0",
+            "timeout": 60000
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "hooks": [
+          {
+            "name": "kb-stop",
+            "type": "command",
+            "command": "uv run --quiet python -m kbtools.hooks stop --agent gemini",
+            "timeout": 120000
+          }
+        ]
+      }
+    ]
+  }
+}

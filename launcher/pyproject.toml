@@ -1,6 +1,6 @@
 [project]
 name = "okf-kb"
-version = "0.6.0"
+version = "0.7.0"
 description = "Global `kb` command: runs the kb tool of the knowledge base you are in (or name), from anywhere."
 readme = "README.md"
 requires-python = ">=3.11"
