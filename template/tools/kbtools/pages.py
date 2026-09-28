@@ -16,7 +16,7 @@ LOG_OPS = ("Ingest", "Query", "Lint", "Update", "Creation", "Deprecation", "Refa
 _DATE_HEADING = re.compile(r"^## (\d{4}-\d{2}-\d{2})\s*$", re.M)
 # The `actor` pattern of schema/frontmatter.schema.json (a test keeps them equal).
 ACTOR = re.compile(r"^(human:[a-z0-9._-]+|process:[a-z0-9._-]+|[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+)$")
-_CONTEXT_SUFFIX = re.compile(r"(?<=[^/\s])\[[0-9A-Za-z]+\]$")  # claude-opus-5-5[1m] -> claude-opus-5-5
+CONTEXT_SUFFIX = re.compile(r"(?<=[^/\s])\[[0-9A-Za-z]+\]$")  # claude-opus-5-5[1m] -> claude-opus-5-5
 _LOG_OP = re.compile(r"[A-Za-z][A-Za-z-]*")
 
 
@@ -32,7 +32,7 @@ def validate_actor(actor: str, source: str = "--by") -> str:
     """
     actor = actor.strip()
     if "/" in actor:
-        actor = _CONTEXT_SUFFIX.sub("", actor)
+        actor = CONTEXT_SUFFIX.sub("", actor)
     if not ACTOR.fullmatch(actor):
         raise SystemExit(
             f"kb: {source}: {actor!r} is not an actor; use <tool>/<model> "

@@ -43,6 +43,7 @@ import yaml
 from .bundle import RESERVED, Bundle, load_yaml, record_touched
 from .mdlinks import encode_path, find_links, mask_code, reference_definitions
 from .names import slug
+from .pages import CONTEXT_SUFFIX
 
 ALWAYS_EXCLUDED = (".git/**", ".obsidian/**", ".trash/**", "logseq/**", "**/.DS_Store", ".*")
 DEFAULT_MAX_BYTES = 2_000_000
@@ -240,7 +241,7 @@ def check_actor(bundle: Bundle, actor: str) -> str:
     `claude-code/claude-opus-5-5[1m]` -> `claude-code/claude-opus-5-5`.
     """
     if "/" in actor:
-        actor = re.sub(r"\[[^\[\]/]*\]\Z", "", actor)
+        actor = CONTEXT_SUFFIX.sub("", actor)
     pattern = ((bundle.config.schema.get("$defs") or {}).get("actor") or {}).get("pattern") or ACTOR
     if not re.fullmatch(pattern, actor):
         raise _fail(f"actor `{actor}` is not valid: use human:<id>, process:<id> or <agent>/<model> (pattern {pattern})")
