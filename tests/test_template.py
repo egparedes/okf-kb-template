@@ -145,6 +145,29 @@ def test_rendered_knowledge_base_is_conformant(tmp_path: Path, variant: str) -> 
     _check_agent_hooks(dst, answers)
 
 
+@pytest.mark.skipif(shutil.which("uv") is None, reason="uv is required to run the rendered tooling")
+def test_own_retrieval_questions_keep_the_tests_green(tmp_path: Path) -> None:
+    """A fresh knowledge base ships no questions; one that adds its own still passes its tests and `kb eval`."""
+    dst = render(tmp_path, {"github_ci": False})
+    questions = dst / "tools" / "retrieval-eval" / "questions.yaml"
+    assert re.search(r"^questions: \[\]$", read(questions), re.M)
+    run(
+        ["uv", "run", "--quiet", "kb", "new", "Concept", "general/raft.md", "--title", "Raft",
+         "--description", "A consensus algorithm for replicated logs.", "--tags", "consensus", "--by", "test/0"],
+        dst,
+    )  # fmt: skip
+    run(["uv", "run", "--quiet", "kb", "index"], dst)
+    write(
+        questions,
+        read(questions).replace(
+            "questions: []",
+            "questions:\n  - question: How does Raft reach consensus?\n    expected: [/general/raft.md]",
+        ),
+    )
+    run(["uv", "run", "--quiet", "pytest", "-q", "tools/tests/test_eval.py", "tools/tests/test_kb.py"], dst)
+    assert "1/1" in run(["uv", "run", "--quiet", "kb", "eval", "--no-qmd", "--min-recall", "1"], dst)
+
+
 def _check_agent_hooks(dst: Path, answers: dict) -> None:
     """Each agent's hook configuration parses, and every hook command it names runs."""
     import json

@@ -1,6 +1,6 @@
 [project]
 name = "okf-kb-template"
-version = "0.6.0"
+version = "0.7.0"
 description = "Copier template for LLM-maintained knowledge bases that are OKF v0.2 bundles and Obsidian vaults."
 requires-python = ">=3.11"
 license = "MIT-0"

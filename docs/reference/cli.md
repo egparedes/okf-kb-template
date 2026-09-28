@@ -69,6 +69,12 @@ command) and the hooks' blocking results use 2 (see [`kb hook`](#kb-hook)).
 Every command loads `.env` from the repository root first; variables already
 set in the environment take precedence.
 
+The programs `kb` runs (git, qmd, node, markitdown, uvx) are looked up only
+in the absolute directories of the `PATH`, never in the current directory or
+in an empty or relative `PATH` entry, so a `git.exe` or `qmd.cmd` committed
+to a knowledge base never runs in its place. On Windows, `kb setup` runs
+`cmd.exe` by its full path.
+
 ## Commands
 
 | Command | Purpose |
@@ -532,7 +538,8 @@ stopped after 5 minutes.
 ### `kb open`
 
 Open an external resource with the desktop's default handler (`xdg-open`,
-or `open` on macOS), and print what was opened.
+`open` on macOS, the file association on Windows), and print what was
+opened.
 
 ```sh
 uv run kb open REF [--print]
@@ -693,8 +700,10 @@ If `NEW` is already the name, it says so and exits 0. Otherwise it:
    `.claude/settings.json`; it lists them in a `WARNING`;
 4. stages the changes to tracked files outside the folder and in
    `NEW/_templates/` (`git add -u`). It never stages untracked files;
-5. replaces the folder name in `.cache/kb-touched.txt`, the Stop hook's list
-   of pages the current agent session changed;
+5. replaces the folder name in `.cache/kb-touched.txt`, where `kb` commands
+   run by an agent record the pages they change until the session's next
+   hook collects them (the session state in `.cache/kb-hooks/` holds paths
+   relative to the folder and needs no change);
 6. regenerates the indexes (the next `uv run` syncs the tooling with the
    re-rendered `pyproject.toml`), and prints what it staged, the `WARNING`
    if any, the next steps (review `git diff --cached`, commit), what to fix
@@ -725,7 +734,7 @@ hook configurations use it because the shell hooks run on every command.
 |---|---|---|
 | `pre-tool` | Before a shell command (Codex: also before a patch) | Records the digest of `log.md` if this is the session's first event, and a listing of the knowledge base's `.md` files (path, modification time, size, content hash; dot-folders skipped). Always exits 0, even on errors, so it never blocks a command. |
 | `post-tool` | After it, also when it failed (Claude Code: `PostToolUseFailure`) | Compares the listing: pages whose content was created, changed or deleted are recorded for the session, and those that exist are checked with `kb check`. |
-| `post-edit` | After a file tool wrote `tool_input.file_path` (Claude Code: Write, Edit; Gemini CLI: `write_file`, `replace`) | If it is a `.md` file in the knowledge-base folder: records it and runs `kb check` on it. |
+| `post-edit` | After a file tool wrote `tool_input.file_path` (Claude Code: Write, Edit, MultiEdit; Gemini CLI: `write_file`, `replace`) | If it is a `.md` file in the knowledge-base folder: records it and runs `kb check` on it. |
 | `stop` | Before the agent finishes (Gemini CLI: `AfterAgent`) | Every page recorded this session passes `kb check`, the indexes above them are fresh, and if knowledge pages changed, `log.md` differs from its digest at the session's start. |
 
 `--agent` selects how problems reach the agent:

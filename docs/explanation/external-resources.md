@@ -51,8 +51,10 @@ deterministic and scriptable.
 | generic deny patterns | deny patterns that would reveal sensitive names (`KB_DENY`) |
 | the numeric Zotero user id (not a secret) | API keys, the Zotero data directory, the KaraKeep address |
 
-Agents are told never to read `.env`, and Claude Code's `Read` tool is
-denied it. The `kb` tool reads it itself.
+Agents are told never to read `.env`, and Claude Code denies it to its
+file tools and to shell commands that name it
+([details](agents-and-hooks.md#other-settings)). The `kb` tool reads it
+itself.
 
 ## Deny rules
 

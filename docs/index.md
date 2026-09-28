@@ -39,7 +39,8 @@ the repository.
 - **External material by reference:** Zotero items, KaraKeep bookmarks and
   files in synced folders are resolved on demand and never copied into git.
 - **Maintenance analytics:** a link graph, near-duplicate candidates and
-  unlinked mentions, which the agent reviews.
+  unlinked mentions, which the agent reviews, and a deterministic
+  retrieval evaluation (`kb eval`).
 - **Imports** from existing Obsidian vaults and Logseq graphs.
 - **Obsidian set up by one command:** settings, templates, Bases dashboards
   and pinned community plugins.

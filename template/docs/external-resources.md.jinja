@@ -16,10 +16,10 @@ Settings live in two places:
   your Zotero user id for the web API.
 - **`.env` (gitignored; copy `.env.example`):** secrets, machine paths, and
   deny patterns that would reveal sensitive names (`KB_DENY`).
-  - Agents are told never to read it{% if claude_code %}, and Claude Code's Read tool is denied
-    it{% endif %}.
-  - A shell command could still print it, so keep only what this checkout
-    needs.
+  - Agents are told never to read it{% if claude_code %}, and Claude Code denies it to its file
+    tools and to shell commands that name it{% endif %}.
+  - A command that reaches the file another way could still print it, so
+    keep only what this checkout needs.
   - The `kb` tooling reads it itself.
 
 ## Zotero

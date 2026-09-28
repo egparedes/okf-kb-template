@@ -25,9 +25,10 @@ cp .env.example .env
   uv's own `UV_*` settings are kept, because `uvx` may need them for a
   private package index.
 - `~` in paths is expanded where the value is a path.
-- Agents are told never to read it, and with Claude Code the `Read` tool is
-  denied `.env` in `.claude/settings.json`. A shell command could still
-  print it, so keep only what this checkout needs.
+- Agents are told never to read it, and `.claude/settings.json` denies
+  Claude Code's file tools and shell commands that name `.env`. A command
+  that reaches the file another way could still print it, so keep only what
+  this checkout needs.
 
 ## Variables
 

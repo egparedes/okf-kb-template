@@ -11,7 +11,7 @@ my-kb/
 ├── .copier-answers.yml          template source, version and answers (written by Copier)
 ├── .agents/skills/              kb-ingest, kb-query, kb-maintain (SKILL.md each)
 ├── .claude/
-│   ├── settings.json            hooks, KB_ACTOR, reading .env denied                 [claude_code]
+│   ├── settings.json            hooks, KB_ACTOR, access to .env denied               [claude_code]
 │   └── skills -> ../.agents/skills                                                   [claude_code]
 ├── .codex/hooks.json            hooks for Codex (new in v0.7.0)                      [codex]
 ├── .gemini/settings.json        Gemini CLI reads AGENTS.md; hooks (new in v0.7.0)    [gemini_cli]

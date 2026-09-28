@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from kbtools import retrieval_eval, search
-from kbtools.bundle import Bundle
+from kbtools.bundle import Bundle, bundle_dir
 from kbtools.cli import main
 
 REPO = Path(__file__).resolve().parents[2]
@@ -303,6 +303,7 @@ def test_eval_empty_set_passes(repo: Path, capsys) -> None:
     assert json.loads(capsys.readouterr().out)["questions"] == []
 
 
-def test_eval_shipped_question_file_is_valid(repo: Path) -> None:
-    shipped = REPO / "tools" / "retrieval-eval" / "questions.yaml"
-    assert retrieval_eval.load_questions(Bundle(repo / "kb", repo), shipped) == []
+def test_eval_question_file_is_valid() -> None:
+    """This knowledge base's own question file loads against its own bundle (it owns both)."""
+    questions = REPO / "tools" / "retrieval-eval" / "questions.yaml"
+    retrieval_eval.load_questions(Bundle(REPO / bundle_dir(REPO), REPO), questions)

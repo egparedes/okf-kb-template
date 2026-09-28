@@ -20,15 +20,16 @@ to pull template changes. Full documentation:
 AGENTS.md{% if claude_code %} / CLAUDE.md{% endif %}   conventions and workflows for agents
 .agents/skills/         kb-ingest, kb-query, kb-maintain
 schema/                 vocabulary (types, relations, extra fields), taxonomy (folders), resources, core frontmatter schema
-tools/kbtools/          the `kb` CLI: check, index, fix-links, mv, merge, new, log, find, report,
-                        graph, dupes, unlinked, zotero, karakeep, fetch, open
+tools/kbtools/          the `kb` CLI: check, index, fix-links, mv, merge, new, log, find, search,
+                        eval, report, graph, dupes, unlinked, zotero, karakeep, fetch, open, import
 pyproject.toml          the tools' package, and the tasks (`uv run poe` lists them)
 {{ (bundle_dir ~ '/').ljust(23) }} OKF bundle root{% if obsidian %} == Obsidian vault root{% endif %}
 ```
 
 **Owned by this knowledge base:** `schema/vocabulary.yaml`,
-`schema/taxonomy.yaml`, `schema/resources.yaml`, this README and everything
-in `{{ bundle_dir }}/`.
+`schema/taxonomy.yaml`, `schema/resources.yaml`, `tasks.toml`,
+`tools/retrieval-eval/questions.yaml`, this README and everything in
+`{{ bundle_dir }}/`.
 Copier never overwrites these files.
 
 **Managed by the template:** the rest (tooling, skills, AGENTS.md, CI).

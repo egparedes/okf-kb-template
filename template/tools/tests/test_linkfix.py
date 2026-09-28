@@ -99,6 +99,17 @@ def test_mv_into_a_folder_keeps_the_name(repo: Path, new: str) -> None:
     assert (repo / "kb" / new.strip("/") / "a.md").is_file()
 
 
+def test_mv_into_an_empty_existing_folder_keeps_the_name(repo: Path) -> None:
+    """A folder without pages is not in the bundle's file list, but it is still a folder."""
+    write(repo, "systems/a.md", "A")
+    (repo / "kb" / "ai").mkdir()
+    linkfix.move(bundle(repo), "systems/a.md", "ai")
+    assert (repo / "kb" / "ai" / "a.md").is_file() and not (repo / "kb" / "ai.md").exists()
+    (repo / "kb" / "Ml").mkdir()
+    linkfix.move(bundle(repo), "ai/a.md", "ml")  # another case is not that folder: a page ml.md
+    assert (repo / "kb" / "ml.md").is_file() and not (repo / "kb" / "Ml" / "a.md").exists()
+
+
 def test_mv_keeps_yaml_anchors_and_tags(repo: Path) -> None:
     write(repo, "systems/a.md", "A")
     write(repo, "systems/b.md", "B")

@@ -336,12 +336,22 @@ def _ignored(bundle: Bundle, path: Path) -> bool:
     return result.returncode == 0
 
 
+def _folder_on_disk(bundle: Bundle, rel: str) -> bool:
+    """An existing folder of the bundle, spelled with its exact case, even one that holds no page yet."""
+    path = bundle.root / rel
+    try:
+        return path.is_dir() and path.name in os.listdir(path.parent)
+    except OSError:
+        return False
+
+
 def _destination(bundle: Bundle, old_rel: str, new_arg: str) -> str:
     new_rel = bundle.rel(new_arg)
     if not new_rel:
         raise SystemExit(f"kb: give a new path or folder, not `{new_arg}`")
     suffix = PurePosixPath(old_rel).suffix
-    if new_rel in bundle.dirs or new_arg.endswith(("/", "\\")):  # into a folder, keeping the name
+    if new_rel in bundle.dirs or _folder_on_disk(bundle, new_rel) or new_arg.endswith(("/", "\\")):
+        # into a folder, keeping the name
         new_rel = posixpath.join(new_rel, posixpath.basename(old_rel))
     elif new_rel and not PurePosixPath(new_rel).suffix:
         new_rel += suffix

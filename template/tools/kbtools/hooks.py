@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import ntpath
 import os
 import shutil
 import subprocess
@@ -255,14 +256,33 @@ def _is_junction(path: Path) -> bool:
     return bool(is_junction and is_junction(path))
 
 
+_PLATFORM = sys.platform  # a seam for tests
+
+
+def _cmd_exe() -> str:
+    """The absolute path of cmd.exe, never a `cmd` from the current directory (CreateProcess looks there first).
+
+    %COMSPEC% when it names an existing file, else %SYSTEMROOT%\\System32\\cmd.exe when
+    %SYSTEMROOT% is an absolute path, else C:\\Windows\\System32\\cmd.exe (Windows environment
+    names ignore case).
+    """
+    comspec = os.environ.get("COMSPEC", "")
+    if os.path.isabs(comspec) and os.path.isfile(comspec):
+        return comspec
+    root = os.environ.get("SYSTEMROOT", "")
+    return ntpath.join(root if ntpath.isabs(root) else r"C:\Windows", "System32", "cmd.exe")
+
+
 def _link_skills(link: Path, target: Path) -> str:
     try:
         os.symlink(SKILLS_TARGET.replace("/", os.sep), link, target_is_directory=True)
         return "a symlink"
     except (OSError, NotImplementedError):
         pass
-    if os.name == "nt":
-        done = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True, check=False)
+    if _PLATFORM == "win32":
+        done = subprocess.run(
+            [_cmd_exe(), "/c", "mklink", "/J", str(link), str(target)], capture_output=True, check=False
+        )
         if done.returncode == 0:
             return "a directory junction"
     _copy_skills(target, link)

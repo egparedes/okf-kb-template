@@ -99,9 +99,11 @@ The command:
    committed local edits that the re-render reverted;
 5. stages the re-rendered files (`git add -u` on tracked files outside the
    folder and in `my-notes/_templates/`). It never stages untracked files;
-6. updates the folder name in `.cache/kb-touched.txt`, so that the Claude
-   Code Stop hook of a running agent session still finds the pages it
-   changed;
+6. updates the folder name in `.cache/kb-touched.txt`, where `kb` commands
+   run by an agent record the pages they change until the session's next
+   hook collects them, so that the Stop hook of a running agent session
+   still finds those pages. The hooks' session state in `.cache/kb-hooks/`
+   holds paths relative to the folder and needs no change;
 7. regenerates the indexes, and prints the summary. The next `uv run`
    syncs the tooling with the re-rendered `pyproject.toml`.
 

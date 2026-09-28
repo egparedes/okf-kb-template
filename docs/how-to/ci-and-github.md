@@ -29,7 +29,7 @@ repositories, runs count against your GitHub Actions minutes.
 ## The lockfile
 
 `uv.lock` pins the versions of the tooling's dependencies (PyYAML,
-jsonschema, pytest, pre-commit, poethepoet). The first `uv run` writes it;
+jsonschema, pytest, pre-commit, poethepoet, ruff, mypy). The first `uv run` writes it;
 commit it with the knowledge base. The `validate` job installs exactly
 these versions with `uv sync --locked`, and fails when `uv.lock` no longer
 matches `pyproject.toml`, for example after a `copier update` that changed

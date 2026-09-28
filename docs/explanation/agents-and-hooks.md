@@ -57,7 +57,7 @@ before a Bash command is the exception: it never fails (it ends in
 `|| true` and catches its own errors), because a failing `PreToolUse` hook
 would block every command, including the `uv sync` that could repair it.
 
-**After each Write or Edit** (`post-edit`): if the file is a `.md`
+**After each Write, Edit or MultiEdit** (`post-edit`): if the file is a `.md`
 file inside the knowledge-base folder, the hook records its path and runs `kb check` on that
 file. Errors go straight back to the agent, while it still has the page in
 mind. Warnings, such as wanted pages, do not block.
@@ -106,7 +106,7 @@ three; `--agent` adapts the output.
 
 | Check | Claude Code | Codex | Gemini CLI |
 |---|---|---|---|
-| file tools | `post-edit` after `Write`, `Edit` | `pre-tool`/`post-tool` around `apply_patch` (its payload holds the patch, not a path) | `post-edit` after `write_file`, `replace` |
+| file tools | `post-edit` after `Write`, `Edit`, `MultiEdit` | `pre-tool`/`post-tool` around `apply_patch` (its payload holds the patch, not a path) | `post-edit` after `write_file`, `replace` |
 | shell commands | `pre-tool`/`post-tool` around `Bash` (`PostToolUse` and `PostToolUseFailure`) | around `Bash` | around `run_shell_command` |
 | before stopping | `Stop` | `Stop` | `AfterAgent` |
 

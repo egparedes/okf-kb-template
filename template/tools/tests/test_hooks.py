@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import ntpath
 import os
 import re
 import shutil
@@ -429,6 +430,52 @@ def test_skills_placeholder_falls_back_to_a_copy(repo: Path, monkeypatch) -> Non
     (repo / ".agents" / "skills" / "kb-query" / "SKILL.md").write_text("x", newline="\n")
     assert "refreshed" in (hooks.repair_skills_link(repo) or "")
     assert (link / "kb-query" / "SKILL.md").is_file()
+
+
+@pytest.mark.parametrize(
+    ("comspec", "systemroot", "expected"),
+    [
+        ("existing", r"D:\Win", None),  # None: the COMSPEC file
+        ("relative", r"D:\Win", r"D:\Win\System32\cmd.exe"),
+        (None, r"D:\Win", r"D:\Win\System32\cmd.exe"),
+        (None, "Windows", r"C:\Windows\System32\cmd.exe"),  # a relative SYSTEMROOT is not used
+        (None, None, r"C:\Windows\System32\cmd.exe"),
+    ],
+)
+def test_junction_runs_cmd_exe_by_absolute_path(
+    repo: Path, tmp_path: Path, monkeypatch, comspec: str | None, systemroot: str | None, expected: str | None
+) -> None:
+    """`mklink /J` must not run a cmd.exe committed to the current directory."""
+    link = _placeholder(repo)
+    link.unlink()
+    cmd = tmp_path / "cmd.exe"
+    cmd.write_text("", newline="\n")
+    for name, value in (
+        ("COMSPEC", {"existing": str(cmd), "relative": "cmd.exe"}.get(comspec or "")),
+        ("SYSTEMROOT", systemroot),
+    ):
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
+    monkeypatch.setattr(hooks, "_PLATFORM", "win32")
+
+    def no_symlinks(*args, **kwargs):
+        raise OSError("symbolic links are not available")
+
+    calls: list[list[str]] = []
+
+    def run(args, **kwargs):
+        calls.append(list(args))
+        return subprocess.CompletedProcess(args, 1, "", "")
+
+    monkeypatch.setattr(os, "symlink", no_symlinks)
+    monkeypatch.setattr(hooks.subprocess, "run", run)
+    hooks._link_skills(link, repo / ".agents" / "skills")
+    assert calls[0][1:3] == ["/c", "mklink"]
+    argv0 = calls[0][0]
+    assert argv0 == (expected or str(cmd))
+    assert os.path.isabs(argv0) or ntpath.isabs(argv0)
 
 
 def test_dangling_skills_link_is_replaced(repo: Path, tmp_path: Path) -> None:
