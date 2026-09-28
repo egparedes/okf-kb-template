@@ -3,8 +3,9 @@
 The knowledge-base folder is the folder of the repository that holds the
 pages: the OKF bundle and, with Obsidian, the vault. It is named after
 `kb_name` by default, and is `kb/` in knowledge bases created before v0.5.0.
-`just rename-bundle NEW` gives it another name. This guide renames `kb/` to
-`my-notes/`; use your own names.
+`uv run poe rename-bundle NEW`, which runs
+[`kb rename-bundle`](../reference/cli.md#kb-rename-bundle), gives it
+another name. This guide renames `kb/` to `my-notes/`; use your own names.
 
 ## When to rename
 
@@ -26,13 +27,15 @@ name keep their names. The repository directory itself is not renamed.
 - The knowledge base is at template v0.5.0 or later (`_commit` in
   `.copier-answers.yml`, which must not be empty). If it is older,
   [update it](update-from-the-template.md) and commit the update first.
+  At v0.5.x, run `just rename-bundle NEW` instead of
+  `uv run poe rename-bundle NEW`; it behaves the same.
 - Changes to tracked files outside the knowledge-base folder, and in its
-  `_templates/`, are committed or stashed: the recipe re-renders those files.
+  `_templates/`, are committed or stashed: the command re-renders those files.
   Changes to pages and vault settings, and untracked files such as notes you
   have not committed yet, are fine: they move with the folder.
 - Obsidian is closed, so that it does not write into the folder while it
   moves.
-- The template repository is reachable. The recipe fetches the template at
+- The template repository is reachable. The command fetches the template at
   the version recorded in `.copier-answers.yml`, as `copier update` does; for
   a private fork, see
   [When the template repository is private](update-from-the-template.md#when-the-template-repository-is-private).
@@ -50,13 +53,13 @@ name keep their names. The repository directory itself is not renamed.
 From the repository root:
 
 ```sh
-just rename-bundle my-notes
+uv run poe rename-bundle my-notes
 ```
 
-If a check fails, the recipe says why and changes nothing; for uncommitted
+If a check fails, the command says why and changes nothing; for uncommitted
 changes, it lists the files to commit or stash.
 
-Copier lists the files it renders, and the recipe ends with a summary:
+The command ends with a summary:
 
 ```text
 …
@@ -64,15 +67,17 @@ Renamed kb/ to my-notes/ and staged the move and the re-rendered template files.
 WARNING: these template-managed files had local edits that the re-render reverted (see git diff --cached):
   .claude/settings.json
 Next: review git diff --cached, then commit. Your unstaged edits and untracked notes are untouched;
-the pre-commit hook checks the whole working tree, including them.
+note that the pre-commit hook also checks untracked pages: one without valid frontmatter blocks the commit.
 By hand: mentions of kb/ in README.md and in schema/*.yaml comments (not re-rendered).
-Obsidian: open my-notes/ with Open folder as vault. qmd: qmd collection remove my-kb && just search-setup
+Obsidian: open my-notes/ with Open folder as vault.
+qmd: qmd collection remove my-kb && uv run poe search-setup (the folder path changed)
 ```
 
 The `WARNING` lines appear only when there is something to restore (see
-below).
+below), the `Obsidian` line only with an Obsidian vault, and the `qmd` line
+only when qmd is installed.
 
-The recipe:
+The command:
 
 1. checks the name, the recorded template version and the working tree,
    and stops without changing anything if a check fails;
@@ -97,28 +102,29 @@ The recipe:
 6. updates the folder name in `.cache/kb-touched.txt`, so that the Claude
    Code Stop hook of a running agent session still finds the pages it
    changed;
-7. runs `uv sync` and `kb index`, and prints the summary.
+7. regenerates the indexes, and prints the summary. The next `uv run`
+   syncs the tooling with the re-rendered `pyproject.toml`.
 
 It does not commit.
 
 If the recopy fails, for example because the template repository cannot be
-reached or Copier rejects the name, the recipe moves the folder back,
+reached or Copier rejects the name, the command moves the folder back,
 restores the managed files and `kb/_templates/` to the last commit, says
 that everything was put back as it was, and exits with an error.
 
 ## Review and commit
 
-1. Review what the recipe staged:
+1. Review what the command staged:
 
     ```sh
     git diff --cached --stat
     git diff --cached
-    just check
+    uv run poe check
     ```
 
     The pages show as renamed, and the managed files as modified.
 
-2. If the recipe printed a `WARNING`, the listed files had committed local
+2. If the command printed a `WARNING`, the listed files had committed local
    edits, such as a hand-edited `KB_ACTOR` in `.claude/settings.json`,
    that the re-render replaced with the template's version. The removed
    lines are in `git diff --cached`: put back the ones you want to keep,
@@ -152,12 +158,13 @@ that everything was put back as it was, and exits with an error.
   Templater trigger is off, repeat the two manual steps of
   [Set up Obsidian](set-up-obsidian.md#do-the-two-manual-steps). Remove the
   old vault from Obsidian's vault list. From then on,
-  `just obsidian-setup --open` opens the vault.
+  `uv run poe obsidian-setup --open` opens the vault.
 - **qmd.** The collection keeps its name but still points at the old
-  folder. Recreate it:
+  folder. Recreate it with the command the rename printed, where
+  `my-kb` is the [collection name](enable-search.md#the-collection-name):
 
     ```sh
-    qmd collection remove "$(just --evaluate qmd_collection)" && just search-setup
+    qmd collection remove my-kb && uv run poe search-setup
     ```
 
 - **Launcher and scripts.** The [launcher](install-the-cli-launcher.md)
@@ -170,12 +177,13 @@ that everything was put back as it was, and exits with an error.
   tracked files, but the files git ignores or does not track stay in the old
   folder there: the Obsidian plugins, per-device settings and uncommitted
   notes. Move the notes you want to keep, delete the old folder, run
-  `just setup` and `just obsidian-setup`, and open the new folder as a vault.
+  `uv run poe setup` and `uv run poe obsidian-setup`, and open the new
+  folder as a vault.
 
 ## Rename it back
 
 After the commit, rename it again the same way, for example
-`just rename-bundle kb`.
+`uv run poe rename-bundle kb`.
 
 To undo a rename you have not committed, move the folder back, restore the
 re-rendered files, and refresh the environment and the indexes:
@@ -185,7 +193,7 @@ git mv my-notes kb        # or mv, if the folder had no tracked files
 git restore --source=HEAD --staged --worktree -- . ':(exclude)kb'   # files outside the folder
 git restore --source=HEAD --staged --worktree -- kb/_templates       # the Templater templates
 uv sync
-just index
+uv run poe index
 ```
 
 ## Why not rename it by hand
@@ -194,5 +202,6 @@ A plain `mv` or `git mv` moves the pages, but `pyproject.toml`,
 `.gitignore`, the pre-commit hooks and the agent instructions keep the old
 name, so `kb` and the hooks no longer find the bundle. Those files are
 managed by the template, and the next `copier update` would render them
-again from the name recorded in `.copier-answers.yml`. `just rename-bundle`
-changes the folder, the managed files and the recorded answer together.
+again from the name recorded in `.copier-answers.yml`.
+`uv run poe rename-bundle` changes the folder, the managed files and the
+recorded answer together.

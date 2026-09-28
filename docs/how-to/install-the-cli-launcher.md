@@ -1,10 +1,13 @@
 # Install the kb launcher
 
 Each knowledge base carries its own copy of the `kb` tool, in its own
-`.venv`. Inside a knowledge base, `uv run kb …` and `just …` always work and
-need nothing else. The launcher is an optional global `kb` command that
+`.venv`. Inside a knowledge base, `uv run kb …` and the
+[tasks](../reference/tasks.md), `uv run poe …`, always work and need
+nothing but uv. The launcher is an optional global `kb` command that
 finds the right knowledge base and runs *its* tool, so you can type `kb`
-from any directory.
+from any directory. It runs `kb` commands only, not tasks, but most tasks
+have a `kb` equivalent: `kb search …` for `uv run poe search …`,
+`kb rename-bundle NEW` for `uv run poe rename-bundle NEW`.
 
 ## Install
 

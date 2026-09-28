@@ -17,9 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v7
-      - uses: extractions/setup-just@v4
       - run: uv sync
-      - run: just ci
+      - run: uv run poe ci
 
   links:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

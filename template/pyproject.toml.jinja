@@ -12,7 +12,7 @@ dependencies = [
 kb = "kbtools.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "pre-commit>=4"]
+dev = ["pytest>=8", "pre-commit>=4", "poethepoet>=0.48"]
 
 [build-system]
 requires = ["hatchling"]
@@ -21,8 +21,77 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["tools/kbtools"]
 
+# Tasks: `uv run poe` lists them, `uv run poe <task>` runs one (extra arguments are passed on).
+# This table is template-managed; put this knowledge base's own tasks in tasks.toml.
+[tool.poe]
+include = "tasks.toml"
+
+[tool.poe.tasks.setup]
+help = "First-time setup of a clone: git repository, pre-commit hooks, indexes"
+cmd = "kb setup"
+
+[tool.poe.tasks.check]
+help = "Validate OKF conformance and house rules (optionally only the given files)"
+cmd = "kb check"
+
+[tool.poe.tasks.fix]
+help = "Normalize links to /bundle-absolute form, then regenerate every index.md"
+sequence = [{ cmd = "kb fix-links" }, { cmd = "kb index" }]
+
+[tool.poe.tasks.index]
+help = "Regenerate every index.md from frontmatter"
+cmd = "kb index"
+
+[tool.poe.tasks.validate-okf]
+help = "Independent second opinion on OKF conformance (scaccogatto/okf-skills, pinned); tolerates warnings such as wanted pages"
+cmd = "uv run --quiet https://raw.githubusercontent.com/scaccogatto/okf-skills/68ce7a0c07f66ca9a6b0beb68937d75314d5e8a5/skills/validate/scripts/okf_validate.py {{ bundle_dir }}"
+
+[tool.poe.tasks.report]
+help = "Health report: trust tiers, stale pages, uncited pages, unused sources, wanted pages"
+cmd = "kb report"
+
+[tool.poe.tasks.health]
+help = "Maintenance candidates (read-only): report, link graph, near-duplicates, unlinked mentions"
+sequence = [{ cmd = "kb report" }, { cmd = "kb graph" }, { cmd = "kb dupes" }, { cmd = "kb unlinked" }]
+
+[tool.poe.tasks.find]
+help = "List pages by frontmatter, e.g. `uv run poe find --type Concept --tag distributed-systems`"
+cmd = "kb find"
+
+[tool.poe.tasks.links-online]
+help = "Check external URLs (source rot); needs lychee"
+cmd = "lychee --no-progress --scheme https --scheme http --accept 200..=299,403,429 --root-dir \"${POE_ROOT}/{{ bundle_dir }}\" --exclude-path {{ bundle_dir }}/.obsidian '{{ bundle_dir }}/**/*.md'"
+
+[tool.poe.tasks.search]
+help = "Search: qmd hybrid search when set up, otherwise a text search over the words of the query"
+cmd = "kb search"
+
+[tool.poe.tasks.search-setup]
+help = "One-time qmd setup: collection, per-folder contexts from the taxonomy, embeddings"
+cmd = "kb search --setup"
+
+[tool.poe.tasks.search-reindex]
+help = "Refresh the qmd index after changes"
+cmd = "kb search --reindex"
+
+[tool.poe.tasks.obsidian-setup]
+help = "Install the vault's pinned Obsidian community plugins, e.g. `--add omnisearch` or `--open`"
+cmd = "kb obsidian setup"
+
+[tool.poe.tasks.rename-bundle]
+help = "Rename the knowledge-base folder (and Obsidian vault), e.g. `uv run poe rename-bundle my-notes`; close Obsidian first"
+cmd = "kb rename-bundle"
+
+[tool.poe.tasks.test]
+help = "Run the tooling tests"
+cmd = "pytest -q"
+
+[tool.poe.tasks.ci]
+help = "Everything CI runs: check, independent validator, tests, index freshness"
+sequence = [{ ref = "check" }, { ref = "validate-okf" }, { ref = "test" }, { cmd = "kb index --check" }]
+
 [tool.kb]
-# Folder of the knowledge base (OKF bundle) in this repository; rename it with `just rename-bundle`.
+# Folder of the knowledge base (OKF bundle) in this repository; rename it with `uv run poe rename-bundle`.
 bundle = "{{ bundle_dir }}"
 
 [tool.pytest.ini_options]

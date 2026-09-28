@@ -71,8 +71,8 @@ it was always `kb/`. But Obsidian names a vault after its folder, so every
 knowledge base appeared as "kb" in the vault switcher. Since v0.5.0 the
 name is the Copier answer `bundle_dir`, which defaults to the knowledge
 base's `kb_name`. It is recorded in the `[tool.kb]` table of
-`pyproject.toml`, where the tooling, the justfile and CI read it.
-Knowledge bases created earlier keep `kb/`, and `just rename-bundle`
+`pyproject.toml`, where the tooling and CI read it.
+Knowledge bases created earlier keep `kb/`, and `uv run poe rename-bundle`
 renames the folder later (see
 [Rename the knowledge-base folder](../how-to/rename-the-knowledge-base-folder.md)).
 
@@ -155,9 +155,20 @@ template separates it from the content:
   and never touches the files each knowledge base owns.
 
 Publishing the tooling as a separate package was considered. It would force
-each knowledge base to depend on a published package just to run CI, and
-would not cover the agent layer, the justfile or the CI workflow. With
+each knowledge base to depend on a published package only to run CI, and
+would not cover the agent layer, the tasks or the CI workflow. With
 Copier, a knowledge base is complete in its repository.
 
 Updates need release tags in the template repository, so that Copier has a
 base version to compare against.
+
+## Tasks on top of `kb`
+
+The short commands, such as `uv run poe check` or `uv run poe search`, are
+[poethepoet tasks](../reference/tasks.md) in `pyproject.toml`. Each task is
+one line, or a sequence of lines, that calls `kb` or another tool; the
+logic, such as the text search fallback or the folder rename, lives in the
+`kb` Python tool, where it is tested and runs the same on every platform.
+poethepoet is a development dependency of the tooling, so the tasks need
+nothing installed besides uv. Until v0.5.0 the tasks were just recipes,
+which needed just, and bash for the longer ones.

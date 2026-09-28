@@ -5,7 +5,7 @@ contains `.github/workflows/kb.yml`. It has two jobs.
 
 | Job | Runs on | What it does |
 |---|---|---|
-| `validate` | every push and pull request, and manual runs | Installs uv and just, runs `uv sync` and `just ci`: `kb check`, the independent OKF validator, the tooling tests, and `kb index --check` |
+| `validate` | every push and pull request, and manual runs | Installs uv, runs `uv sync` and `uv run poe ci`: `kb check`, the independent OKF validator, the tooling tests, and `kb index --check` |
 | `links` | every Monday at 06:00 UTC, and manual runs | Checks the external `http` and `https` URLs in the pages of the knowledge-base folder with [lychee](https://lychee.cli.rs) and fails on dead links |
 
 Both jobs have read-only access to the repository.
@@ -28,11 +28,11 @@ repositories, runs count against your GitHub Actions minutes.
 ## Run the same checks locally
 
 ```sh
-just ci             # what the validate job runs
-just links-online   # what the links job runs; needs lychee installed
+uv run poe ci             # what the validate job runs
+uv run poe links-online   # what the links job runs; needs lychee installed
 ```
 
-`just validate-okf` downloads a pinned copy of the independent validator
+`uv run poe validate-okf` downloads a pinned copy of the independent validator
 ([scaccogatto/okf-skills](https://github.com/scaccogatto/okf-skills)), so it
 needs network access.
 
@@ -60,9 +60,9 @@ URL to the Source page, or records the loss in the page. Ask the agent to
 
 ## If validate fails
 
-Open the failed run and read the `just ci` step. The output lists each
+Open the failed run and read the `uv run poe ci` step. The output lists each
 diagnostic as `path:line: CODE message`; the
 [check codes reference](../reference/check-codes.md) says how to fix each
 one. Typical causes are a commit made with `--no-verify`, which skips the
 pre-commit hook, and edits made on another machine without the hook
-installed (`just setup` installs it).
+installed (`uv run poe setup` installs it).

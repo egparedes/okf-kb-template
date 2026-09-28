@@ -1,6 +1,6 @@
 [project]
 name = "okf-kb-template"
-version = "0.5.0"
+version = "0.6.0"
 description = "Copier template for LLM-maintained knowledge bases that are OKF v0.2 bundles and Obsidian vaults."
 requires-python = ">=3.11"
 license = "MIT-0"
@@ -8,8 +8,27 @@ license-files = ["LICENSE"]
 dependencies = []
 
 [dependency-groups]
-dev = ["copier>=9.6", "pytest>=8"]
+dev = ["copier>=9.6", "pytest>=8", "poethepoet>=0.48"]
 docs = ["zensical>=0.0.65"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Development tasks: `uv run poe` lists them.
+[tool.poe.tasks.test]
+help = "Render the template in several configurations and run each result's checks"
+cmd = "pytest -q"
+
+[tool.poe.tasks.render]
+help = "Render the template with defaults into a scratch directory (default /tmp/okf-kb-preview)"
+cmd = "copier copy --trust --defaults --vcs-ref=HEAD --overwrite . \"${dest}\""
+args = [{ name = "dest", positional = true, default = "/tmp/okf-kb-preview" }]
+
+[tool.poe.tasks.docs]
+help = "Build the documentation site into site/ (Zensical, strict)"
+cmd = "uv run --only-group docs zensical build --clean --strict"
+
+[tool.poe.tasks.docs-serve]
+help = "Serve the documentation with live reload on http://localhost:8000"
+cmd = "uv run --only-group docs zensical serve"
+

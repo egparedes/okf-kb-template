@@ -33,7 +33,7 @@ nav = [
     "reference/index.md",
     { "Copier questions" = "reference/copier-questions.md" },
     { "kb command line" = "reference/cli.md" },
-    { "just recipes" = "reference/just-recipes.md" },
+    { "Tasks" = "reference/tasks.md" },
     { "Page frontmatter and schema files" = "reference/page-frontmatter.md" },
     { "Check codes" = "reference/check-codes.md" },
     { "Import mapping" = "reference/import-mapping.md" },

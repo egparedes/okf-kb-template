@@ -22,7 +22,7 @@ Your pages are your own work. The template claims nothing over them.
 
 ## Obsidian plugins are licensed separately
 
-`just obsidian-setup` downloads community plugins from their authors'
+`uv run poe obsidian-setup` downloads community plugins from their authors'
 GitHub releases onto your machine. The template does not contain,
 redistribute or relicense any plugin code:
 
@@ -50,7 +50,8 @@ plugin's repository for the authoritative terms.
 ## Other third-party software
 
 The tooling installs its Python dependencies (PyYAML, jsonschema, pytest,
-pre-commit) from PyPI into the knowledge base's `.venv`, under their own
-licences. `just validate-okf` downloads the independent validator from
+pre-commit, poethepoet) from PyPI into the knowledge base's `.venv`, under
+their own licences. `uv run poe validate-okf` downloads the independent
+validator from
 [scaccogatto/okf-skills](https://github.com/scaccogatto/okf-skills) at run
 time; it is not part of the template either.

@@ -22,7 +22,7 @@ AGENTS.md{% if claude_code %} / CLAUDE.md{% endif %}   conventions and workflows
 schema/                 vocabulary (types, relations, extra fields), taxonomy (folders), resources, core frontmatter schema
 tools/kbtools/          the `kb` CLI: check, index, fix-links, mv, merge, new, log, find, report,
                         graph, dupes, unlinked, zotero, karakeep, fetch, open
-justfile                task runner (`just` lists recipes)
+pyproject.toml          the tools' package, and the tasks (`uv run poe` lists them)
 {{ (bundle_dir ~ '/').ljust(23) }} OKF bundle root{% if obsidian %} == Obsidian vault root{% endif %}
 ```
 
@@ -36,16 +36,19 @@ Change them upstream and run `copier update`.
 
 ## Setup
 
-Requirements: [uv](https://docs.astral.sh/uv/), [just](https://just.systems), git
+Requirements: [uv](https://docs.astral.sh/uv/), git
 {%- if obsidian %} and Obsidian 1.13.7 or later{% endif %}. Optional:
 [lychee](https://lychee.cli.rs) (URL checks) and [qmd](https://github.com/tobi/qmd)
 (hybrid search).
 
 ```sh
 cp .env.example .env   # then fill in paths and keys for this machine
-just setup             # git init if needed, uv sync, pre-commit, indexes
-just ci                # kb check, independent OKF validator, tests, index freshness
+uv run poe setup       # git init if needed, pre-commit hooks, indexes (uv syncs the tools)
+uv run poe ci          # kb check, independent OKF validator, tests, index freshness
 ```
+
+`uv run poe` lists every task. Tip: `uv tool install poethepoet` once, and
+`poe check` works in any knowledge base.
 
 `copier update` fetches the template from `_src_path` in
 `.copier-answers.yml`. If that repository is private, git needs GitHub
@@ -54,7 +57,7 @@ credentials (e.g. `gh auth setup-git`).
 Obsidian: open `{{ bundle_dir }}/`, not the repository root, as the vault.
 
 ```sh
-just obsidian-setup          # installs the pinned community plugins
+uv run poe obsidian-setup   # installs the pinned community plugins
 ```
 
 Then open `{{ bundle_dir }}/` with *Open folder as vault*, choose "Trust author and enable plugins", and in *Settings → Templater*
@@ -76,13 +79,13 @@ Talk to your agent from the repository root:
 
 | Command | Purpose |
 |---|---|
-| `just check` | OKF v0.2 conformance and house rules |
-| `just fix` | Normalize links to `/…` form and regenerate every `index.md` |
-| `just validate-okf` | Independent OKF validator (okf-skills, pinned) |
-| `just report` | Trust tiers, stale pages, uncited pages and wanted pages |
-| `just find --type Concept --tag x` | Frontmatter queries |
-| `just search "question"` | qmd hybrid search, falling back to ripgrep |
-| `just health` | Link graph (index hubs excluded), duplicate candidates, unlinked mentions |
+| `uv run poe check` | OKF v0.2 conformance and house rules |
+| `uv run poe fix` | Normalize links to `/…` form and regenerate every `index.md` |
+| `uv run poe validate-okf` | Independent OKF validator (okf-skills, pinned) |
+| `uv run poe report` | Trust tiers, stale pages, uncited pages and wanted pages |
+| `uv run poe find --type Concept --tag x` | Frontmatter queries |
+| `uv run poe search "question"` | qmd hybrid search, falling back to a text search |
+| `uv run poe health` | Link graph (index hubs excluded), duplicate candidates, unlinked mentions |
 | `uv run kb mv old.md new.md` | Move a page and rewrite every inbound link |
 | `uv run kb merge old.md into.md` | Fold a duplicate into another page (after merging the text) |
 | `uv run kb zotero search …` / `kb fetch <ref>` | Zotero, KaraKeep and file roots: see [docs/external-resources.md](docs/external-resources.md) |

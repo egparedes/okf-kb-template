@@ -8,7 +8,7 @@ is per repository.
 
 | Item | Where |
 |---|---|
-| Tooling version and Python environment | `.venv/`, created by `just setup` |
+| Tooling version and Python environment | `.venv/`, created by uv on the first `uv run` |
 | Secrets and machine paths | `.env` |
 | Scratch space (fetched sources, drafts) | `.cache/` |
 | git hooks | `.git/hooks/pre-commit` |
@@ -35,21 +35,21 @@ and deny patterns, and maps them in its own `.env`.
     uvx copier copy --trust gh:egparedes/okf-kb-template ~/cooking-kb
     ```
 
-2. Run `just setup` in each, and fill in each `.env` from its
+2. Run `uv run poe setup` in each, and fill in each `.env` from its
    `.env.example`.
 
-3. If you use qmd, run `just search-setup` in each. The collection is named
+3. If you use qmd, run `uv run poe search-setup` in each. The collection is named
    after `kb_name` (`work-kb`, `cooking-kb`), so the indexes stay separate.
    See [Enable search](enable-search.md).
 
-4. If you use Obsidian, run `just obsidian-setup` in each and open each
+4. If you use Obsidian, run `uv run poe obsidian-setup` in each and open each
    knowledge-base folder (`~/work-kb/work-kb/`, `~/cooking-kb/cooking-kb/`)
    with *Open folder as vault*. Obsidian names a vault after its folder, and
    since v0.5.0 the folder is named after `kb_name` by default, so the
    vaults appear as `work-kb` and `cooking-kb` in the vault switcher.
    Knowledge bases created before v0.5.0 keep the folder `kb/`, so they all
    appear as `kb`; give each a distinct name with
-   [`just rename-bundle`](rename-the-knowledge-base-folder.md).
+   [`uv run poe rename-bundle`](rename-the-knowledge-base-folder.md).
 
 5. Optional: install the [launcher](install-the-cli-launcher.md) and register
    the knowledge bases by name, so that `kb -C work report` works from

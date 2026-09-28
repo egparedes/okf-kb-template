@@ -3,9 +3,9 @@
 This guide applies when you answered *Yes* to the Obsidian question: the
 template then configures the knowledge-base folder as a vault. That folder
 is named after `kb_name` by default (`kb/` in knowledge bases created before
-v0.5.0); below it is `<folder>/`, and `just --evaluate bundle` prints its
-name. You need Obsidian 1.13.7 or later, the minimum version of the pinned
-plugins.
+v0.5.0); below it is `<folder>/`, and `bundle` in the `[tool.kb]` table
+of `pyproject.toml` holds its name. You need Obsidian 1.13.7 or later, the
+minimum version of the pinned plugins.
 
 !!! important "Open the knowledge-base folder, not the repository root"
     Pages link to each other with bundle-absolute paths such as
@@ -20,13 +20,13 @@ before you open it in Obsidian: after a rename, Obsidian sees a new vault.
 ## Run the setup command
 
 ```sh
-just obsidian-setup
+uv run poe obsidian-setup
 ```
 
 Then, in Obsidian, choose *Open folder as vault* and select `<folder>/`. Later,
-`just obsidian-setup --open` reopens it from the terminal.
+`uv run poe obsidian-setup --open` reopens it from the terminal.
 
-`just obsidian-setup` runs `uv run kb obsidian setup`. It:
+`uv run poe obsidian-setup` runs `kb obsidian setup`. It:
 
 1. reads the plugin list in `<folder>/.obsidian/community-plugins.json`;
 2. downloads each listed plugin that has a pin in
@@ -98,7 +98,7 @@ Five more plugins are pinned. Add any of them to the list and install them
 in one step:
 
 ```sh
-just obsidian-setup --add obsidian-front-matter-title-plugin,folder-notes
+uv run poe obsidian-setup --add obsidian-front-matter-title-plugin,folder-notes
 ```
 
 Then configure them by hand in Obsidian:
@@ -125,8 +125,8 @@ knowledge base: template updates never overwrite them.
 | Setting | Value | Why |
 |---|---|---|
 | Use `[[Wikilinks]]` | off | OKF links are standard markdown links. Typing `[[` still autocompletes, but inserts a markdown link. |
-| New link format | Path from vault folder | Better Markdown Links adds the leading `/`. `just fix` repairs any link written without it. |
-| Automatically update internal links | on | Renames inside Obsidian keep links working. `just fix` restores the `/` form afterwards. |
+| New link format | Path from vault folder | Better Markdown Links adds the leading `/`. `uv run poe fix` repairs any link written without it. |
+| Automatically update internal links | on | Renames inside Obsidian keep links working. `uv run poe fix` restores the `/` form afterwards. |
 | Deleted files | Move to system trash | A `.trash/` folder inside the vault would put files without frontmatter into the bundle. |
 | Properties in document | Source | The Properties editor rewrites the whole YAML block, reordering keys and dropping quotes. Edit frontmatter as text. |
 | Default location for new notes | Same folder as current file | |
@@ -150,8 +150,8 @@ markdown, so they are outside the bundle:
   title and description, and renames the file to kebab-case.
 - **Links:** type `[[` and pick a page (Obsidian writes a markdown link), or
   write `[Title](/folder/page.md)` directly.
-- Before committing, run `just fix` and `just check`. The pre-commit hook
-  runs them too.
+- Before committing, run `uv run poe fix` and `uv run poe check`. The
+  pre-commit hook runs them too.
 
 Pages you write are signed `human:<your id>` in `generated.by`. The id is
 set in the templates from the `owner_id` question.

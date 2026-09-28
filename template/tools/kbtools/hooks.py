@@ -91,7 +91,7 @@ def stop(bundle: Bundle) -> int:
     ]
     problems += [str(d) for d in errors[:30]]
     if len(errors) > 30:
-        problems.append(f"... and {len(errors) - 30} more (run `just check`)")
+        problems.append(f"... and {len(errors) - 30} more (run `uv run poe check`)")
     personal = tuple(bundle.root / folder for folder in bundle.config.personal_folders)
     knowledge_edits = [
         p for p in touched

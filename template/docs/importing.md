@@ -8,7 +8,7 @@ The source is only read, never modified.
 ```sh
 uv run kb import ~/notes/old-vault --into projects/old --map imports/old-vault.yaml --dry-run
 uv run kb import ~/notes/old-vault --into projects/old --map imports/old-vault.yaml
-just check
+uv run poe check
 ```
 
 The dry run prints the plan and every issue:
@@ -163,7 +163,7 @@ such as `exlude` does not silently import everything.
 ## After the import
 
 1. Register the new folders in `schema/taxonomy.yaml` (otherwise `kb check`
-   warns W050), run `just fix`, then `just check`, and fix what it reports.
+   warns W050), run `uv run poe fix`, then `uv run poe check`, and fix what it reports.
 2. Run `uv run kb dupes --scope all` and `uv run kb unlinked --all` for
    overlaps with existing pages.
 3. Improve weak descriptions: the first sentence is not always a summary.

@@ -2,6 +2,41 @@
 
 Releases are git tags. A knowledge base records its tag in
 `.copier-answers.yml`; see [Update from the template](../how-to/update-from-the-template.md).
+Entries before v0.6.0 name tasks as just recipes (`just X`); today, run
+them as `uv run poe X`.
+
+## v0.6.0
+
+- **poethepoet tasks instead of just.** The `justfile` is gone, from
+  generated knowledge bases and from the template repository. The short
+  commands are [poethepoet tasks](../reference/tasks.md), one-liners and
+  sequences in `[tool.poe.tasks]` of `pyproject.toml`, with the same names
+  as the old recipes. Run them with `uv run poe <task> [ARGS…]`; extra
+  arguments are passed on, and `uv run poe` alone lists the tasks (and
+  exits with status 1). poethepoet is a development dependency, so there is
+  nothing to install besides uv; `uv tool install poethepoet` once makes
+  `poe <task>` work anywhere. Tasks run without a shell, so they work on
+  Windows, except `links-online`, which needs lychee.
+- **The logic of the longer recipes moved into `kb`**:
+  [`kb setup`](../reference/cli.md#kb-setup) (git repository, pre-commit
+  hook, indexes), [`kb search`](../reference/cli.md#kb-search) (qmd when set
+  up, otherwise a built-in text search that no longer needs ripgrep;
+  `--setup` and `--reindex` for qmd) and
+  [`kb rename-bundle`](../reference/cli.md#kb-rename-bundle) (the former
+  recipe, same behaviour).
+- **Local tasks** go in `tasks.toml`, which each knowledge base owns: the
+  template creates it once and `pyproject.toml` includes it.
+- The just variables are gone. The folder name is written into the tasks
+  that need it; `kb search` computes the qmd collection name, and
+  `KB_QMD_COLLECTION` can now also be set in `.env`.
+- CI runs `uv run poe ci`; the step that installed just is gone.
+- Template repository: `uv run poe test | render [DEST] | docs | docs-serve`.
+
+**Upgrading.** `copier update` deletes the `justfile`, even an edited one
+(recover your own recipes with `git show HEAD:justfile`), and adds
+`tasks.toml`. Replace `just X` with `uv run poe X`, also in your
+`README.md`, and move your own recipes into `tasks.toml`. See
+[Updating to v0.6.0](../how-to/update-from-the-template.md#updating-to-v060).
 
 ## v0.5.0
 

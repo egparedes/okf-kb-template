@@ -17,7 +17,7 @@ asks questions. Every edit must keep `{{ bundle_dir }}/` a conformant bundle.
 | `schema/frontmatter.schema.json` | Core frontmatter field shapes (template-managed; extend via `fields` in the vocabulary). |
 | `.agents/skills/` | Workflows: `kb-ingest`, `kb-query`, `kb-maintain`. |
 | `schema/resources.yaml`, `docs/external-resources.md` | External material (Zotero, KaraKeep, file roots) resolved on demand, never copied into `{{ bundle_dir }}/`. |
-| `justfile`, `tools/kbtools/` | Commands (`just` lists them) and the `kb` CLI behind them. |
+| `pyproject.toml`, `tasks.toml`, `tools/kbtools/` | Tasks (`uv run poe` lists them; `tasks.toml` holds this knowledge base's own) and the `kb` CLI behind them. |
 | `.cache/` | Gitignored scratch space: fetched source text, drafts. |
 | `.env` | Secrets and machine paths. Never read it; `kb` loads it. |
 
@@ -40,7 +40,7 @@ These make `{{ bundle_dir }}/` a bundle. Breaking any of them breaks conformance
    YAML frontmatter that has a non-empty `type`. Anything else goes in
    `.cache/` or outside `{{ bundle_dir }}/`.
 2. `index.md` files are **generated**. Change titles, descriptions and
-   `schema/taxonomy.yaml`, then run `just fix`.
+   `schema/taxonomy.yaml`, then run `uv run poe fix`.
 3. `log.md` is newest-first under `## YYYY-MM-DD` headings. Add entries only
    with `uv run kb log <Op> "<text>"`.
 
@@ -97,7 +97,7 @@ depends_on: ["[Consistency models](/systems/distributed/consistency-models.md)"]
 
 ## Placement
 
-- **One concept per page.** Search before creating (`just find`, `rg -il`,
+- **One concept per page.** Search before creating (`uv run poe find`, `rg -il`,
   folder `index.md`), and extend an existing page rather than creating a
   near-duplicate.
 - The folder follows the type (`vocabulary.yaml`) and the topic
@@ -111,7 +111,7 @@ depends_on: ["[Consistency models](/systems/distributed/consistency-models.md)"]
 
 A change is done when:
 
-- `just check` reports 0 errors{% if claude_code %} (in Claude Code, hooks enforce this){% endif %};
+- `uv run poe check` reports 0 errors{% if claude_code %} (in Claude Code, hooks enforce this){% endif %};
 - knowledge edits have a `log.md` entry;
 - you have told the human which pages changed.
 

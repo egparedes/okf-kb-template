@@ -17,8 +17,8 @@ my-kb/
 ├── .pre-commit-config.yaml      fix-links, index, check before each commit
 ├── .env.example                 template for the gitignored .env
 ├── .gitignore
-├── justfile                     task runner (see just recipes)
-├── pyproject.toml, uv.lock      the tooling package <kb_name>-tools; [tool.kb] bundle
+├── pyproject.toml, uv.lock      the tooling package <kb_name>-tools; [tool.kb] bundle; the tasks
+├── tasks.toml                   this knowledge base's own tasks (new in v0.6.0)
 ├── docs/
 │   ├── external-resources.md    Zotero, KaraKeep, file roots
 │   ├── importing.md             kb import and its mapping format
@@ -63,28 +63,29 @@ The name is recorded in `pyproject.toml`:
 
 ```toml
 [tool.kb]
-# Folder of the knowledge base (OKF bundle) in this repository; rename it with `just rename-bundle`.
+# Folder of the knowledge base (OKF bundle) in this repository; rename it with `uv run poe rename-bundle`.
 bundle = "my-kb"
 ```
 
 | Reader | How it uses `[tool.kb] bundle` |
 |---|---|
-| the `kb` command | The bundle is `<repo>/<bundle>`, unless `--bundle` is given. |
-| the `justfile` | The `bundle` variable, used by `validate-okf`, `search`, `search-setup`, `links-online` and `rename-bundle` (see [just recipes](just-recipes.md#variables)). |
-| `.github/workflows/kb.yml` | The weekly link check; the `validate` job through `just ci`. |
+| the `kb` command | The bundle is `<repo>/<bundle>`, unless `--bundle` is given. The tasks that run `kb`, such as `search-setup` and `rename-bundle`, use it this way. |
+| `.github/workflows/kb.yml` | The weekly link check; the `validate` job through `uv run poe ci`. |
 
-When the table or the key is missing, all three use `kb`. `pyproject.toml`
+When the table or the key is missing, both use `kb`. The `validate-okf` and
+`links-online` [tasks](tasks.md) do not read the table: Copier writes the
+folder name into them when it renders `pyproject.toml`. `pyproject.toml`
 is managed by the template, so edit the name only through
-[`just rename-bundle`](../how-to/rename-the-knowledge-base-folder.md), which
+[`uv run poe rename-bundle`](../how-to/rename-the-knowledge-base-folder.md), which
 also moves the folder and re-renders the files below.
 
 ## Files rendered with the folder name
 
 These files contain the folder name, written when Copier renders them:
 
-| File | Where the name appears | Re-rendered by `copier update` and `just rename-bundle` |
+| File | Where the name appears | Re-rendered by `copier update` and `uv run poe rename-bundle` |
 |---|---|---|
-| `pyproject.toml` | `[tool.kb] bundle`, the package description | yes |
+| `pyproject.toml` | `[tool.kb] bundle`, the package description, the `validate-okf` and `links-online` tasks | yes |
 | `.gitignore` | the Obsidian and `.trash/` patterns | yes |
 | `.pre-commit-config.yaml` | the `files:` patterns of the hooks | yes |
 | `AGENTS.md`, `CLAUDE.md` | the map and the rules | yes |
@@ -100,11 +101,11 @@ After a rename, update the old name in the owned files by hand.
 `copier update` merges upstream changes into these files. Change them in the
 template, or in your fork of it, rather than locally.
 
-- the tooling: `tools/kbtools/`, `tools/tests/`, `pyproject.toml`,
+- the tooling: `tools/kbtools/`, `tools/tests/`, `pyproject.toml` with its tasks,
   `tools/obsidian-plugins.json`;
 - the agent layer: `AGENTS.md`, `CLAUDE.md`, `.agents/skills/`,
   `.claude/settings.json`;
-- `justfile`, `.pre-commit-config.yaml`, `.github/workflows/kb.yml`,
+- `.pre-commit-config.yaml`, `.github/workflows/kb.yml`,
   `.gitignore`, `.env.example`;
 - `schema/frontmatter.schema.json`;
 - `docs/`;
@@ -122,6 +123,7 @@ template's `copier.yml`, so `copier update` never overwrites them:
 | `schema/taxonomy.yaml` | the folder tree |
 | `schema/resources.yaml` | file roots, deny patterns, Zotero ids |
 | `tools/retrieval-eval/questions.yaml` | retrieval evaluation questions |
+| `tasks.toml` | the knowledge base's own [tasks](tasks.md#local-tasks-taskstoml) (new in v0.6.0) |
 | `{{ bundle_dir }}/log.md` | the update log |
 | `{{ bundle_dir }}/.obsidian/*.json` | Obsidian settings, including `community-plugins.json` |
 | `{{ bundle_dir }}/.obsidian/plugins/*/data.json` | plugin settings, such as Templater's folder templates |

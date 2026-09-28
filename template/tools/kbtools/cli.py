@@ -9,7 +9,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from . import dupes, graph, hooks, importer, indexgen, linkfix, obsidian, pages, report, resources, unlinked
+from . import dupes, graph, hooks, importer, indexgen, linkfix, obsidian, pages, rename, report, resources, search, unlinked
 from .bundle import Bundle
 from .check import Checker, exit_code
 
@@ -103,10 +103,8 @@ def _cmd_find(bundle: Bundle, args: argparse.Namespace) -> int:
 
 def _cmd_folders(bundle: Bundle, args: argparse.Namespace) -> int:
     """Print `folder<TAB>description` for every indexed folder (used for search contexts)."""
-    for folder in indexgen.folders_to_index(bundle):
-        if folder:
-            spec = bundle.config.folder_spec(folder) or {}
-            print(f"{folder}\t{spec.get('title', folder)}: {spec.get('description', '')}")
+    for folder, description in _folder_contexts(bundle):
+        print(f"{folder}\t{description}")
     return 0
 
 
@@ -220,6 +218,43 @@ def _cmd_import(bundle: Bundle, args: argparse.Namespace) -> int:
 def _cmd_obsidian(bundle: Bundle, args: argparse.Namespace) -> int:
     add = [p.strip() for p in (args.add or "").split(",") if p.strip()]
     return obsidian.setup(bundle, add, force=args.force, open_vault=args.open)
+
+
+def _cmd_setup(bundle: Bundle, args: argparse.Namespace) -> int:
+    """First-time setup of a clone: git repository, pre-commit hooks, indexes (uv has synced the tools)."""
+    repo = bundle.repo_root
+    if subprocess.run(["git", "rev-parse", "--git-dir"], cwd=repo, capture_output=True, check=False).returncode != 0:
+        subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+        print("initialized a git repository", flush=True)
+    subprocess.run([sys.executable, "-m", "pre_commit", "install"], cwd=repo, check=True)
+    for path in indexgen.write(bundle):
+        print(f"wrote {path.relative_to(repo)}")
+    return 0
+
+
+def _folder_contexts(bundle: Bundle) -> list[tuple[str, str]]:
+    out = []
+    for folder in indexgen.folders_to_index(bundle):
+        if folder:
+            spec = bundle.config.folder_spec(folder) or {}
+            out.append((folder, f"{spec.get('title', folder)}: {spec.get('description', '')}"))
+    return out
+
+
+def _cmd_search(bundle: Bundle, args: argparse.Namespace) -> int:
+    if (args.setup or args.reindex) and args.query:
+        raise SystemExit("kb search: --setup and --reindex take no query")
+    if args.setup:
+        return search.setup(bundle, _folder_contexts(bundle))
+    if args.reindex:
+        return search.reindex()
+    if not " ".join(args.query).strip():
+        raise SystemExit("kb search: give a query (or --setup / --reindex)")
+    return search.search(bundle, " ".join(args.query))
+
+
+def _cmd_rename_bundle(bundle: Bundle, args: argparse.Namespace) -> int:
+    return rename.rename(bundle, args.new)
 
 
 def _cmd_hook(bundle: Bundle, args: argparse.Namespace) -> int:
@@ -347,6 +382,20 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--force", action="store_true", help="download again even if the pinned version is installed")
     p.add_argument("--open", action="store_true", help="then open the vault in Obsidian (obsidian:// URI)")
     p.set_defaults(func=_cmd_obsidian)
+
+    p = sub.add_parser("setup", help="first-time setup of a clone: git repository, pre-commit hooks, indexes")
+    p.set_defaults(func=_cmd_setup)
+
+    p = sub.add_parser("search", help="search: qmd hybrid search when set up, otherwise a text search")
+    p.add_argument("query", nargs="*", help="words to search for")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--setup", action="store_true", help="one-time qmd setup: collection, folder contexts, embeddings")
+    mode.add_argument("--reindex", action="store_true", help="refresh the qmd index after changes")
+    p.set_defaults(func=_cmd_search)
+
+    p = sub.add_parser("rename-bundle", help="rename the knowledge-base folder (and Obsidian vault); close Obsidian first")
+    p.add_argument("new", help="new folder name (kebab-case)")
+    p.set_defaults(func=_cmd_rename_bundle)
 
     p = sub.add_parser("hook", help="Claude Code hook entry points")
     p.add_argument("event", choices=["post-edit", "stop"])

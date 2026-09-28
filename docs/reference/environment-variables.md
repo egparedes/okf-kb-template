@@ -12,8 +12,7 @@ cp .env.example .env
 - The `kb` tool loads it itself on each run, after finding the repository
   root. Variables already set in the real environment take precedence.
 - Only `kb` reads `.env`. `KB_REPO_ROOT` has no effect there, and the
-  launcher (`KB_DIR`) and `just` (`KB_QMD_COLLECTION`) need these variables
-  in the shell environment.
+  launcher needs `KB_DIR` in the shell environment.
 - Format: `KEY=value` lines. `export KEY=value`, single or double quotes,
   `#` comment lines and inline ` # comments` after unquoted values are
   accepted.
@@ -32,8 +31,9 @@ cp .env.example .env
 | `KB_REPO_ROOT` | `kb` | Repository root to use instead of searching upwards from the current directory. The launcher sets it for each call. Never export it globally: it pins every `kb` call to one knowledge base. |
 | `CLAUDECODE` | `kb` | Set to `1` by Claude Code for the commands its agent runs. When set, commands that change pages record them for the Stop hook. |
 
-No variable names the knowledge-base folder. `kb`, `just` and CI read it
-from `[tool.kb] bundle` in `pyproject.toml` (see
+No variable names the knowledge-base folder. `kb` and CI read it from
+`[tool.kb] bundle` in `pyproject.toml`, and the tasks that need it have it
+written in (see
 [Repository layout](repository-layout.md#the-knowledge-base-folder)); for a
 single call, `kb --bundle PATH` overrides it.
 
@@ -49,7 +49,7 @@ single call, `kb --bundle PATH` overrides it.
 
 | Variable | Meaning |
 |---|---|
-| `KB_QMD_COLLECTION` | Name of the qmd collection used by `just search`, `just search-setup` and `just search-reindex`. Default: the knowledge base's `kb_name`. Read by `just` from the environment it runs in. |
+| `KB_QMD_COLLECTION` | Name of the qmd collection used by [`kb search`](cli.md#kb-search), and so by the `search`, `search-setup` and `search-reindex` tasks. Default: the knowledge base's `kb_name`. Since v0.6.0 it can also be set in `.env`. |
 
 ### File roots
 

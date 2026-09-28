@@ -51,7 +51,7 @@ touch 5-15 pages.
 
 4. **Map the impact.**
    - Read `{{ bundle_dir }}/index.md`, then the index of each relevant domain folder.
-   - Run `just find --tag <tag>` and `rg -il "<term>" {{ bundle_dir }}` for each key term
+   - Run `uv run poe find --tag <tag>` and `rg -il "<term>" {{ bundle_dir }}` for each key term
      in the source.
    - After compiling, run `uv run kb unlinked <pages you touched>` to find
      mentions of existing pages that should become links.
@@ -79,7 +79,7 @@ touch 5-15 pages.
 6. **Close the loop.**
    - Under the Source page's `# Pages updated`, list every page you created
      or updated, as links.
-   - Run `just fix`, then run `just check` until it reports 0 errors.
+   - Run `uv run poe fix`, then run `uv run poe check` until it reports 0 errors.
    - Log it: `uv run kb log Ingest "[<Source title>](/sources/<slug>.md). Created …; updated …."`
 
 7. **Report** to the human:

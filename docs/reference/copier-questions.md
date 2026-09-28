@@ -62,7 +62,7 @@ The default depends on the operation:
 | Operation | Default |
 |---|---|
 | `copier copy` | the answer to `kb_name`: `copier copy … my-notes` with `kb_name: my-notes` creates `my-notes/my-notes/`. Choose another name, such as `notes`, if you prefer. |
-| `copier update` of a knowledge base created before v0.5.0 | `kb`, so nothing moves. Accept it, and rename the folder afterwards with [`just rename-bundle`](../how-to/rename-the-knowledge-base-folder.md) if you want another name. |
+| `copier update` of a knowledge base created before v0.5.0 | `kb`, so nothing moves. Accept it, and rename the folder afterwards with [`uv run poe rename-bundle`](../how-to/rename-the-knowledge-base-folder.md) if you want another name. |
 | later `copier update`s | the recorded answer, as for every question. |
 
 Copier tells a new knowledge base from an existing one by reading the
@@ -89,10 +89,10 @@ The answer determines:
 - the folder itself, with `index.md`, `log.md` and, with `obsidian`,
   `.obsidian/`, `_templates/` and `_views/`;
 - `bundle = "<bundle_dir>"` in the `[tool.kb]` table of `pyproject.toml`.
-  The `kb` command, the `bundle` just variable and the CI link check read
-  the name from there, not from `.copier-answers.yml`; a missing entry means
-  `kb`;
-- the folder name written into `.gitignore`, `.pre-commit-config.yaml`,
+  The `kb` command and the CI link check read the name from there, not
+  from `.copier-answers.yml`; a missing entry means `kb`;
+- the folder name written into the `validate-okf` and `links-online` tasks
+  of `pyproject.toml`, `.gitignore`, `.pre-commit-config.yaml`,
   `AGENTS.md`, `CLAUDE.md`, the three skills, `README.md`,
   `docs/obsidian-setup.md` and the comments of `schema/taxonomy.yaml` (see
   [Repository layout](repository-layout.md#files-rendered-with-the-folder-name)).
@@ -100,7 +100,7 @@ The answer determines:
 Do not change the answer during `copier update`. Copier does not move your
 pages: the tooling would point at a new folder that holds only the
 template's files, and the pages would stay in the old one. To rename the
-folder, run `just rename-bundle NEW` instead
+folder, run `uv run poe rename-bundle NEW` instead
 ([Rename the knowledge-base folder](../how-to/rename-the-knowledge-base-folder.md)).
 The `kb` command and the `kb_name` answer keep their names either way.
 
@@ -114,7 +114,7 @@ With `run_setup`, Copier runs, in the new repository:
 | `uv run --quiet kb index` | on `copy` and `update` |
 
 They need `--trust` on the command line. Without them the bundle has no
-`index.md` files; `just setup` generates them later.
+`index.md` files; `uv run poe setup` generates them later.
 
 ## Non-interactive use
 

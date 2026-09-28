@@ -14,9 +14,9 @@ visible instead of silently filling them with your own knowledge.
    folder. Descriptions there are one sentence each, so scanning is cheap.
 
 2. **Narrow.** Use whichever of these fit the question:
-   - frontmatter filters: `just find --type <Type> --tag <tag> --folder <folder>`;
+   - frontmatter filters: `uv run poe find --type <Type> --tag <tag> --folder <folder>`;
    - keyword search: `rg -il "<term>" {{ bundle_dir }}`;
-   - semantic search: `just search "<question>"`. It uses qmd when installed
+   - semantic search: `uv run poe search "<question>"`. It uses qmd when installed
      and falls back to ripgrep.
 
 3. **Read and follow.**
@@ -47,5 +47,5 @@ visible instead of silently filling them with your own knowledge.
      `Comparison`). Its `sources` are the knowledge-base pages used, with
      `resource: /path.md`. Link it from the pages it draws on where that helps
      navigation.
-   - **Then:** run `just fix` and `just check`, then log it:
+   - **Then:** run `uv run poe fix` and `uv run poe check`, then log it:
      `uv run kb log Query "[<Title>](/syntheses/<slug>.md) - <question in brief>"`.

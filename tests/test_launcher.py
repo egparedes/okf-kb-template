@@ -79,4 +79,4 @@ def test_config_errors_and_guard(kbs: dict[str, Path], tmp_path: Path) -> None:
     assert "needs a path" in launch(["--kb=", "find"], tmp_path, tmp_path).stderr
     assert "neither a knowledge base" in launch(["find"], tmp_path, tmp_path, KB_DIR="/nonexistent").stderr
     guarded = launch(["find"], kbs["one"], tmp_path, OKF_KB_LAUNCHER="1")
-    assert guarded.returncode != 0 and "just setup" in guarded.stderr
+    assert guarded.returncode != 0 and "uv run poe setup" in guarded.stderr

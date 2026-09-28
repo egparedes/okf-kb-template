@@ -113,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     if os.environ.get(GUARD):
         raise SystemExit(
             "kb: the knowledge base's environment has no `kb` command, so the global launcher was found "
-            "instead; run `just setup` (or `uv sync`) in the knowledge base"
+            "instead; run `uv run poe setup` (or `uv sync`) in the knowledge base"
         )
     if args[:1] in (["--help-launcher"], []):
         print(USAGE.format(config=config_path()))

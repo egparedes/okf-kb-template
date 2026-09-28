@@ -12,8 +12,8 @@ agent decide what to change.
 ## 1. Measure
 
 ```sh
-just check     # errors and warnings
-just health    # report, link graph, duplicate candidates, unlinked mentions
+uv run poe check     # errors and warnings
+uv run poe health    # report, link graph, duplicate candidates, unlinked mentions
 ```
 
 Keep the output: at the end you compare against it.
@@ -27,7 +27,7 @@ gives the fix for each code.
 
 ## 3. Work through the report
 
-`just report` (the first part of `just health`) lists:
+`uv run poe report` (the first part of `uv run poe health`) lists:
 
 | Section | What to do |
 |---|---|
@@ -118,10 +118,10 @@ uv run kb graph --json          # for scripts
 ## 8. Close
 
 ```sh
-just fix
-just check
+uv run poe fix
+uv run poe check
 uv run kb log Lint "Merged the LLM pages into [Large language models](/ai/large-language-models.md); linked 12 mentions."
-just report
+uv run poe report
 ```
 
 Compare the report with the one from step 1, then commit.

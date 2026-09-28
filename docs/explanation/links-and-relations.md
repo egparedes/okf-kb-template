@@ -33,7 +33,7 @@ relative to the linking file. And when you rename a note, Obsidian rewrites
 links in its own format. Three things close the gap:
 
 - the **Better Markdown Links** plugin writes the `/` form;
-- **`kb fix-links`** (run by `just fix` and by the pre-commit hook) rewrites
+- **`kb fix-links`** (run by `uv run poe fix` and by the pre-commit hook) rewrites
   any internal link to the `/` form. It tries the target relative to the
   linking file first, then relative to the bundle root, and leaves links it
   cannot resolve alone;

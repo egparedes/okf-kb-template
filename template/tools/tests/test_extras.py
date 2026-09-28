@@ -503,3 +503,19 @@ def test_cli_karakeep_save_and_env_actor(repo: Path, server, monkeypatch, capsys
     assert "saved: bm9" in capsys.readouterr().out
     assert main(["new", "Concept", "systems/env-actor.md", "--title", "Env actor", "--description", "Uses .env."]) == 0
     assert "by: human:from-env" in (repo / "kb" / "systems" / "env-actor.md").read_text()
+
+
+def test_text_search_and_qmd_collection_name(repo: Path, monkeypatch) -> None:
+    from kbtools import search
+
+    write(repo, "systems/dns.md", "DNS", body="DNS resolves names. DNS caches answers. dns")
+    write(repo, "systems/tcp.md", "TCP", body="TCP carries DNS sometimes.")
+    b = bundle(repo)
+    assert search.text_search(b, "dns names") == [("kb/systems/dns.md", 6), ("kb/systems/tcp.md", 1)]
+    assert search.text_search(b, "tcp")[0][0] == "kb/systems/tcp.md"
+    monkeypatch.delenv("KB_QMD_COLLECTION", raising=False)
+    assert search.qmd_collection(b) == "kb"  # no pyproject.toml in the fixture
+    (repo / "pyproject.toml").write_text('[project]\nname = "notes-tools"\n')
+    assert search.qmd_collection(b) == "notes"
+    monkeypatch.setenv("KB_QMD_COLLECTION", "custom")
+    assert search.qmd_collection(b) == "custom"

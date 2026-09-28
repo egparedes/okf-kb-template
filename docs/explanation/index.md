@@ -6,7 +6,7 @@ want to adapt the template, or when a rule seems arbitrary.
 
 | Page | Question it answers |
 |---|---|
-| [Design overview](design-overview.md) | Why an LLM wiki, why OKF, why the vault is the bundle, why generated indexes and a log, why a Copier template. |
+| [Design overview](design-overview.md) | Why an LLM wiki, why OKF, why the vault is the bundle, why generated indexes and a log, why a Copier template, why tasks on top of `kb`. |
 | [Links and relations](links-and-relations.md) | Why bundle-absolute markdown links, and why every typed relation also needs a link in the prose. |
 | [Provenance and trust](provenance-and-trust.md) | How a page records who wrote it, what it rests on, whether a human checked it, and when it expires. |
 | [External resources](external-resources.md) | Why PDFs and web archives stay outside the repository, and how deny rules keep private material out. |

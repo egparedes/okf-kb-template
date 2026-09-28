@@ -78,8 +78,8 @@ After a few ingests, ask:
 
 > Lint the knowledge base.
 
-The agent follows `kb-maintain`. It first runs `just check` and
-`just health`, which print:
+The agent follows `kb-maintain`. It first runs `uv run poe check` and
+`uv run poe health`, which print:
 
 - the report: pages by type, trust tiers, stale pages, uncited pages,
   unused sources, wanted pages and drafts;
@@ -108,7 +108,7 @@ The agent adds your review to the frontmatter:
 verified: { by: human:alice, at: 2026-09-27T15:00:00Z }
 ```
 
-The page is now *human-reviewed*. `just report` counts pages per trust tier,
+The page is now *human-reviewed*. `uv run poe report` counts pages per trust tier,
 and in Obsidian the `_views/review-queue.base` dashboard lists what is
 left to review. The agent never marks its own work as verified. See
 [Provenance and trust](../explanation/provenance-and-trust.md).
@@ -116,7 +116,7 @@ left to review. The agent never marks its own work as verified. See
 ## 6. Commit
 
 ```sh
-just check
+uv run poe check
 git add -A
 git commit -m "Ingest the OKF specification; first lint"
 ```

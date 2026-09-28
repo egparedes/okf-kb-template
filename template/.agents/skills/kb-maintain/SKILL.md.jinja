@@ -10,7 +10,7 @@ duplicates, weak pages and missing connections.
 
 ## Steps
 
-1. **Measure.** Run `just check` and `just health` (the report, link graph,
+1. **Measure.** Run `uv run poe check` and `uv run poe health` (the report, link graph,
    duplicate candidates and unlinked mentions). Keep the output as the
    baseline.
 
@@ -63,12 +63,12 @@ duplicates, weak pages and missing connections.
      pages with `uv run kb mv`.
    - Keep the tree at most 3 levels deep.
 
-6. **External links.** When lychee is installed, run `just links-online`.
+6. **External links.** When lychee is installed, run `uv run poe links-online`.
    For dead source URLs, add an `archived` snapshot URL, or record it in the
    Source page.
 
 7. **Close.**
-   - Run `just fix`, then `just check`, until it reports 0 errors.
+   - Run `uv run poe fix`, then `uv run poe check`, until it reports 0 errors.
    - Log it: `uv run kb log Lint "<what changed, with /links to key pages>"`.
    - Report the baseline against the final `kb report` numbers, plus any
      decisions that need the human.

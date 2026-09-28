@@ -11,8 +11,7 @@ bundle with a few real pages in it.
 | Tool | What it does here | Install |
 |---|---|---|
 | [git](https://git-scm.com) | Version history of the knowledge base | Your system's package manager |
-| [uv](https://docs.astral.sh/uv/) | Runs the Python tooling and Copier; manages the `.venv` | [Installer](https://docs.astral.sh/uv/getting-started/installation/) (see below) |
-| [just](https://just.systems) | Runs the short commands (`just setup`, `just check`) | `uv tool install rust-just`, or your package manager |
+| [uv](https://docs.astral.sh/uv/) | Runs the Python tooling, its short commands (`uv run poe setup`, `uv run poe check`) and Copier; manages the `.venv` | [Installer](https://docs.astral.sh/uv/getting-started/installation/) (see below) |
 | [Copier](https://copier.readthedocs.io) | Generates the repository from the template | Nothing to install: `uvx copier` runs it |
 | [Obsidian](https://obsidian.md) 1.13.7 or later | Reading and writing by hand (optional) | From obsidian.md |
 | A command-line agent | Writes the pages | [Claude Code](https://github.com/anthropics/claude-code), [Codex](https://github.com/openai/codex) or [Gemini CLI](https://github.com/google-gemini/gemini-cli) |
@@ -28,7 +27,6 @@ Check the tools:
 ```sh
 git --version
 uv --version
-just --version
 uvx copier --version
 ```
 
@@ -87,7 +85,7 @@ path below that starts with `my-kb/` is relative to the repository root. If
 you choose another name, such as `notes`, read `notes/` wherever the
 tutorial says `my-kb/`. The name cannot be one of your domains, such as
 `ai`. You can rename the folder later with
-[`just rename-bundle`](../how-to/rename-the-knowledge-base-folder.md).
+[`uv run poe rename-bundle`](../how-to/rename-the-knowledge-base-folder.md).
 
 The [Copier questions reference](../reference/copier-questions.md)
 describes every question.
@@ -108,27 +106,31 @@ wrote my-kb/entities/index.md
 
 ```sh
 cd my-kb
-just setup
+uv run poe setup
 ```
 
-`just setup` initializes git, installs the Python tooling into `.venv`,
-installs the pre-commit hook and regenerates the indexes:
+`uv run` keeps the Python tooling in `.venv` in sync with `pyproject.toml`,
+including [poethepoet](https://poethepoet.natn.io), which runs the task
+`setup`. The task runs `kb setup`, which initializes git, installs the
+pre-commit hook and regenerates any out-of-date index:
 
 ```text
-git rev-parse --git-dir >/dev/null 2>&1 || git init -q
-uv sync
-uv run pre-commit install
+Poe => kb setup
+initialized a git repository
 pre-commit installed at .git/hooks/pre-commit
-uv run --quiet kb index
 ```
+
+`uv run poe` alone lists every task; the
+[tasks reference](../reference/tasks.md) describes them.
 
 Check the empty bundle:
 
 ```sh
-just check
+uv run poe check
 ```
 
 ```text
+Poe => kb check
 kb check: 0 error(s), 0 warning(s) in 12 file(s)
 ```
 
@@ -141,7 +143,7 @@ Look at `my-kb/index.md`. It lists your domains, then the Library folders
 Skip this step if you answered *No* to the Obsidian question.
 
 ```sh
-just obsidian-setup
+uv run poe obsidian-setup
 ```
 
 The command downloads the two required community plugins, Templater and
@@ -149,6 +151,7 @@ Better Markdown Links, into `my-kb/.obsidian/plugins/`, and checks their SHA-256
 checksums:
 
 ```text
+Poe => kb obsidian setup
 templater-obsidian: installed 2.25.1 (Templater, AGPL-3.0)
 better-markdown-links: installed 5.1.0 (Better Markdown Links, MIT)
 
@@ -161,7 +164,7 @@ Open my-kb/ as the vault (Open folder as vault), not the repository root.
 In Obsidian, choose *Open folder as vault* and select the knowledge-base
 folder, `my-kb/my-kb/` (the `my-kb/` folder inside the repository). The
 vault appears as "my-kb" in Obsidian's vault switcher.
-Later, `just obsidian-setup --open` reopens the vault from the terminal.
+Later, `uv run poe obsidian-setup --open` reopens the vault from the terminal.
 Then do the two steps:
 
 1. Obsidian asks **"Do you trust the author of this vault?"**. Choose
@@ -196,8 +199,8 @@ The agent follows the `kb-ingest` skill. Expect it to:
    summary and key points;
 4. create or update the pages the source covers, for example a Concept page
    in `my-kb/ai/`, citing the source with footnotes such as `[^karpathy-llm-wiki]`;
-5. run `just fix` and `just check`, and add a line to `my-kb/log.md` with
-   `uv run kb log Ingest …`;
+5. run `uv run poe fix` and `uv run poe check`, and add a line to
+   `my-kb/log.md` with `uv run kb log Ingest …`;
 6. report the key takeaways and the pages it created or updated.
 
 With Claude Code, hooks check each file as it is written, and the session
@@ -230,7 +233,7 @@ In the same session, ask:
 > retrieval-augmented generation?
 
 The agent follows the `kb-query` skill: it reads `my-kb/index.md` and the
-folder indexes, narrows with `just find` and `rg`, reads the pages, and
+folder indexes, narrows with `uv run poe find` and `rg`, reads the pages, and
 answers with links to them and to their sources. It marks anything it adds
 from its own knowledge. If the answer draws on three or more pages, it files
 it back as a Synthesis page in `my-kb/syntheses/`.
@@ -240,10 +243,11 @@ it back as a Synthesis page in `my-kb/syntheses/`.
 Leave the agent and run the full check:
 
 ```sh
-just check
+uv run poe check
 ```
 
 ```text
+Poe => kb check
 my-kb/ai/llm-wiki.md:21: W030 broken link `/ai/retrieval-augmented-generation.md` (not-yet-written page?)
 …
 kb check: 0 error(s), 2 warning(s) in 16 file(s)

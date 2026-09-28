@@ -16,31 +16,36 @@ and CI keep the bundle valid at every commit.
 
 ## Quick start
 
-Requirements: git, [uv](https://docs.astral.sh/uv/) and
-[just](https://just.systems); optionally Obsidian 1.13.7 or later.
+Requirements: git and [uv](https://docs.astral.sh/uv/); optionally
+Obsidian 1.13.7 or later.
 
 ```sh
 uvx copier copy --trust gh:egparedes/okf-kb-template my-kb
 cd my-kb
-just setup
-just obsidian-setup           # then open my-kb/ with Open folder as vault
-claude    # or codex, or gemini
+uv run poe setup              # git init, pre-commit hook, indexes; uv installs the tooling
+uv run poe obsidian-setup     # then open my-kb/ with Open folder as vault
+claude                        # or codex, or gemini
 ```
 
 Then ask the agent to ingest a URL. The
 [first tutorial](https://egparedes.github.io/okf-kb-template/tutorials/first-knowledge-base/)
-explains each step. To pull later template changes into a knowledge base,
-run `uvx copier update --trust` in it.
+explains each step, and `uv run poe` lists the other
+[tasks](https://egparedes.github.io/okf-kb-template/reference/tasks/). To
+pull later template changes into a knowledge base, run
+`uvx copier update --trust` in it.
 
 ## Develop
 
 ```sh
 uv sync
-just test      # renders several configurations and runs each result's checks
-just render    # renders defaults into /tmp/okf-kb-preview
-just docs-serve   # preview the documentation site on http://localhost:8000
-just docs         # build it into site/
+uv run poe test                # renders several configurations and runs each result's checks
+uv run poe render [DEST]       # renders the working tree with defaults into DEST (default /tmp/okf-kb-preview)
+uv run poe docs-serve          # preview the documentation site on http://localhost:8000
+uv run poe docs                # build it into site/ (strict)
 ```
+
+`uv run poe` lists these tasks; they are defined in `[tool.poe.tasks]` of
+`pyproject.toml`.
 
 Tag releases (`v0.1.0`, …) and push the tags with the commits
 (`git push origin main --tags`). Generated knowledge bases record the tag

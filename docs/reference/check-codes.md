@@ -25,8 +25,8 @@ run.
 |---|---|---|
 | O001 | The page has no YAML frontmatter, the block is not closed with `---`, the YAML does not parse, or it is not a mapping. | Add or repair the frontmatter. Files that are not pages belong outside the knowledge-base folder or in `.cache/`. |
 | O002 | The frontmatter has no non-empty `type`. | Add a `type` from `schema/vocabulary.yaml`. |
-| O003 | An `index.md` other than the root one has frontmatter, or the root `index.md` has keys other than `okf_version`. | Run `just index`; never edit indexes by hand. |
-| O004 | An `index.md` line is neither a heading nor a `* [Title](url) - description` entry. | Run `just index`. |
+| O003 | An `index.md` other than the root one has frontmatter, or the root `index.md` has keys other than `okf_version`. | Run `uv run poe index`; never edit indexes by hand. |
+| O004 | An `index.md` line is neither a heading nor a `* [Title](url) - description` entry. | Run `uv run poe index`. |
 | O005 | `log.md` has frontmatter, a section heading that is not `## YYYY-MM-DD`, or dates that are not unique and newest first. | Repair the headings; add entries only with `uv run kb log`. |
 
 ## House-rule errors
@@ -43,7 +43,7 @@ run.
 | H030 | A link escapes the bundle (e.g. `../../README.md`). | Link inside the knowledge-base folder, or use an external URL. |
 | H031 | A relation target is not linked from the body. | Link it in a sentence that explains the relation. |
 | H032 | A wikilink or embed (`[[…]]`, `![[…]]`) outside code. | Write `[text](/path.md)`, or `![alt](/path.png)` for images. |
-| H040 | An `index.md` is missing or out of date. | Run `just index` (or `just fix`). |
+| H040 | An `index.md` is missing or out of date. | Run `uv run poe index` (or `uv run poe fix`). |
 | H060 | A locator points at material that a deny pattern covers. | Remove the locator. |
 | H061 | `schema/resources.yaml` has the wrong shape: `roots` not a mapping, `deny` not a list of strings, or `zotero` not a mapping. | Correct the file. |
 
@@ -55,12 +55,12 @@ run.
 | W020 | A source in `sources` is never cited in the body. | Cite it with `[^id]` where it supports a claim, or remove it. |
 | W021 | A source's bundle `resource` (e.g. `/sources/x.md`) does not exist. | Create the Source page, or fix the path. |
 | W030 | A link to a page that does not exist. | Nothing, if it marks a wanted page. Fix it if it is a typo. |
-| W031 | An internal link is not bundle-absolute. | Run `just fix`. It rewrites links whose target exists; fix the others by hand. |
+| W031 | An internal link is not bundle-absolute. | Run `uv run poe fix`. It rewrites links whose target exists; fix the others by hand. |
 | W032 | A relation target does not exist. | Create the page, or fix the target. |
 | W033 | A reference-style link definition (`[x]: path`). The tooling only follows inline links. | Rewrite it as an inline link `[text](/path.md)`. |
 | W040 | The page is past its `stale_after` date. | Re-check it against its sources, update it, refresh `generated`, and move `stale_after` forward. |
 | W041 | A `generated.at` or `verified.at` is in the future. | Correct the timestamp (UTC). |
-| W050 | A folder has no entry in `schema/taxonomy.yaml`. | Add the folder with a title and description, then run `just index`. |
+| W050 | A folder has no entry in `schema/taxonomy.yaml`. | Add the folder with a title and description, then run `uv run poe index`. |
 | W060 | A locator uses a root not declared in `schema/resources.yaml`. | Declare the root under `roots`, or fix the locator. |
 
 ## Exit status

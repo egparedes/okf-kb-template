@@ -18,7 +18,7 @@ configured to read `AGENTS.md`; see their documentation on context files.
 `AGENTS.md` is short and stable: rules that apply to every edit. The skills
 hold the procedures, and are loaded only when a workflow applies, which
 keeps the agent's context small. Each skill ends with a definition of done
-that can be checked (`just check` reports 0 errors, a log entry exists) and
+that can be checked (`uv run poe check` reports 0 errors, a log entry exists) and
 with a report to you.
 
 Both are template-managed. When the workflows improve upstream,
@@ -35,8 +35,8 @@ mechanically, at three points:
 | Where | When | What runs | Who it covers |
 |---|---|---|---|
 | Claude Code hooks | during the session | `kb check` on each edited file; a final check before the agent stops | Claude Code sessions |
-| pre-commit | on `git commit` | `kb fix-links`, `kb index`, `kb check` | everyone who commits from a machine where `just setup` ran |
-| CI | on push | `just ci`, including an independent OKF validator | everything that reaches GitHub |
+| pre-commit | on `git commit` | `kb fix-links`, `kb index`, `kb check` | everyone who commits from a machine where `uv run poe setup` ran |
+| CI | on push | `uv run poe ci`, including an independent OKF validator | everything that reaches GitHub |
 
 Agents without hooks are covered by the pre-commit hook and CI. The earlier
 a problem is caught, the cheaper it is to fix, which is why the hooks exist

@@ -178,7 +178,7 @@ class Checker:
             if not self.bundle.exists(target):
                 self.report(doc, line, "W030", f"broken link `{link.target}` (not-yet-written page?)")
             if not link.target.startswith("/"):
-                self.report(doc, line, "W031", f"link `{link.target}` should be bundle-absolute (`/{target}`); run `just fix`")
+                self.report(doc, line, "W031", f"link `{link.target}` should be bundle-absolute (`/{target}`); run `uv run poe fix`")
 
     def check_wikilinks(self, doc: Document) -> None:
         masked = mask_code(doc.body)
@@ -293,7 +293,7 @@ class Checker:
     def check_indexes(self) -> None:
         for path in indexgen.stale(self.bundle):
             rel = PurePosixPath(path.relative_to(self.bundle.root).as_posix())
-            self.report(str(rel), 1, "H040", "index.md is missing or out of date; run `just index`")
+            self.report(str(rel), 1, "H040", "index.md is missing or out of date; run `uv run poe index`")
 
 
 def exit_code(diagnostics: list[Diagnostic], strict: bool) -> int:

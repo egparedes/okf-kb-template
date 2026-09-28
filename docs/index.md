@@ -47,15 +47,15 @@ the repository.
 
 ## Quick start
 
-You need [git](https://git-scm.com), [uv](https://docs.astral.sh/uv/) and
-[just](https://just.systems). Obsidian 1.13.7 or later is optional.
+You need [git](https://git-scm.com) and [uv](https://docs.astral.sh/uv/).
+Obsidian 1.13.7 or later is optional.
 
 ```sh
 uvx copier copy --trust gh:egparedes/okf-kb-template my-kb
 cd my-kb
-just setup
-just obsidian-setup           # then open my-kb/ with Open folder as vault
-claude    # or codex, or gemini
+uv run poe setup              # git init, pre-commit hook, indexes; uv installs the tooling
+uv run poe obsidian-setup     # then open my-kb/ with Open folder as vault
+claude                        # or codex, or gemini
 ```
 
 Then ask the agent: *"Ingest https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f"*.

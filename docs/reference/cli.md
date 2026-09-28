@@ -1,11 +1,15 @@
 # kb command line
 
 The `kb` command is the tooling of a knowledge base, installed in its
-`.venv` by `just setup`. Run it from anywhere inside the repository:
+`.venv` by uv on the first `uv run`. Run it from anywhere inside the
+repository:
 
 ```sh
 uv run kb <command> [options]
 ```
+
+The [tasks](tasks.md) (`uv run poe …`) are short names for the commands
+used most.
 
 With the [global launcher](#the-global-launcher) installed, `kb <command>`
 works inside any knowledge base, and elsewhere with `-C`, `$KB_DIR` or a
@@ -41,8 +45,8 @@ inside the bundle: if the path, or its parent folder, exists inside the
 knowledge-base folder, it is read as a bundle path. So when the bundle
 holds a folder with the same name as itself, such as a domain `my-kb/` in
 the knowledge-base folder `my-kb/`, `my-kb/page.md` means the page in that
-domain. Copier and `just rename-bundle` refuse such names, but a domain
-added later can still create one.
+domain. Copier and [`kb rename-bundle`](#kb-rename-bundle) refuse such
+names, but a domain added later can still create one.
 
 Messages show pages as the repository sees them, `<folder>/<path>`, for
 example `my-kb/ai/llm.md:12: W030 …` or `wrote my-kb/index.md`. With
@@ -69,6 +73,7 @@ set in the environment take precedence.
 | [`log`](#kb-log) | Add an entry to the bundle's `log.md` |
 | [`find`](#kb-find) | List pages by frontmatter |
 | [`folders`](#kb-folders) | Print the indexed folders and their descriptions |
+| [`search`](#kb-search) | Search the pages: qmd when set up, otherwise text search |
 | [`report`](#kb-report) | Health report |
 | [`graph`](#kb-graph) | Link-graph analytics |
 | [`dupes`](#kb-dupes) | Near-duplicate candidates |
@@ -79,6 +84,8 @@ set in the environment take precedence.
 | [`open`](#kb-open) | Open an external resource |
 | [`import`](#kb-import) | Convert an Obsidian vault or Logseq graph |
 | [`obsidian setup`](#kb-obsidian-setup) | Install the pinned Obsidian plugins and open the vault |
+| [`setup`](#kb-setup) | First-time setup of a clone |
+| [`rename-bundle`](#kb-rename-bundle) | Rename the knowledge-base folder |
 | [`hook`](#kb-hook) | Claude Code hook entry points |
 
 ### `kb check`
@@ -229,11 +236,47 @@ uv run kb find [--type TYPE] [--tag TAG]… [--status STATUS] [--folder FOLDER] 
 ### `kb folders`
 
 Print `folder<TAB>title: description` for every folder that gets an index.
-`just search-setup` uses it to create qmd contexts.
+[`kb search --setup`](#kb-search) creates a qmd context for each of them.
 
 ```sh
 uv run kb folders
 ```
+
+### `kb search`
+
+*New in v0.6.0.* Search the pages of the knowledge base, and set up or
+refresh its [qmd](https://github.com/tobi/qmd) index. See
+[Enable search](../how-to/enable-search.md).
+
+```sh
+uv run kb search QUERY…
+uv run kb search --setup
+uv run kb search --reindex
+```
+
+| Argument or option | Meaning |
+|---|---|
+| `QUERY` | Words to search for, joined with spaces. Required unless `--setup` or `--reindex` is given. |
+| `--setup` | One-time qmd setup: create the collection over `<folder>/**/*.md`, add a context for the knowledge base and one per indexed folder (the title and description from `schema/taxonomy.yaml`, as [`kb folders`](#kb-folders) prints them), then compute the embeddings (`qmd embed`). |
+| `--reindex` | Refresh the qmd index after changes: `qmd update`, then `qmd embed`. |
+
+The qmd collection is named after the knowledge base: `$KB_QMD_COLLECTION`
+when set, otherwise `kb_name` (read from the project name `<kb_name>-tools`
+in `pyproject.toml`), or `kb` if that cannot be read.
+
+With a query, `kb search`:
+
+- runs `qmd query QUERY -c <collection>` when qmd is on the `PATH` and the
+  collection exists, and exits with qmd's status;
+- otherwise runs a built-in text search: it keeps the words of the query
+  that have 3 characters or more (letters, digits, `_` and `-`), counts
+  their case-insensitive matches in each page, skips `index.md` files, and
+  prints the 20 pages with the most matches as `<folder>/path:count`. When
+  no word is long enough, it searches for the whole query. No output means
+  no match; the exit status is 0 either way.
+
+`--setup` and `--reindex` stop with "qmd is not installed" when `qmd` is
+not on the `PATH`.
 
 ### `kb report`
 
@@ -399,6 +442,89 @@ SHA-256 checksums are verified. Listed IDs without a pin are reported. The
 command ends by printing the two manual steps, trusting the vault and
 turning on Templater's trigger on new file creation, and the folder to open
 as the vault.
+
+### `kb setup`
+
+*New in v0.6.0.* First-time setup of a clone, run by `uv run poe setup`.
+`uv run` has already created `.venv` and installed the tooling. It:
+
+1. runs `git init` if the repository root is not inside a git repository;
+2. installs the pre-commit hook (`pre-commit install`);
+3. regenerates every `index.md`, printing each file it writes.
+
+```sh
+uv run kb setup
+```
+
+Safe to run again.
+
+### `kb rename-bundle`
+
+*New in v0.6.0; the `just rename-bundle` recipe of v0.5.0, with the same
+behaviour.* Rename the knowledge-base folder from `<folder>` to `NEW`: move
+it, re-render the template-managed files that name it, and stage the
+result. Close Obsidian first. The task-oriented guide is
+[Rename the knowledge-base folder](../how-to/rename-the-knowledge-base-folder.md).
+
+```sh
+uv run kb rename-bundle NEW
+```
+
+| Argument | Meaning |
+|---|---|
+| `NEW` | New folder name, lowercase kebab-case. |
+
+It refuses to run, and changes nothing, when:
+
+- `NEW` is not lowercase kebab-case;
+- `NEW` is `schema`, `tools`, `docs`, `imports`, `template`, `launcher` or
+  `site` (folders of the repository), or `sources`, `syntheses`,
+  `entities`, `projects` or `journal` (standard folders inside the
+  knowledge base);
+- `<folder>/` does not exist, or `NEW` already exists;
+- `<folder>/NEW` exists, for example a domain folder of that name;
+- `_commit` in `.copier-answers.yml` is empty, so the template version to
+  re-render is unknown;
+- tracked files outside `<folder>/`, or in `<folder>/_templates/`, have
+  uncommitted changes: the re-render may overwrite them. It lists them.
+  Changes to pages and vault settings, and untracked files, are fine: they
+  move with the folder.
+
+If `NEW` is already the name, it says so and exits 0. Otherwise it:
+
+1. moves `<folder>/` to `NEW/` with `git mv` when the folder has tracked
+   files (with a plain move otherwise). `git mv` stages the renames and
+   keeps the history. Untracked notes and the installed plugins move along
+   but stay untracked, and modified pages stay unstaged;
+2. runs `uvx copier recopy --trust --defaults --overwrite --skip-tasks
+   --vcs-ref=<_commit> --data bundle_dir=NEW`, which re-renders the
+   template-managed files at the template version recorded in
+   `.copier-answers.yml` and records the new answer. This needs access to
+   the template repository. Copier validates `NEW` as it validates the
+   [`bundle_dir` question](copier-questions.md#bundle_dir), so it also
+   refuses the slug of a domain in the recorded `domains` answer. If the
+   recopy fails, it moves the folder back, restores the managed files and
+   `<folder>/_templates/` to `HEAD`, reports that everything was put back
+   as it was, and exits 1;
+3. compares each re-rendered managed file with `HEAD`, ignoring the folder
+   name. Files that differ in more than the name had committed local edits
+   that the re-render reverted, for example a hand-edited `KB_ACTOR` in
+   `.claude/settings.json`; it lists them in a `WARNING`;
+4. stages the changes to tracked files outside the folder and in
+   `NEW/_templates/` (`git add -u`). It never stages untracked files;
+5. replaces the folder name in `.cache/kb-touched.txt`, the Stop hook's list
+   of pages the current agent session changed;
+6. regenerates the indexes (the next `uv run` syncs the tooling with the
+   re-rendered `pyproject.toml`), and prints what it staged, the `WARNING`
+   if any, the next steps (review `git diff --cached`, commit), what to fix
+   by hand (mentions of the old folder in `README.md` and in the comments
+   of `schema/*.yaml`), and the Obsidian and qmd steps.
+
+If a step after the re-render fails, it stops with a message that asks you
+to run `uv run kb index`, then review `git diff --cached`.
+
+It does not commit, and does not touch files owned by the knowledge base,
+such as `README.md`.
 
 ### `kb hook`
 

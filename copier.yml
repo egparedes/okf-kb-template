@@ -18,6 +18,7 @@ _skip_if_exists:
   - schema/vocabulary.yaml
   - schema/taxonomy.yaml
   - tools/retrieval-eval/questions.yaml
+  - tasks.toml
   - schema/resources.yaml
   - "{{ bundle_dir }}/log.md"
   - "{{ bundle_dir }}/.obsidian/*.json"

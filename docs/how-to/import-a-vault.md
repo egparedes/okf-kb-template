@@ -99,7 +99,7 @@ done.
 ## 6. Finish
 
 1. Register the new folders in `schema/taxonomy.yaml` (otherwise `kb check`
-   warns W050), then run `just fix` and `just check`, and fix what it
+   warns W050), then run `uv run poe fix` and `uv run poe check`, and fix what it
    reports.
 2. Look for overlaps with existing pages:
 

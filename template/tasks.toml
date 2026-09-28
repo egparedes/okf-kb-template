@@ -1,0 +1,8 @@
+# This knowledge base's own tasks (poethepoet), next to the template's tasks in
+# pyproject.toml. The template creates this file once and never overwrites it.
+# Example:
+#   [tool.poe.tasks.new-note]
+#   help = "Create a Concept page"
+#   cmd = "kb new Concept"
+
+[tool.poe.tasks]
